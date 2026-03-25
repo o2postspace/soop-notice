@@ -52,7 +52,7 @@ module.exports = async function handler(req, res) {
       start: row.broadcast_start,
       end: row.broadcast_end,
       title_no: row.title_no,
-      raw_text: row.raw_text,
+      description: row.description || row.raw_text,
     });
   }
 

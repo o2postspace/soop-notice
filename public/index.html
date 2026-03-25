@@ -569,17 +569,46 @@
     background: #fafafa;
     min-width: 80px;
   }
+  .cal-sub-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .cal-sub-btn {
+    padding: 5px 16px;
+    border-radius: 14px;
+    border: 1px solid #a29bfe;
+    background: transparent;
+    color: #a29bfe;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .cal-sub-btn:hover { background: #f5f3ff; }
+  .cal-sub-btn.active { background: #a29bfe; color: #fff; }
+
   .cal-slot {
     background: #eef0ff;
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 8px;
     margin: 2px 0;
     font-size: 11px;
     color: #444;
     cursor: default;
+    line-height: 1.4;
   }
-  .cal-slot .time { font-weight: 600; color: #5B6AED; }
+  .cal-slot .bj { font-weight: 700; color: #5B6AED; font-size: 12px; }
+  .cal-slot .desc { color: #666; font-size: 11px; margin-top: 2px; }
   .cal-empty { color: #ddd; text-align: center; font-size: 11px; }
+  .cal-time-cell {
+    font-weight: 700;
+    color: #5B6AED;
+    font-size: 13px;
+    text-align: center;
+    white-space: nowrap;
+    background: #fafafa;
+  }
 
   @media (max-width: 700px) {
     .calendar-grid td, .calendar-grid th { padding: 4px; font-size: 11px; min-width: 60px; }
@@ -609,7 +638,7 @@
 
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
-  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">인기</button>
+  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
 </div>
 
 <div class="filter-bar" id="filterBar">
@@ -631,6 +660,9 @@
 </div>
 
 <div id="calendarContainer" style="display:none;">
+  <div class="cal-sub-tabs">
+    <button class="cal-sub-btn active" onclick="switchCalTab('popular')">인기</button>
+  </div>
   <div class="calendar-nav">
     <button onclick="changeWeek(-1)">&#9664; 이전 주</button>
     <span id="calWeekLabel"></span>
@@ -1250,10 +1282,56 @@ async function loadSchedules(offset) {
   }
 }
 
+// 캘린더 슬롯 클릭 → 공지 상세 모달
+async function openCalDetail(bjId, titleNo) {
+  const info = prevData[bjId];
+  let notice = info ? info.notices.find(n => String(n.title_no) === String(titleNo)) : null;
+
+  // 상세 모달 열기
+  const nameEl = document.getElementById('detailName');
+  const titleEl = document.getElementById('detailTitle');
+  const metaEl = document.getElementById('detailMeta');
+  const bodyEl = document.getElementById('detailBody');
+
+  if (notice) {
+    const tag = info.tag ? ' <span style="color:#999;font-size:12px">' + escapeHtml(info.tag) + '</span>' : '';
+    nameEl.innerHTML = escapeHtml(info.name) + tag;
+    titleEl.innerHTML = (notice.is_pin ? '<span class="pin">PIN</span>' : '') + escapeHtml(notice.title_name || '');
+    const reads = notice.count?.read_cnt?.toLocaleString() || '0';
+    metaEl.innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
+    bodyEl.innerHTML = notice.contentHtml || '<p style="color:#999">본문 로딩 중...</p>';
+  } else {
+    nameEl.innerHTML = bjId;
+    titleEl.innerHTML = '';
+    metaEl.innerHTML = '';
+    bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div> 로딩 중...</div>';
+  }
+
+  document.getElementById('detailBg').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  bodyEl.scrollTop = 0;
+
+  // 본문이 없으면 API에서 가져오기
+  if (!notice || !notice.contentHtml) {
+    try {
+      const resp = await fetch('/api/notice-content?title_no=' + titleNo);
+      const data = await resp.json();
+      bodyEl.innerHTML = data.content_html || '<p style="color:#999">본문 없음</p>';
+    } catch(e) {
+      bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
+    }
+  }
+}
+
+function switchCalTab(tab) {
+  document.querySelectorAll('.cal-sub-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadSchedules(calWeekOffset);
+}
+
 function renderCalendar(data) {
   document.getElementById('calWeekLabel').textContent = data.week_start + ' ~ ' + data.week_end;
 
-  // 오늘 날짜 (KST)
   const now = new Date();
   const todayStr = new Date(now.getTime() + 9*60*60*1000).toISOString().slice(0, 10);
 
@@ -1266,7 +1344,39 @@ function renderCalendar(data) {
     weekDates.push(d.toISOString().slice(0, 10));
   }
 
-  let html = '<table><thead><tr><th>BJ</th>';
+  // 모든 슬롯을 {day, hour, bjName, description} 형태로 변환
+  const allSlots = [];
+  for (const [bjId, info] of Object.entries(data.schedules)) {
+    for (const slot of info.slots) {
+      // schedules는 정상 UTC 저장 → KST로 변환 (+9시간)
+      const utc = new Date(slot.start);
+      const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+      const dateStr = t.getUTCFullYear() + '-' + String(t.getUTCMonth()+1).padStart(2,'0') + '-' + String(t.getUTCDate()).padStart(2,'0');
+      const dayIdx = weekDates.indexOf(dateStr);
+      if (dayIdx === -1) continue;
+      allSlots.push({
+        dayIdx,
+        hour: t.getUTCHours(),
+        minute: t.getUTCMinutes(),
+        bjId: bjId,
+        bjName: info.name,
+        titleNo: slot.title_no,
+        description: slot.description || '',
+      });
+    }
+  }
+
+  // 사용된 시간대 추출 + 정렬
+  const hoursSet = new Set(allSlots.map(s => s.hour));
+  const hours = [...hoursSet].sort((a, b) => a - b);
+
+  if (hours.length === 0) {
+    document.getElementById('calendarGrid').innerHTML = '<div class="empty-msg">이번 주 일정이 없습니다</div>';
+    return;
+  }
+
+  // 테이블 헤더
+  let html = '<table><thead><tr><th>시간</th>';
   for (let i = 0; i < 7; i++) {
     const isToday = weekDates[i] === todayStr;
     const mm = weekDates[i].slice(5, 7);
@@ -1275,25 +1385,17 @@ function renderCalendar(data) {
   }
   html += '</tr></thead><tbody>';
 
-  for (const [bjId, info] of Object.entries(data.schedules)) {
-    html += '<tr><td class="bj-name-cell">' + escapeHtml(info.name) + '</td>';
-    for (let i = 0; i < 7; i++) {
-      const dateStr = weekDates[i];
-      const daySlots = info.slots.filter(s => {
-        // DB에 UTC로 저장된 KST → parseKST로 날짜 추출
-        const parsed = parseKST(s.start);
-        const slotDate = parsed.getFullYear() + '-' + String(parsed.getMonth()+1).padStart(2,'0') + '-' + String(parsed.getDate()).padStart(2,'0');
-        return slotDate === dateStr;
-      });
-
-      if (daySlots.length === 0) {
+  // 시간대별 행
+  for (const h of hours) {
+    html += '<tr><td class="cal-time-cell">' + String(h).padStart(2,'0') + ':00</td>';
+    for (let d = 0; d < 7; d++) {
+      const cellSlots = allSlots.filter(s => s.hour === h && s.dayIdx === d);
+      if (cellSlots.length === 0) {
         html += '<td><div class="cal-empty">-</div></td>';
       } else {
         html += '<td>';
-        for (const slot of daySlots) {
-          const t = parseKST(slot.start);
-          const timeStr = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
-          html += '<div class="cal-slot"><span class="time">' + timeStr + '</span></div>';
+        for (const s of cellSlots) {
+          html += '<div class="cal-slot" onclick="openCalDetail(\'' + s.bjId + '\',' + s.titleNo + ')" style="cursor:pointer;"><div class="bj">' + escapeHtml(s.bjName) + '</div><div class="desc">' + escapeHtml(s.description) + '</div></div>';
         }
         html += '</td>';
       }

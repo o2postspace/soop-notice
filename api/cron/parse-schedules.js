@@ -1,7 +1,7 @@
 const { supabase } = require("../../lib/supabase");
 const { POPULAR_BJ_IDS, BJ_LIST } = require("../../lib/bj-list");
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 function stripHtml(html) {
   return (html || "")
@@ -15,31 +15,55 @@ function stripHtml(html) {
     .trim();
 }
 
-async function parseWithGemini(noticeText, today) {
+// HTML에서 이미지 URL 추출 (최대 3개)
+function extractImageUrls(html) {
+  const urls = [];
+  const regex = /(?:src|data-url)="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null && urls.length < 3) {
+    const url = match[1];
+    if (!url.includes('ogqmarket') && !url.includes('sticker')) urls.push(url);
+  }
+  return urls;
+}
+
+async function parseWithGemini(noticeText, today, imageUrls) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
 
-  const prompt = `SOOP BJ의 공지사항에서 방송 일정(날짜와 시간)을 추출해.
+  const prompt = `SOOP BJ의 공지사항에서 "방송 시작 시간"을 추출해. 공지를 올린 시간이 아니라 실제 방송 시작 시간이야.
+텍스트에 시간이 없으면 첨부된 이미지도 확인해.
 오늘: ${today}
 
 ${noticeText}
 
 규칙:
-- "오방공", "오늘 방송", "생방공지" → 공지 작성일
+- "오방공", "오늘 방송", "생방공지" → 공지 작성일 날짜
 - "내일" → 작성일 다음날
-- 시간 변환: "오후6시"→18:00, "5시"→17:00, "저녁9시"→21:00, "점심"→12:00, "새벽"→02:00
-- 시간 없으면 start_time: null
+- 시간은 반드시 본문/이미지에 명시된 방송 시작 시간만 추출 (공지 작성 시간 아님!)
+- 본문/이미지에 시간이 명시되지 않으면 start_time: null
+- BJ는 보통 오후~저녁에 방송함. "7시"→19:00, "5시"→17:00, "1시"→13:00, "2시"→14:00 (오전이 명시된 경우만 AM)
+- "오후6시"→18:00, "저녁9시"→21:00, "점심"→12:00, "새벽2시"→02:00, "오전11시"→11:00
+- description: 방송 내용 요약 (합방 상대, 컨텐츠명, 대회명 등 10~20자)
 - "쉽니다", "휴방", "오프" → 빈 배열 []
-- 방송 일정이 아닌 글(일상, 홍보, 결과) → 빈 배열 []
+- 방송 일정이 아닌 글(일상, 홍보, 경기결과, 모집) → 빈 배열 []
 
-JSON 배열로 응답: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null}]`;
+JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"요약"}]`;
+
+  // parts: 텍스트 + 이미지 URL
+  const parts = [{ text: prompt }];
+  for (const url of (imageUrls || [])) {
+    parts.push({
+      fileData: { mimeType: "image/jpeg", fileUri: url }
+    });
+  }
 
   try {
     const resp = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.1,
@@ -96,26 +120,17 @@ module.exports = async function handler(req, res) {
     if (!plainText || plainText.length < 5) continue;
 
     const noticeDate = notice.reg_date ? notice.reg_date.slice(0, 10) : today;
+    const imageUrls = extractImageUrls(notice.content_html);
     const schedules = await parseWithGemini(
       `[작성일: ${noticeDate}] [제목: ${notice.title_name}] ${plainText}`,
-      today
+      today,
+      imageUrls
     );
 
     // rate limit 방지: 1초 대기
     await new Promise(r => setTimeout(r, 1000));
 
-    if (schedules.length === 0) {
-      // 파싱 결과 없음도 기록 (재파싱 방지)
-      await supabase.from("schedules").upsert({
-        bj_id: notice.bj_id,
-        bj_name: notice.bj_name,
-        title_no: notice.title_no,
-        broadcast_start: notice.reg_date, // 공지 시간으로 대체
-        raw_text: "파싱결과없음",
-        parsed_at: new Date().toISOString(),
-      }, { onConflict: "title_no,broadcast_start" });
-      continue;
-    }
+    if (schedules.length === 0) continue;
 
     for (const s of schedules) {
       if (!s.date) continue;
@@ -129,6 +144,7 @@ module.exports = async function handler(req, res) {
         title_no: notice.title_no,
         broadcast_start: startStr,
         broadcast_end: endStr,
+        description: s.description || notice.title_name || "",
         raw_text: `${notice.title_name}: ${s.start_time}~${s.end_time || "?"}`,
         parsed_at: new Date().toISOString(),
       }, { onConflict: "title_no,broadcast_start" });
