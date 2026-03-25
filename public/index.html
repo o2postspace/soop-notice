@@ -991,11 +991,8 @@ function buildBjListAndTags(data) {
   ALL_TAGS = Array.from(tagSet).sort();
 }
 
-// 태그 필터 버튼을 동적으로 생성
-function renderTagFilters() {
-  const container = document.getElementById('tagFilters');
-  container.innerHTML = ALL_TAGS.map(t => '<button class="filter-btn tag" data-filter="tag:'+t+'" onclick="setFilter(\'tag:'+t+'\')">'+t+'</button>').join('\n  ');
-}
+// 태그 필터는 HTML에 하드코딩 (즉시 표시, 순서 고정)
+function renderTagFilters() {}
 
 let totalOnServer = 0;
 let isLoadingMore = false;
