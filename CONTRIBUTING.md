@@ -24,8 +24,9 @@ claude mcp add --scope project --transport http supabase "https://mcp.supabase.c
 
 ### 로컬 실행
 ```bash
-npx vercel dev --yes
+npm run dev
 ```
+Vercel 연동 없이 http://localhost:3000 에서 테스트 가능.
 
 ---
 
