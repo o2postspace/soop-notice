@@ -138,6 +138,9 @@
   .card.span2 {
     grid-column: span 2;
   }
+  .card.span2 .card-body img {
+    max-height: none;
+  }
 
   .card {
     background: #fff;
@@ -203,7 +206,7 @@
     display: flex; gap: 10px;
     margin-bottom: 8px;
   }
-  /* 공지 본문 영역 - 동적 max-height */
+  /* 공지 본문 영역 - 접힘 (화면 1/4 기준 동적) */
   .card-body {
     font-size: 13px;
     line-height: 1.7;
@@ -217,7 +220,6 @@
   .card-body.expanded {
     max-height: none;
   }
-  /* gradient fade removed */
   .card-body:not(.expanded)::after {
     display: none;
   }
@@ -254,7 +256,6 @@
     margin: 6px 0;
   }
 
-  /* Responsive: friend's breakpoints */
   @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } .card.span2 { grid-column: span 2; } }
   @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } .card.span2 { grid-column: span 1; } }
 
@@ -286,7 +287,6 @@
     transition: all 0.3s; z-index: 200;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
-  .toast.show { transform: translateY(0); opacity: 1; }
 
   /* 쇼츠 스타일 네비게이션 버튼 */
   .scroll-nav {
@@ -344,6 +344,7 @@
     border-radius: 10px;
     box-shadow: 0 1px 6px rgba(0,0,0,0.1);
   }
+  .toast.show { transform: translateY(0); opacity: 1; }
 
   /* 본진 편집 모달 */
   .modal-bg {
@@ -398,6 +399,14 @@
   }
   .btn-save { background: #5B6AED; color: #fff; font-weight: 600; }
   .btn-cancel { background: #eee; color: #666; }
+
+  @media (max-width: 600px) {
+    .page { padding: 10px 8px; }
+    header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+    .filter-bar { padding: 8px 14px; }
+    .scroll-nav { right: 12px; }
+    .scroll-nav button { width: 40px; height: 40px; font-size: 18px; }
+  }
 
   /* 공지 상세보기 모달 */
   .detail-bg {
@@ -466,22 +475,6 @@
     border-radius: 6px;
     margin: 8px 0;
   }
-  .detail-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px;
-    color: #5B6AED;
-    font-size: 14px;
-  }
-  .detail-loading .spinner {
-    width: 20px; height: 20px;
-    border: 3px solid #e0e0e0;
-    border-top: 3px solid #5B6AED;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-right: 10px;
-  }
   .detail-close {
     position: absolute;
     top: 14px; right: 14px;
@@ -494,14 +487,6 @@
     z-index: 1;
   }
   .detail-close:hover { border-color: #ff6b6b; color: #ff6b6b; }
-
-  @media (max-width: 600px) {
-    .page { padding: 10px 8px; }
-    header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
-    .filter-bar { padding: 8px 14px; }
-    .scroll-nav { right: 12px; }
-    .scroll-nav button { width: 40px; height: 40px; font-size: 18px; }
-  }
 </style>
 </head>
 <body>
@@ -583,18 +568,11 @@
 <script>
 let BJ_LIST = {};
 let ALL_TAGS = [];
-let allNotices = [];
-let prevTitleNos = [];
+let prevData = {};
 let autoTimer = null;
 let currentFilter = 'all';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
 let tempFav = [];
-let currentPage = 0;
-let totalPages = 0;
-let filteredNotices = [];
-let packedPages = [];
-// Cache for loaded detail content
-const contentCache = {};
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -631,31 +609,31 @@ function escapeHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-// Build dynamic tag filter buttons from API response
-function buildTagFilters() {
-  const container = document.getElementById('tagFilters');
-  container.innerHTML = ALL_TAGS.map(t =>
-    '<button class="filter-btn tag" data-filter="tag:' + t + '" onclick="setFilter(\'tag:' + t + '\')">' + t + '</button>'
-  ).join(' ');
-}
-
+// 필터
 function setFilter(f) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.querySelector('.filter-btn[data-filter="'+f+'"]');
-  if (btn) btn.classList.add('active');
-  currentPage = 0;
-  renderPages();
+  document.querySelector('.filter-btn[data-filter="'+f+'"]').classList.add('active');
+  applyFilter();
 }
 
-// Favorites modal
+function applyFilter() {
+  // 필터 변경 시 페이지를 다시 렌더링
+  if (Object.keys(prevData).length > 0) {
+    renderPages(prevData);
+  }
+}
+
+// 본진 모달
 function openModal() {
   tempFav = [...favorites];
   const list = document.getElementById('modalList');
   list.innerHTML = '';
   for (const [id, info] of Object.entries(BJ_LIST)) {
     const on = tempFav.includes(id) ? 'on' : '';
-    list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\'' + id + '\')"><div class="check ' + on + '">V</div><span>' + escapeHtml(info.name) + ' <small style="color:#999;font-size:11px">' + escapeHtml(info.tag) + '</small></span></div>';
+    const name = info.name || info;
+    const tag = info.tag || '';
+    list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\''+id+'\')"><div class="check '+on+'">V</div><span>'+escapeHtml(name)+' <small style="color:#999;font-size:11px">'+escapeHtml(tag)+'</small></span></div>';
   }
   document.getElementById('modalBg').classList.add('show');
 }
@@ -683,28 +661,63 @@ function saveFav() {
   favorites = [...tempFav];
   localStorage.setItem('soop_fav', JSON.stringify(favorites));
   closeModal();
-  currentPage = 0;
-  renderPages();
+  applyFilter();
   showToast("본진 저장 완료!");
 }
 
-// Card HTML - no body content on initial render, title preview only
-function buildCardHtml(n) {
-  const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
-  const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
-  const reads = (n.read_cnt || 0).toLocaleString();
-  const tagBadge = n.tag ? '<span class="card-tag">' + escapeHtml(n.tag) + '</span>' : '';
-
-  return '<div class="card" data-bjid="' + escapeHtml(n.bjId) + '" data-titleno="' + n.title_no + '">'
-    + '<div class="card-header"><span class="card-name">' + escapeHtml(n.name) + '</span>' + tagBadge + '</div>'
-    + '<div class="card-content">'
-    + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
-    + '<div class="card-meta"><span>' + formatDate(n.reg_date) + '</span><span>' + timeAgo(n.reg_date) + '</span><span>조회 ' + reads + '</span></div>'
-    + '</div></div>';
+// 이미지가 많거나 큰 본문인지 판별
+function isLargeContent(html) {
+  if (!html) return false;
+  const imgCount = (html.match(/<img[\s>]/gi) || []).length;
+  if (imgCount >= 2) return true;
+  // 큰 이미지가 포함된 경우 (width 속성이 크거나 style에 큰 값)
+  if (imgCount >= 1 && html.length > 500) return true;
+  return false;
 }
 
-// Filter notices
-function getFiltered() {
+// 카드 HTML 생성
+function buildCardHtml(item) {
+  const n = item.notice;
+  const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
+  const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
+  const reads = n.count?.read_cnt?.toLocaleString() || '0';
+  const tagBadge = item.tag ? '<span class="card-tag">' + escapeHtml(item.tag) + '</span>' : '';
+  const bodyHtml = n.contentHtml || '';
+  const spanClass = isLargeContent(bodyHtml) ? ' span2' : '';
+
+  return '<div class="card' + spanClass + '" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
+    + '<div class="card-header">'
+    + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
+    + tagBadge
+    + '</div>'
+    + '<div class="card-content">'
+    + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
+    + '<div class="card-meta">'
+    + '<span>' + formatDate(n.reg_date) + '</span>'
+    + '<span>' + timeAgo(n.reg_date) + '</span>'
+    + '<span>조회 ' + reads + '</span>'
+    + '</div>'
+    + (bodyHtml ? '<div class="card-body">' + bodyHtml + '</div>'
+      + '<button class="card-expand-btn" onclick="toggleExpand(event, this)">더보기</button>' : '')
+    + '</div>'
+    + '</div>';
+}
+
+let currentPage = 0;
+let totalPages = 0;
+let filteredNotices = [];
+let packedPages = []; // 각 페이지별 카드 인덱스 배열
+
+// 필터 적용 후 공지 목록 생성
+function getFilteredNotices(data) {
+  const allNotices = [];
+  for (const [bjId, info] of Object.entries(data)) {
+    for (const n of info.notices) {
+      allNotices.push({ bjId, name: info.name, tag: info.tag, notice: n });
+    }
+  }
+  allNotices.sort((a, b) => new Date(b.notice.reg_date) - new Date(a.notice.reg_date));
+
   if (currentFilter === 'all') return allNotices;
   if (currentFilter === 'fav') return allNotices.filter(x => favorites.includes(x.bjId));
   if (currentFilter.startsWith('tag:')) {
@@ -714,9 +727,22 @@ function getFiltered() {
   return allNotices;
 }
 
-// 4-column x 1-row packing per page (from friend's version)
+// 카드 높이 추정 (본문 없으면 짧음, 있으면 슬롯 꽉 참)
+function estimateCardH(item, slotH) {
+  const body = item.notice.contentHtml || '';
+  if (!body) return 90; // 헤더+제목+메타만
+  if (body.length < 100 && !body.includes('<img')) return 140;
+  return slotH; // 긴 본문/이미지 → 슬롯 최대
+}
+
+// 카드가 span2인지 판별
+function isCardSpan2(item) {
+  return isLargeContent(item.notice.contentHtml || '');
+}
+
+// 4열 × 1행 고정 패킹 (가로 우선 배치)
 function packIntoPages(notices) {
-  const cols = getColumnCount();
+  const cols = 4;
   const maxRows = 1;
   const pages = [];
   let i = 0;
@@ -726,9 +752,10 @@ function packIntoPages(notices) {
     let rows = 0;
 
     while (i < notices.length && rows < maxRows) {
+      // 한 행에 4칸 채우기
       let colsUsed = 0;
       while (i < notices.length && colsUsed < cols) {
-        const span = 1; // No span2 without content_html in list view
+        const span = isCardSpan2(notices[i]) ? 2 : 1;
         if (colsUsed + span > cols) break;
         indices.push(i);
         colsUsed += span;
@@ -742,17 +769,9 @@ function packIntoPages(notices) {
   return pages;
 }
 
-// Get current column count based on viewport
-function getColumnCount() {
-  const w = window.innerWidth;
-  if (w <= 700) return 1;
-  if (w <= 1200) return 2;
-  return 4;
-}
-
-// Render pages with packing
-function renderPages() {
-  filteredNotices = getFiltered();
+// 페이지 단위로 렌더링
+function renderPages(data) {
+  filteredNotices = getFilteredNotices(data);
   const container = document.getElementById('container');
   const scroller = document.getElementById('scroller');
 
@@ -764,13 +783,17 @@ function renderPages() {
     return;
   }
 
-  // Dynamic card body max height based on viewport
+  // 화면 높이 기준 본문 최대 높이 계산
   const pageH = scroller.clientHeight;
-  const availH = pageH - 40;
-  const bodyMax = Math.max(60, availH - 130);
+  const padding = 40;
+  const gap = 14;
+  const availH = pageH - padding;
+  const slotH = Math.floor(availH); // 1행 기준 한 슬롯
+  const bodyMax = Math.max(60, slotH - 130);
+
   document.documentElement.style.setProperty('--card-body-max', bodyMax + 'px');
 
-  // Pack into pages
+  // 4열 × 1행 고정 패킹
   packedPages = packIntoPages(filteredNotices);
   totalPages = packedPages.length;
   currentPage = Math.min(currentPage, totalPages - 1);
@@ -785,74 +808,54 @@ function renderPages() {
   }
   container.innerHTML = html;
 
+  // 긴 본문에만 "더보기" 버튼 표시
+  container.querySelectorAll('.card-body').forEach(body => {
+    if (body.scrollHeight > body.clientHeight + 10) {
+      const btn = body.nextElementSibling;
+      if (btn && btn.classList.contains('card-expand-btn')) {
+        btn.classList.add('visible');
+      }
+    }
+  });
+
   showCurrentPage();
   document.getElementById('scrollNav').style.display = 'flex';
 }
 
-// Detail modal: open on card click, fetch content from API
+function toggleExpand(e, btn) {
+  e.stopPropagation();
+  const body = btn.previousElementSibling;
+  const expanded = body.classList.toggle('expanded');
+  btn.textContent = expanded ? '접기' : '더보기';
+}
+
 function openDetail(cardEl) {
   const bjId = cardEl.dataset.bjid;
   const titleNo = cardEl.dataset.titleno;
-
-  // Find the notice data
-  const notice = allNotices.find(n => String(n.title_no) === String(titleNo) && n.bjId === bjId);
+  const info = prevData[bjId];
+  if (!info) return;
+  const notice = info.notices.find(n => String(n.title_no) === String(titleNo));
   if (!notice) return;
 
-  const tag = notice.tag ? ' <span style="color:#999;font-size:12px">' + escapeHtml(notice.tag) + '</span>' : '';
-  document.getElementById('detailName').innerHTML = escapeHtml(notice.name) + tag;
-
-  const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
-  document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
-
-  const reads = (notice.read_cnt || 0).toLocaleString();
-  document.getElementById('detailMeta').innerHTML =
-    '<span>' + formatDate(notice.reg_date) + '</span>'
-    + '<span>' + timeAgo(notice.reg_date) + '</span>'
-    + '<span>조회 ' + reads + '</span>';
-
-  const detailBody = document.getElementById('detailBody');
-
-  // Check cache first
-  if (contentCache[titleNo]) {
-    detailBody.innerHTML = contentCache[titleNo];
-  } else {
-    // Show loading spinner, then fetch
-    detailBody.innerHTML = '<div class="detail-loading"><div class="spinner"></div> 본문 로딩 중...</div>';
-    fetchDetailContent(titleNo, detailBody);
-  }
-
+  const tag = info.tag ? ' <span style="color:#999;font-size:12px">' + escapeHtml(info.tag) + '</span>' : '';
+  document.getElementById('detailName').innerHTML = escapeHtml(info.name) + tag;
+  const pin = notice && notice.is_pin ? '<span class="pin">PIN</span>' : '';
+  document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice ? notice.title_name || '' : titleText);
+  const reads = notice && notice.count ? notice.count.read_cnt?.toLocaleString() || '0' : '0';
+  document.getElementById('detailMeta').innerHTML = (notice ? '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>' : '');
+  document.getElementById('detailBody').innerHTML = notice ? (notice.contentHtml || '<p style="color:#999">본문 없음</p>') : '';
   document.getElementById('detailBg').classList.add('show');
 }
-
-async function fetchDetailContent(titleNo, bodyEl) {
-  try {
-    const resp = await fetch('/api/notice-content?title_no=' + titleNo);
-    const data = await resp.json();
-    const html = data.content_html || '<p style="color:#999">본문 없음</p>';
-    contentCache[titleNo] = html;
-    // Only update if the modal is still showing this notice
-    if (document.getElementById('detailBg').classList.contains('show')) {
-      bodyEl.innerHTML = html;
-    }
-  } catch(e) {
-    bodyEl.innerHTML = '<p style="color:#f66;">본문 로드 실패</p>';
-  }
-}
-
 function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
 }
-
-// Card click -> open detail (not expand toggle)
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
-  if (card && !e.target.closest('a') && !document.getElementById('detailBg').classList.contains('show')) {
+  if (card && !e.target.closest('.card-expand-btn') && !e.target.closest('a') && !document.getElementById('detailBg').classList.contains('show')) {
     openDetail(card);
   }
 });
-
-// Escape key closes detail modal
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('detailBg').classList.contains('show')) {
     closeDetail();
@@ -880,11 +883,10 @@ function updateNav() {
   document.getElementById('btnNext').disabled = (currentPage >= totalPages - 1);
 }
 
-// Keyboard navigation
+// 키보드: 위/아래, j/k, PageUp/PageDown
 document.addEventListener('keydown', (e) => {
   if (document.getElementById('modalBg').classList.contains('show')) return;
-  if (document.getElementById('detailBg').classList.contains('show')) return;
-  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
   if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
     e.preventDefault();
@@ -903,12 +905,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Mouse wheel page navigation
+// 마우스 휠로 페이지 전환
 document.addEventListener('DOMContentLoaded', () => {
   let wheelLock = false;
   document.addEventListener('wheel', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
-    if (document.getElementById('detailBg').classList.contains('show')) return;
     e.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
@@ -918,12 +919,30 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { passive: false });
 });
 
-// Resize re-renders pages
+// 리사이즈 시 페이지 재구성
 window.addEventListener('resize', () => {
-  if (allNotices.length > 0) renderPages();
+  if (Object.keys(prevData).length > 0) {
+    renderPages(prevData);
+  }
 });
 
-// Fetch notices list from API (no content_html)
+// API 응답에서 BJ_LIST와 ALL_TAGS를 동적으로 구축
+function buildBjListAndTags(data) {
+  BJ_LIST = {};
+  const tagSet = new Set();
+  for (const [bjId, info] of Object.entries(data)) {
+    BJ_LIST[bjId] = { name: info.name, tag: info.tag };
+    if (info.tag) tagSet.add(info.tag);
+  }
+  ALL_TAGS = Array.from(tagSet).sort();
+}
+
+// 태그 필터 버튼을 동적으로 생성
+function renderTagFilters() {
+  const container = document.getElementById('tagFilters');
+  container.innerHTML = ALL_TAGS.map(t => '<button class="filter-btn tag" data-filter="tag:'+t+'" onclick="setFilter(\'tag:'+t+'\')">'+t+'</button>').join('\n  ');
+}
+
 async function loadAll() {
   const btn = document.getElementById("refreshBtn");
   btn.disabled = true;
@@ -933,39 +952,25 @@ async function loadAll() {
     const resp = await fetch("/api/notices");
     const data = await resp.json();
 
-    // Flat array from API
-    const newNotices = data.map(r => ({
-      bjId: r.bj_id, name: r.bj_name, tag: r.bj_tag,
-      title_no: r.title_no, title_name: r.title_name,
-      reg_date: r.reg_date, read_cnt: r.read_cnt, is_pin: r.is_pin,
-    }));
+    // 동적으로 BJ_LIST와 ALL_TAGS 구축
+    buildBjListAndTags(data);
+    renderTagFilters();
 
-    // Detect new notices for toast
-    if (prevTitleNos.length > 0) {
-      const newCount = newNotices.filter(n => !prevTitleNos.includes(n.title_no)).length;
-      if (newCount > 0) showToast("새 공지 " + newCount + "개!");
+    let newCount = 0;
+    for (const bjId in data) {
+      const oldIds = (prevData[bjId]?.notices || []).map(n => n.title_no);
+      for (const n of data[bjId].notices) {
+        if (oldIds.length > 0 && !oldIds.includes(n.title_no)) newCount++;
+      }
     }
-    prevTitleNos = newNotices.map(n => n.title_no);
+    if (newCount > 0) showToast("새 공지 " + newCount + "개!");
 
-    allNotices = newNotices;
-
-    // Build BJ_LIST and ALL_TAGS dynamically from response
-    BJ_LIST = {};
-    for (const n of allNotices) {
-      if (!BJ_LIST[n.bjId]) BJ_LIST[n.bjId] = { name: n.name, tag: n.tag };
-    }
-    ALL_TAGS = [...new Set(Object.values(BJ_LIST).map(v => v.tag))];
-    buildTagFilters();
-
-    // Re-apply active state to current tag filter button if it still exists
-    if (currentFilter !== 'all' && currentFilter !== 'fav') {
-      const activeBtn = document.querySelector('.filter-btn[data-filter="'+currentFilter+'"]');
-      if (activeBtn) activeBtn.classList.add('active');
-    }
-
+    prevData = data;
     currentPage = 0;
-    renderPages();
-    document.getElementById("lastUpdate").textContent = new Date().toLocaleTimeString("ko-KR");
+    renderPages(data);
+
+    document.getElementById("lastUpdate").textContent =
+      new Date().toLocaleTimeString("ko-KR");
   } catch(e) {
     showToast("실패: " + e.message);
   }
