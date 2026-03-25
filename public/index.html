@@ -54,6 +54,7 @@
     border-radius: 4px; font-size: 11px;
   }
 
+  /* 필터 바 */
   .filter-bar {
     background: #fff;
     padding: 10px 24px;
@@ -95,18 +96,21 @@
   .filter-btn.tag { border-color: #a29bfe; }
   .filter-btn.tag.active { background: #a29bfe; color: #fff; border-color: #a29bfe; }
 
+  /* 전체 레이아웃 */
   .app-wrap {
     display: flex;
     flex-direction: column;
     height: 100vh;
   }
 
+  /* 페이지 컨테이너 */
   .page-scroller {
     flex: 1;
     overflow: hidden;
     position: relative;
   }
 
+  /* 각 페이지 */
   .page {
     display: none;
     height: 100%;
@@ -123,13 +127,16 @@
     to { opacity: 1; transform: translateY(0); }
   }
   .page-inner {
-    max-width: 1400px;
+    max-width: 1800px;
     width: 100%;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 14px;
     align-items: start;
     align-content: start;
+  }
+  .card.span2 {
+    grid-column: span 2;
   }
 
   .card {
@@ -196,26 +203,23 @@
     display: flex; gap: 10px;
     margin-bottom: 8px;
   }
+  /* 공지 본문 영역 - 동적 max-height */
   .card-body {
     font-size: 13px;
     line-height: 1.7;
     color: #444;
     overflow: hidden;
     word-break: break-word;
-    max-height: 150px;
+    max-height: var(--card-body-max, 150px);
     position: relative;
     transition: max-height 0.3s ease;
   }
   .card-body.expanded {
     max-height: none;
   }
+  /* gradient fade removed */
   .card-body:not(.expanded)::after {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 40px;
-    background: linear-gradient(transparent, #fff);
-    pointer-events: none;
+    display: none;
   }
   .card-expand-btn {
     display: none;
@@ -239,6 +243,9 @@
     margin: 6px 0;
     display: block;
   }
+  .card-body img:last-child {
+    margin-bottom: 0;
+  }
   .card-body br + br { display: none; }
   .card-body a { color: #5B6AED; }
   .card-body iframe, .card-body video {
@@ -247,9 +254,9 @@
     margin: 6px 0;
   }
 
-  @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 900px) { .page-inner { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 550px) { .page-inner { grid-template-columns: 1fr; } }
+  /* Responsive: friend's breakpoints */
+  @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } .card.span2 { grid-column: span 2; } }
+  @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } .card.span2 { grid-column: span 1; } }
 
   .loading {
     display: flex; align-items: center; justify-content: center;
@@ -279,7 +286,9 @@
     transition: all 0.3s; z-index: 200;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
+  .toast.show { transform: translateY(0); opacity: 1; }
 
+  /* 쇼츠 스타일 네비게이션 버튼 */
   .scroll-nav {
     position: fixed;
     right: 24px;
@@ -335,8 +344,8 @@
     border-radius: 10px;
     box-shadow: 0 1px 6px rgba(0,0,0,0.1);
   }
-  .toast.show { transform: translateY(0); opacity: 1; }
 
+  /* 본진 편집 모달 */
   .modal-bg {
     display: none;
     position: fixed; inset: 0;
@@ -390,6 +399,102 @@
   .btn-save { background: #5B6AED; color: #fff; font-weight: 600; }
   .btn-cancel { background: #eee; color: #666; }
 
+  /* 공지 상세보기 모달 */
+  .detail-bg {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 400;
+    align-items: center; justify-content: center;
+  }
+  .detail-bg.show { display: flex; }
+  .detail-modal {
+    background: #fff;
+    border-radius: 14px;
+    max-width: 700px;
+    width: 92%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+  }
+  .detail-header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+  }
+  .detail-header .detail-name {
+    font-size: 13px;
+    color: #5B6AED;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .detail-header .detail-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #222;
+    line-height: 1.4;
+  }
+  .detail-header .detail-title .pin { color: #ff6b6b; margin-right: 4px; font-size: 11px; }
+  .detail-header .detail-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #999;
+    display: flex;
+    gap: 12px;
+  }
+  .detail-body {
+    padding: 20px 22px;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #333;
+    word-break: break-word;
+  }
+  .detail-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 8px 0;
+    display: block;
+  }
+  .detail-body br + br { display: none; }
+  .detail-body a { color: #5B6AED; }
+  .detail-body iframe, .detail-body video {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 8px 0;
+  }
+  .detail-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #5B6AED;
+    font-size: 14px;
+  }
+  .detail-loading .spinner {
+    width: 20px; height: 20px;
+    border: 3px solid #e0e0e0;
+    border-top: 3px solid #5B6AED;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 10px;
+  }
+  .detail-close {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 32px; height: 32px;
+    border: 1px solid #ddd; border-radius: 8px;
+    background: #fff; color: #999;
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    z-index: 1;
+  }
+  .detail-close:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
   @media (max-width: 600px) {
     .page { padding: 10px 8px; }
     header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
@@ -437,16 +542,18 @@
   </div>
 </div>
 
-</div>
+</div><!-- app-wrap -->
 
 <div class="toast" id="toast"></div>
 
+<!-- 쇼츠 스타일 페이지 네비게이션 -->
 <div class="scroll-nav" id="scrollNav" style="display:none;">
   <button id="btnPrev" onclick="goPage(-1)" title="이전 페이지">&#9650;</button>
   <div class="nav-counter" id="navCounter"></div>
   <button id="btnNext" onclick="goPage(1)" title="다음 페이지">&#9660;</button>
 </div>
 
+<!-- 본진 설정 모달 -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <div class="modal-top">
@@ -460,10 +567,24 @@
   </div>
 </div>
 
+<!-- 공지 상세보기 모달 -->
+<div class="detail-bg" id="detailBg">
+  <div class="detail-modal" style="position:relative;">
+    <button class="detail-close" onclick="closeDetail()">X</button>
+    <div class="detail-header">
+      <div class="detail-name" id="detailName"></div>
+      <div class="detail-title" id="detailTitle"></div>
+      <div class="detail-meta" id="detailMeta"></div>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
 <script>
 let BJ_LIST = {};
 let ALL_TAGS = [];
 let allNotices = [];
+let prevTitleNos = [];
 let autoTimer = null;
 let currentFilter = 'all';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
@@ -471,6 +592,9 @@ let tempFav = [];
 let currentPage = 0;
 let totalPages = 0;
 let filteredNotices = [];
+let packedPages = [];
+// Cache for loaded detail content
+const contentCache = {};
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -479,13 +603,17 @@ function timeAgo(dateStr) {
   if (m < 60) return m + "분 전";
   const h = Math.floor(m / 60);
   if (h < 24) return h + "시간 전";
-  return Math.floor(h / 24) + "일 전";
+  const d = Math.floor(h / 24);
+  return d + "일 전";
 }
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
-  return String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0')
-    + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return mm+'.'+dd+' '+hh+':'+mi;
 }
 
 function showToast(msg) {
@@ -503,6 +631,7 @@ function escapeHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+// Build dynamic tag filter buttons from API response
 function buildTagFilters() {
   const container = document.getElementById('tagFilters');
   container.innerHTML = ALL_TAGS.map(t =>
@@ -516,9 +645,10 @@ function setFilter(f) {
   const btn = document.querySelector('.filter-btn[data-filter="'+f+'"]');
   if (btn) btn.classList.add('active');
   currentPage = 0;
-  render();
+  renderPages();
 }
 
+// Favorites modal
 function openModal() {
   tempFav = [...favorites];
   const list = document.getElementById('modalList');
@@ -530,13 +660,23 @@ function openModal() {
   document.getElementById('modalBg').classList.add('show');
 }
 
-document.addEventListener('click', (e) => { if (e.target.id === 'modalBg') closeModal(); });
-function closeModal() { document.getElementById('modalBg').classList.remove('show'); }
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'modalBg') closeModal();
+});
+
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('show');
+}
 
 function toggleFav(el, id) {
   const check = el.querySelector('.check');
-  if (tempFav.includes(id)) { tempFav = tempFav.filter(x => x !== id); check.classList.remove('on'); }
-  else { tempFav.push(id); check.classList.add('on'); }
+  if (tempFav.includes(id)) {
+    tempFav = tempFav.filter(x => x !== id);
+    check.classList.remove('on');
+  } else {
+    tempFav.push(id);
+    check.classList.add('on');
+  }
 }
 
 function saveFav() {
@@ -544,54 +684,26 @@ function saveFav() {
   localStorage.setItem('soop_fav', JSON.stringify(favorites));
   closeModal();
   currentPage = 0;
-  render();
+  renderPages();
   showToast("본진 저장 완료!");
 }
 
-// 카드 HTML - 본문은 클릭 시 로드
+// Card HTML - no body content on initial render, title preview only
 function buildCardHtml(n) {
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
   const reads = (n.read_cnt || 0).toLocaleString();
   const tagBadge = n.tag ? '<span class="card-tag">' + escapeHtml(n.tag) + '</span>' : '';
 
-  return '<div class="card" data-titleno="' + n.title_no + '" onclick="toggleContent(this)">'
+  return '<div class="card" data-bjid="' + escapeHtml(n.bjId) + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header"><span class="card-name">' + escapeHtml(n.name) + '</span>' + tagBadge + '</div>'
     + '<div class="card-content">'
     + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
     + '<div class="card-meta"><span>' + formatDate(n.reg_date) + '</span><span>' + timeAgo(n.reg_date) + '</span><span>조회 ' + reads + '</span></div>'
-    + '<div class="card-body" style="display:none;"></div>'
-    + '<button class="card-expand-btn" onclick="toggleExpand(event, this)">더보기</button>'
     + '</div></div>';
 }
 
-// 카드 클릭 → 본문 로드 (CDN 5분 캐시)
-async function toggleContent(card) {
-  const body = card.querySelector('.card-body');
-  // 이미 로드됨 → 토글
-  if (body.dataset.loaded) {
-    body.style.display = body.style.display === 'none' ? '' : 'none';
-    return;
-  }
-  // 처음 클릭 → API에서 본문 가져오기
-  body.style.display = '';
-  body.innerHTML = '<span style="color:#aaa;font-size:12px;">로딩 중...</span>';
-  try {
-    const resp = await fetch('/api/notice-content?title_no=' + card.dataset.titleno);
-    const data = await resp.json();
-    body.innerHTML = data.content_html || '<span style="color:#ccc;">본문 없음</span>';
-    body.dataset.loaded = '1';
-    if (body.scrollHeight > 160) {
-      const btn = body.nextElementSibling;
-      if (btn) btn.classList.add('visible');
-    }
-  } catch(e) {
-    body.innerHTML = '<span style="color:#f66;">로드 실패</span>';
-  }
-}
-
-function getCardsPerPage() { return 4; }
-
+// Filter notices
 function getFiltered() {
   if (currentFilter === 'all') return allNotices;
   if (currentFilter === 'fav') return allNotices.filter(x => favorites.includes(x.bjId));
@@ -602,38 +714,150 @@ function getFiltered() {
   return allNotices;
 }
 
-function render() {
-  filteredNotices = getFiltered();
-  const perPage = getCardsPerPage();
-  totalPages = Math.max(1, Math.ceil(filteredNotices.length / perPage));
-  currentPage = Math.min(currentPage, totalPages - 1);
+// 4-column x 1-row packing per page (from friend's version)
+function packIntoPages(notices) {
+  const cols = getColumnCount();
+  const maxRows = 1;
+  const pages = [];
+  let i = 0;
 
+  while (i < notices.length) {
+    const indices = [];
+    let rows = 0;
+
+    while (i < notices.length && rows < maxRows) {
+      let colsUsed = 0;
+      while (i < notices.length && colsUsed < cols) {
+        const span = 1; // No span2 without content_html in list view
+        if (colsUsed + span > cols) break;
+        indices.push(i);
+        colsUsed += span;
+        i++;
+      }
+      rows++;
+    }
+
+    pages.push(indices);
+  }
+  return pages;
+}
+
+// Get current column count based on viewport
+function getColumnCount() {
+  const w = window.innerWidth;
+  if (w <= 700) return 1;
+  if (w <= 1200) return 2;
+  return 4;
+}
+
+// Render pages with packing
+function renderPages() {
+  filteredNotices = getFiltered();
   const container = document.getElementById('container');
+  const scroller = document.getElementById('scroller');
+
   if (filteredNotices.length === 0) {
     container.innerHTML = '<div class="page active"><div class="empty-msg">공지가 없습니다</div></div>';
     document.getElementById('scrollNav').style.display = 'none';
+    packedPages = [];
+    totalPages = 0;
     return;
   }
 
+  // Dynamic card body max height based on viewport
+  const pageH = scroller.clientHeight;
+  const availH = pageH - 40;
+  const bodyMax = Math.max(60, availH - 130);
+  document.documentElement.style.setProperty('--card-body-max', bodyMax + 'px');
+
+  // Pack into pages
+  packedPages = packIntoPages(filteredNotices);
+  totalPages = packedPages.length;
+  currentPage = Math.min(currentPage, totalPages - 1);
+
   let html = '';
   for (let p = 0; p < totalPages; p++) {
-    const start = p * perPage;
-    const end = Math.min(start + perPage, filteredNotices.length);
     html += '<div class="page" data-page="' + p + '"><div class="page-inner">';
-    for (let i = start; i < end; i++) html += buildCardHtml(filteredNotices[i]);
+    for (const idx of packedPages[p]) {
+      html += buildCardHtml(filteredNotices[idx]);
+    }
     html += '</div></div>';
   }
   container.innerHTML = html;
+
   showCurrentPage();
   document.getElementById('scrollNav').style.display = 'flex';
 }
 
-function toggleExpand(e, btn) {
-  e.stopPropagation();
-  const body = btn.previousElementSibling;
-  const expanded = body.classList.toggle('expanded');
-  btn.textContent = expanded ? '접기' : '더보기';
+// Detail modal: open on card click, fetch content from API
+function openDetail(cardEl) {
+  const bjId = cardEl.dataset.bjid;
+  const titleNo = cardEl.dataset.titleno;
+
+  // Find the notice data
+  const notice = allNotices.find(n => String(n.title_no) === String(titleNo) && n.bjId === bjId);
+  if (!notice) return;
+
+  const tag = notice.tag ? ' <span style="color:#999;font-size:12px">' + escapeHtml(notice.tag) + '</span>' : '';
+  document.getElementById('detailName').innerHTML = escapeHtml(notice.name) + tag;
+
+  const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
+  document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
+
+  const reads = (notice.read_cnt || 0).toLocaleString();
+  document.getElementById('detailMeta').innerHTML =
+    '<span>' + formatDate(notice.reg_date) + '</span>'
+    + '<span>' + timeAgo(notice.reg_date) + '</span>'
+    + '<span>조회 ' + reads + '</span>';
+
+  const detailBody = document.getElementById('detailBody');
+
+  // Check cache first
+  if (contentCache[titleNo]) {
+    detailBody.innerHTML = contentCache[titleNo];
+  } else {
+    // Show loading spinner, then fetch
+    detailBody.innerHTML = '<div class="detail-loading"><div class="spinner"></div> 본문 로딩 중...</div>';
+    fetchDetailContent(titleNo, detailBody);
+  }
+
+  document.getElementById('detailBg').classList.add('show');
 }
+
+async function fetchDetailContent(titleNo, bodyEl) {
+  try {
+    const resp = await fetch('/api/notice-content?title_no=' + titleNo);
+    const data = await resp.json();
+    const html = data.content_html || '<p style="color:#999">본문 없음</p>';
+    contentCache[titleNo] = html;
+    // Only update if the modal is still showing this notice
+    if (document.getElementById('detailBg').classList.contains('show')) {
+      bodyEl.innerHTML = html;
+    }
+  } catch(e) {
+    bodyEl.innerHTML = '<p style="color:#f66;">본문 로드 실패</p>';
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detailBg').classList.remove('show');
+}
+
+// Card click -> open detail (not expand toggle)
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'detailBg') closeDetail();
+  const card = e.target.closest('.card');
+  if (card && !e.target.closest('a') && !document.getElementById('detailBg').classList.contains('show')) {
+    openDetail(card);
+  }
+});
+
+// Escape key closes detail modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('detailBg').classList.contains('show')) {
+    closeDetail();
+  }
+});
 
 function goPage(dir) {
   const next = currentPage + dir;
@@ -643,7 +867,10 @@ function goPage(dir) {
 }
 
 function showCurrentPage() {
-  document.querySelectorAll('#container .page').forEach((p, i) => p.classList.toggle('active', i === currentPage));
+  const pages = document.querySelectorAll('#container .page');
+  pages.forEach((p, i) => {
+    p.classList.toggle('active', i === currentPage);
+  });
   updateNav();
 }
 
@@ -653,30 +880,50 @@ function updateNav() {
   document.getElementById('btnNext').disabled = (currentPage >= totalPages - 1);
 }
 
+// Keyboard navigation
 document.addEventListener('keydown', (e) => {
   if (document.getElementById('modalBg').classList.contains('show')) return;
+  if (document.getElementById('detailBg').classList.contains('show')) return;
   if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
-  if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); goPage(1); }
-  else if (e.key === 'k' || e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goPage(-1); }
-  else if (e.key === 'Home') { e.preventDefault(); currentPage = 0; showCurrentPage(); }
-  else if (e.key === 'End') { e.preventDefault(); currentPage = totalPages - 1; showCurrentPage(); }
+
+  if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+    e.preventDefault();
+    goPage(1);
+  } else if (e.key === 'k' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+    e.preventDefault();
+    goPage(-1);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    currentPage = 0;
+    showCurrentPage();
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    currentPage = totalPages - 1;
+    showCurrentPage();
+  }
 });
 
+// Mouse wheel page navigation
 document.addEventListener('DOMContentLoaded', () => {
   let wheelLock = false;
   document.addEventListener('wheel', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
+    if (document.getElementById('detailBg').classList.contains('show')) return;
     e.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
-    if (e.deltaY > 0) goPage(1); else if (e.deltaY < 0) goPage(-1);
+    if (e.deltaY > 0) goPage(1);
+    else if (e.deltaY < 0) goPage(-1);
     setTimeout(() => { wheelLock = false; }, 400);
   }, { passive: false });
 });
 
-window.addEventListener('resize', () => { if (allNotices.length > 0) render(); });
+// Resize re-renders pages
+window.addEventListener('resize', () => {
+  if (allNotices.length > 0) renderPages();
+});
 
-// 목록 1번 호출 (본문 없이 ~37KB, CDN 60초 캐시)
+// Fetch notices list from API (no content_html)
 async function loadAll() {
   const btn = document.getElementById("refreshBtn");
   btn.disabled = true;
@@ -686,14 +933,23 @@ async function loadAll() {
     const resp = await fetch("/api/notices");
     const data = await resp.json();
 
-    // flat 배열로 변환
-    allNotices = data.map(r => ({
+    // Flat array from API
+    const newNotices = data.map(r => ({
       bjId: r.bj_id, name: r.bj_name, tag: r.bj_tag,
       title_no: r.title_no, title_name: r.title_name,
       reg_date: r.reg_date, read_cnt: r.read_cnt, is_pin: r.is_pin,
     }));
 
-    // BJ_LIST / 태그 구성
+    // Detect new notices for toast
+    if (prevTitleNos.length > 0) {
+      const newCount = newNotices.filter(n => !prevTitleNos.includes(n.title_no)).length;
+      if (newCount > 0) showToast("새 공지 " + newCount + "개!");
+    }
+    prevTitleNos = newNotices.map(n => n.title_no);
+
+    allNotices = newNotices;
+
+    // Build BJ_LIST and ALL_TAGS dynamically from response
     BJ_LIST = {};
     for (const n of allNotices) {
       if (!BJ_LIST[n.bjId]) BJ_LIST[n.bjId] = { name: n.name, tag: n.tag };
@@ -701,8 +957,14 @@ async function loadAll() {
     ALL_TAGS = [...new Set(Object.values(BJ_LIST).map(v => v.tag))];
     buildTagFilters();
 
+    // Re-apply active state to current tag filter button if it still exists
+    if (currentFilter !== 'all' && currentFilter !== 'fav') {
+      const activeBtn = document.querySelector('.filter-btn[data-filter="'+currentFilter+'"]');
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
     currentPage = 0;
-    render();
+    renderPages();
     document.getElementById("lastUpdate").textContent = new Date().toLocaleTimeString("ko-KR");
   } catch(e) {
     showToast("실패: " + e.message);
