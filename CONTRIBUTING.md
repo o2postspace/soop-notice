@@ -77,21 +77,52 @@ style: 카드 레이아웃 간격 조정
 docs: CONTRIBUTING.md 업데이트
 ```
 
-#### 3. PR 생성
+#### 3. PR 올리기 전에 최신 master 반영
+상대방이 먼저 머지했을 수 있으므로, **push 전에 반드시** 최신 master를 내 브랜치에 반영:
+```bash
+git checkout master
+git pull origin master          # 상대방이 머지한 변경사항 가져오기
+git checkout feat/내기능
+git merge master                # 내 브랜치에 최신 master 반영
+```
+
+**충돌이 나면?**
+```bash
+# 충돌 파일 열어서 수동 해결 (<<<<<<< 마커 찾기)
+# 해결 후:
+git add <충돌해결한파일>
+git commit                      # merge commit 자동 생성
+```
+같은 파일을 수정했을 때만 충돌 발생. 다른 파일이면 자동 머지됨.
+
+#### 4. PR 생성
 ```bash
 git push origin feat/내기능
 ```
 GitHub에서 Pull Request 생성 → `master` 로 머지 대상 설정.
 
-#### 4. 코드 리뷰 후 머지
+#### 5. 코드 리뷰 후 머지
 - PR에서 리뷰 → Approve → **Squash and merge**
 - 머지 후 브랜치 삭제
 
-#### 5. 로컬 정리
+#### 6. 로컬 정리
 ```bash
 git checkout master
 git pull origin master
 git branch -d feat/내기능
+```
+
+### 동시 작업 예시
+```
+나:   master → feat/검색기능 → 작업중...
+친구: master → feat/다크모드 → 작업 완료 → PR → master에 머지
+
+# 친구가 먼저 머지함. 이제 내 브랜치는 master보다 뒤처짐
+# PR 올리기 전에:
+git checkout master && git pull        # 친구 변경사항 가져오기
+git checkout feat/검색기능
+git merge master                       # 내 브랜치에 반영
+# 충돌 없으면 바로 push → PR
 ```
 
 ---
