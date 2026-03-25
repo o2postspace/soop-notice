@@ -461,6 +461,8 @@
     border-radius: 6px;
     margin: 8px 0;
     display: block;
+    background: #f0f0f0;
+    min-height: 40px;
   }
   .detail-body br + br { display: none; }
   .detail-body a { color: #5B6AED; }
@@ -842,11 +844,35 @@ function openDetail(cardEl) {
   document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice ? notice.title_name || '' : titleText);
   const reads = notice && notice.count ? notice.count.read_cnt?.toLocaleString() || '0' : '0';
   document.getElementById('detailMeta').innerHTML = (notice ? '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>' : '');
-  document.getElementById('detailBody').innerHTML = notice ? (notice.contentHtml || '<p style="color:#999">본문 없음</p>') : '';
+  // 본문 삽입 + 이미지 lazy loading
+  const bodyEl = document.getElementById('detailBody');
+  let html = notice ? (notice.contentHtml || '<p style="color:#999">본문 없음</p>') : '';
+  // img src를 data-src로 바꿔서 lazy load
+  html = html.replace(/<img([^>]*)\ssrc="([^"]+)"/gi, '<img$1 data-src="$2" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"');
+  bodyEl.innerHTML = html;
+  bodyEl.scrollTop = 0;
+
+  // Intersection Observer로 이미지 lazy load
+  const imgs = bodyEl.querySelectorAll('img[data-src]');
+  if (imgs.length > 0) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.src = e.target.dataset.src;
+          obs.unobserve(e.target);
+        }
+      });
+    }, { root: bodyEl, rootMargin: '200px' });
+    imgs.forEach(img => obs.observe(img));
+  }
+
   document.getElementById('detailBg').classList.add('show');
+  // 메인 페이지 스크롤 잠금
+  document.body.style.overflow = 'hidden';
 }
 function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
+  document.body.style.overflow = '';
 }
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
@@ -937,6 +963,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let wheelLock = false;
   document.addEventListener('wheel', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
+    if (document.getElementById('detailBg').classList.contains('show')) return;
     e.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
