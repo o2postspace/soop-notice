@@ -483,6 +483,108 @@
     z-index: 1;
   }
   .detail-close:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+  /* 탭 바 */
+  .tab-bar {
+    background: #fff;
+    padding: 0 24px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    gap: 0;
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    padding: 10px 24px;
+    border: none;
+    background: transparent;
+    color: #999;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: #5B6AED; }
+  .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
+
+  /* 캘린더 */
+  #calendarContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .calendar-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .calendar-nav button {
+    background: #5B6AED;
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .calendar-nav button:hover { background: #4a58d4; }
+  #calWeekLabel { font-size: 14px; font-weight: 600; color: #333; }
+
+  .calendar-grid {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .calendar-grid table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .calendar-grid th {
+    background: #f8f8ff;
+    padding: 10px 8px;
+    font-size: 12px;
+    color: #666;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+  }
+  .calendar-grid th.today { color: #5B6AED; background: #eef0ff; }
+  .calendar-grid td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+    min-width: 100px;
+    font-size: 12px;
+  }
+  .calendar-grid td.bj-name-cell {
+    font-weight: 700;
+    color: #5B6AED;
+    font-size: 13px;
+    white-space: nowrap;
+    background: #fafafa;
+    min-width: 80px;
+  }
+  .cal-slot {
+    background: #eef0ff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin: 2px 0;
+    font-size: 11px;
+    color: #444;
+    cursor: default;
+  }
+  .cal-slot .time { font-weight: 600; color: #5B6AED; }
+  .cal-empty { color: #ddd; text-align: center; font-size: 11px; }
+
+  @media (max-width: 700px) {
+    .calendar-grid td, .calendar-grid th { padding: 4px; font-size: 11px; min-width: 60px; }
+    .tab-btn { padding: 8px 16px; font-size: 13px; }
+  }
 </style>
 </head>
 <body>
@@ -505,6 +607,11 @@
   </div>
 </header>
 
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
+  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">인기</button>
+</div>
+
 <div class="filter-bar" id="filterBar">
   <span class="label">필터</span>
   <button class="filter-btn fav" data-filter="fav" onclick="setFilter('fav')">본진</button>
@@ -521,6 +628,15 @@
       <div class="spinner"></div> 불러오는 중...
     </div>
   </div>
+</div>
+
+<div id="calendarContainer" style="display:none;">
+  <div class="calendar-nav">
+    <button onclick="changeWeek(-1)">&#9664; 이전 주</button>
+    <span id="calWeekLabel"></span>
+    <button onclick="changeWeek(1)">다음 주 &#9654;</button>
+  </div>
+  <div class="calendar-grid" id="calendarGrid"></div>
 </div>
 
 </div><!-- app-wrap -->
@@ -1089,6 +1205,104 @@ function setupAutoRefresh() {
     if (sec > 0) autoTimer = setInterval(loadAll, sec * 1000);
   });
   autoTimer = setInterval(loadAll, 60000);
+}
+
+// ===================== 탭 전환 =====================
+let currentTab = 'notices';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+
+  if (tab === 'notices') {
+    document.getElementById('filterBar').style.display = '';
+    document.getElementById('scroller').style.display = '';
+    document.getElementById('scrollNav').style.display = totalPages > 0 ? 'flex' : 'none';
+    document.getElementById('calendarContainer').style.display = 'none';
+  } else if (tab === 'calendar') {
+    document.getElementById('filterBar').style.display = 'none';
+    document.getElementById('scroller').style.display = 'none';
+    document.getElementById('scrollNav').style.display = 'none';
+    document.getElementById('calendarContainer').style.display = '';
+    loadSchedules(calWeekOffset);
+  }
+}
+
+// ===================== 캘린더 =====================
+let calWeekOffset = 0;
+const DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
+
+function changeWeek(dir) {
+  calWeekOffset += dir;
+  loadSchedules(calWeekOffset);
+}
+
+async function loadSchedules(offset) {
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div> 불러오는 중...</div>';
+
+  try {
+    const resp = await fetch('/api/schedules?week_offset=' + offset);
+    const data = await resp.json();
+    renderCalendar(data);
+  } catch(e) {
+    grid.innerHTML = '<div class="empty-msg">로드 실패</div>';
+  }
+}
+
+function renderCalendar(data) {
+  document.getElementById('calWeekLabel').textContent = data.week_start + ' ~ ' + data.week_end;
+
+  // 오늘 날짜 (KST)
+  const now = new Date();
+  const todayStr = new Date(now.getTime() + 9*60*60*1000).toISOString().slice(0, 10);
+
+  // 주간 날짜 배열
+  const weekDates = [];
+  const startDate = new Date(data.week_start + 'T00:00:00+09:00');
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    weekDates.push(d.toISOString().slice(0, 10));
+  }
+
+  let html = '<table><thead><tr><th>BJ</th>';
+  for (let i = 0; i < 7; i++) {
+    const isToday = weekDates[i] === todayStr;
+    const mm = weekDates[i].slice(5, 7);
+    const dd = weekDates[i].slice(8, 10);
+    html += '<th' + (isToday ? ' class="today"' : '') + '>' + DAY_NAMES[i] + '<br>' + mm + '/' + dd + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const [bjId, info] of Object.entries(data.schedules)) {
+    html += '<tr><td class="bj-name-cell">' + escapeHtml(info.name) + '</td>';
+    for (let i = 0; i < 7; i++) {
+      const dateStr = weekDates[i];
+      const daySlots = info.slots.filter(s => {
+        // DB에 UTC로 저장된 KST → parseKST로 날짜 추출
+        const parsed = parseKST(s.start);
+        const slotDate = parsed.getFullYear() + '-' + String(parsed.getMonth()+1).padStart(2,'0') + '-' + String(parsed.getDate()).padStart(2,'0');
+        return slotDate === dateStr;
+      });
+
+      if (daySlots.length === 0) {
+        html += '<td><div class="cal-empty">-</div></td>';
+      } else {
+        html += '<td>';
+        for (const slot of daySlots) {
+          const t = parseKST(slot.start);
+          const timeStr = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
+          html += '<div class="cal-slot"><span class="time">' + timeStr + '</span></div>';
+        }
+        html += '</td>';
+      }
+    }
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('calendarGrid').innerHTML = html;
 }
 
 loadAll();

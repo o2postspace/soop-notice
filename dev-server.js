@@ -13,6 +13,8 @@ const PORT = process.env.PORT || 3000;
 const noticesHandler = require("./api/notices");
 const noticeContentHandler = require("./api/notice-content");
 const cronHandler = require("./api/cron/fetch-notices");
+const parseSchedulesHandler = require("./api/cron/parse-schedules");
+const schedulesHandler = require("./api/schedules");
 
 function mockRes() {
   const res = {
@@ -43,6 +45,24 @@ const server = http.createServer(async (req, res) => {
     const mockR = mockRes();
     const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
     await noticeContentHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/schedules") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await schedulesHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/cron/parse-schedules") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await parseSchedulesHandler(mockReq, mockR);
     res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
     res.end(mockR.body);
     return;
