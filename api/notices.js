@@ -1,38 +1,32 @@
 const { supabase } = require("../lib/supabase");
 
 module.exports = async function handler(req, res) {
-  // CDN 캐시 60초 + stale 120초
   res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
 
-  const { data, error } = await supabase
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 8));
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+  const { data, error, count } = await supabase
     .from("notices")
-    .select("*")
-    .order("reg_date", { ascending: false });
+    .select("*", { count: "exact" })
+    .order("reg_date", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return res.status(500).json({ error: error.message });
   }
 
-  // 기존 프론트엔드 형식에 맞게 변환
-  const grouped = {};
-  for (const row of data) {
-    if (!grouped[row.bj_id]) {
-      grouped[row.bj_id] = {
-        name: row.bj_name,
-        tag: row.bj_tag,
-        notices: [],
-      };
-    }
-    grouped[row.bj_id].notices.push({
-      title_no: row.title_no,
-      title_name: row.title_name,
-      contentHtml: row.content_html,
-      reg_date: row.reg_date,
-      count: { read_cnt: row.read_cnt },
-      is_pin: row.is_pin,
-      is_notice: true,
-    });
-  }
+  const notices = data.map((row) => ({
+    bjId: row.bj_id,
+    name: row.bj_name,
+    tag: row.bj_tag,
+    title_no: row.title_no,
+    title_name: row.title_name,
+    contentHtml: row.content_html,
+    reg_date: row.reg_date,
+    read_cnt: row.read_cnt,
+    is_pin: row.is_pin,
+  }));
 
-  res.status(200).json(grouped);
+  res.status(200).json({ notices, offset, limit, total: count });
 };
