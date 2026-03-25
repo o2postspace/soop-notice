@@ -135,12 +135,6 @@
     align-items: start;
     align-content: start;
   }
-  .card.span2 {
-    grid-column: span 2;
-  }
-  .card.span2 .card-body img {
-    max-height: none;
-  }
 
   .card {
     background: #fff;
@@ -256,8 +250,8 @@
     margin: 6px 0;
   }
 
-  @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } .card.span2 { grid-column: span 2; } }
-  @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } .card.span2 { grid-column: span 1; } }
+  @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } }
 
   .loading {
     display: flex; align-items: center; justify-content: center;
@@ -574,8 +568,16 @@ let currentFilter = 'all';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
 let tempFav = [];
 
+// DB에 KST가 +00:00으로 저장되어 있으므로 UTC 기준으로 계산
+function parseKST(dateStr) {
+  // +00:00을 제거하고 KST로 해석
+  const cleaned = dateStr.replace(/[+-]\d{2}:\d{2}$/, '').replace('T', ' ');
+  // "YYYY-MM-DD HH:MM:SS"를 KST로 파싱
+  return new Date(cleaned + '+09:00');
+}
+
 function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - parseKST(dateStr).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "방금";
   if (m < 60) return m + "분 전";
@@ -586,7 +588,7 @@ function timeAgo(dateStr) {
 }
 
 function formatDate(dateStr) {
-  const d = new Date(dateStr);
+  const d = parseKST(dateStr);
   const mm = String(d.getMonth()+1).padStart(2,'0');
   const dd = String(d.getDate()).padStart(2,'0');
   const hh = String(d.getHours()).padStart(2,'0');
@@ -683,9 +685,7 @@ function buildCardHtml(item) {
   const reads = n.count?.read_cnt?.toLocaleString() || '0';
   const tagBadge = item.tag ? '<span class="card-tag">' + escapeHtml(item.tag) + '</span>' : '';
   const bodyHtml = n.contentHtml || '';
-  const spanClass = isLargeContent(bodyHtml) ? ' span2' : '';
-
-  return '<div class="card' + spanClass + '" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
+  return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
     + tagBadge
@@ -755,10 +755,9 @@ function packIntoPages(notices) {
       // 한 행에 4칸 채우기
       let colsUsed = 0;
       while (i < notices.length && colsUsed < cols) {
-        const span = isCardSpan2(notices[i]) ? 2 : 1;
-        if (colsUsed + span > cols) break;
+        if (colsUsed + 1 > cols) break;
         indices.push(i);
-        colsUsed += span;
+        colsUsed += 1;
         i++;
       }
       rows++;
@@ -863,9 +862,37 @@ document.addEventListener('keydown', (e) => {
 });
 
 function goPage(dir) {
+  // 백그라운드 데이터 반영
+  filteredNotices = getFilteredNotices(prevData);
+  packedPages = packIntoPages(filteredNotices);
+  totalPages = packedPages.length;
+
   const next = currentPage + dir;
   if (next < 0 || next >= totalPages) return;
   currentPage = next;
+
+  // 해당 페이지가 DOM에 없으면 추가
+  const existing = document.querySelector('#container .page[data-page="' + next + '"]');
+  if (!existing) {
+    const scroller = document.getElementById('scroller');
+    const pageH = scroller.clientHeight;
+    const bodyMax = Math.max(60, pageH - 40 - 130);
+    let html = '<div class="page" data-page="' + next + '"><div class="page-inner">';
+    for (const idx of packedPages[next]) {
+      html += buildCardHtml(filteredNotices[idx]);
+    }
+    html += '</div></div>';
+    document.getElementById('container').insertAdjacentHTML('beforeend', html);
+
+    const newPage = document.querySelector('#container .page[data-page="' + next + '"]');
+    newPage.querySelectorAll('.card-body').forEach(body => {
+      if (body.scrollHeight > body.clientHeight + 10) {
+        const btn = body.nextElementSibling;
+        if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
+      }
+    });
+  }
+
   showCurrentPage();
 }
 
@@ -943,19 +970,38 @@ function renderTagFilters() {
   container.innerHTML = ALL_TAGS.map(t => '<button class="filter-btn tag" data-filter="tag:'+t+'" onclick="setFilter(\'tag:'+t+'\')">'+t+'</button>').join('\n  ');
 }
 
+let totalOnServer = 0;
+let isLoadingMore = false;
+
+// grouped 데이터를 머지 (새 데이터를 기존에 합침)
+function mergeData(target, source) {
+  for (const bjId in source) {
+    if (!target[bjId]) {
+      target[bjId] = { name: source[bjId].name, tag: source[bjId].tag, notices: [] };
+    }
+    const existIds = new Set(target[bjId].notices.map(n => n.title_no));
+    for (const n of source[bjId].notices) {
+      if (!existIds.has(n.title_no)) target[bjId].notices.push(n);
+    }
+  }
+}
+
 async function loadAll() {
   const btn = document.getElementById("refreshBtn");
   btn.disabled = true;
   btn.textContent = "...";
 
   try {
-    const resp = await fetch("/api/notices");
-    const data = await resp.json();
+    // 1) 첫 8개 즉시 로드 (본문 포함)
+    const resp = await fetch("/api/notices?offset=0&limit=8");
+    const json = await resp.json();
+    const data = json.data;
+    totalOnServer = json.total;
 
-    // 동적으로 BJ_LIST와 ALL_TAGS 구축
     buildBjListAndTags(data);
     renderTagFilters();
 
+    // 새 공지 감지
     let newCount = 0;
     for (const bjId in data) {
       const oldIds = (prevData[bjId]?.notices || []).map(n => n.title_no);
@@ -971,12 +1017,44 @@ async function loadAll() {
 
     document.getElementById("lastUpdate").textContent =
       new Date().toLocaleTimeString("ko-KR");
+
+    // 2) 나머지 백그라운드 로드
+    loadMore();
   } catch(e) {
     showToast("실패: " + e.message);
   }
 
   btn.disabled = false;
   btn.textContent = "새로고침";
+}
+
+async function loadMore() {
+  if (isLoadingMore) return;
+  isLoadingMore = true;
+
+  try {
+    let loaded = Object.values(prevData).reduce((s, v) => s + v.notices.length, 0);
+    const BATCH = 50;
+
+    while (loaded < totalOnServer) {
+      const resp = await fetch('/api/notices?offset=' + loaded + '&limit=' + BATCH);
+      const json = await resp.json();
+      if (!json.data || Object.keys(json.data).length === 0) break;
+
+      mergeData(prevData, json.data);
+      buildBjListAndTags(prevData);
+      loaded = Object.values(prevData).reduce((s, v) => s + v.notices.length, 0);
+    }
+
+    // 태그 필터 업데이트, 페이지 수 갱신 (현재 화면 안 건드림)
+    renderTagFilters();
+    filteredNotices = getFilteredNotices(prevData);
+    packedPages = packIntoPages(filteredNotices);
+    totalPages = packedPages.length;
+    updateNav();
+  } catch(e) { /* 백그라운드 실패 무시 */ }
+
+  isLoadingMore = false;
 }
 
 function setupAutoRefresh() {

@@ -3,10 +3,14 @@ const { supabase } = require("../lib/supabase");
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
 
-  const { data, error } = await supabase
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 8));
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+  const { data, error, count } = await supabase
     .from("notices")
-    .select("*")
-    .order("reg_date", { ascending: false });
+    .select("*", { count: "exact" })
+    .order("reg_date", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return res.status(500).json({ error: error.message });
@@ -33,5 +37,5 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  res.status(200).json(grouped);
+  res.status(200).json({ data: grouped, offset, limit, total: count });
 };
