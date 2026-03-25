@@ -135,12 +135,6 @@
     align-items: start;
     align-content: start;
   }
-  .card.span2 {
-    grid-column: span 2;
-  }
-  .card.span2 .card-body img {
-    max-height: none;
-  }
 
   .card {
     background: #fff;
@@ -256,8 +250,8 @@
     margin: 6px 0;
   }
 
-  @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } .card.span2 { grid-column: span 2; } }
-  @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } .card.span2 { grid-column: span 1; } }
+  @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } }
 
   .loading {
     display: flex; align-items: center; justify-content: center;
@@ -691,9 +685,7 @@ function buildCardHtml(item) {
   const reads = n.count?.read_cnt?.toLocaleString() || '0';
   const tagBadge = item.tag ? '<span class="card-tag">' + escapeHtml(item.tag) + '</span>' : '';
   const bodyHtml = n.contentHtml || '';
-  const spanClass = isLargeContent(bodyHtml) ? ' span2' : '';
-
-  return '<div class="card' + spanClass + '" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
+  return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
     + tagBadge
@@ -763,10 +755,9 @@ function packIntoPages(notices) {
       // 한 행에 4칸 채우기
       let colsUsed = 0;
       while (i < notices.length && colsUsed < cols) {
-        const span = isCardSpan2(notices[i]) ? 2 : 1;
-        if (colsUsed + span > cols) break;
+        if (colsUsed + 1 > cols) break;
         indices.push(i);
-        colsUsed += span;
+        colsUsed += 1;
         i++;
       }
       rows++;
