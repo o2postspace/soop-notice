@@ -463,8 +463,7 @@
 <script>
 let BJ_LIST = {};
 let ALL_TAGS = [];
-let allNotices = [];  // 전체 로드된 공지 (flat)
-let totalOnServer = 0;
+let allNotices = [];
 let autoTimer = null;
 let currentFilter = 'all';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
@@ -472,7 +471,6 @@ let tempFav = [];
 let currentPage = 0;
 let totalPages = 0;
 let filteredNotices = [];
-let isLoadingMore = false;
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -518,7 +516,7 @@ function setFilter(f) {
   const btn = document.querySelector('.filter-btn[data-filter="'+f+'"]');
   if (btn) btn.classList.add('active');
   currentPage = 0;
-  renderFromNotices();
+  render();
 }
 
 function openModal() {
@@ -546,25 +544,50 @@ function saveFav() {
   localStorage.setItem('soop_fav', JSON.stringify(favorites));
   closeModal();
   currentPage = 0;
-  renderFromNotices();
+  render();
   showToast("본진 저장 완료!");
 }
 
-// 카드 HTML - 본문 포함
+// 카드 HTML - 본문은 클릭 시 로드
 function buildCardHtml(n) {
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
   const reads = (n.read_cnt || 0).toLocaleString();
   const tagBadge = n.tag ? '<span class="card-tag">' + escapeHtml(n.tag) + '</span>' : '';
-  const bodyHtml = n.contentHtml || '';
 
-  return '<div class="card" data-bjid="' + n.bjId + '">'
+  return '<div class="card" data-titleno="' + n.title_no + '" onclick="toggleContent(this)">'
     + '<div class="card-header"><span class="card-name">' + escapeHtml(n.name) + '</span>' + tagBadge + '</div>'
     + '<div class="card-content">'
     + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
     + '<div class="card-meta"><span>' + formatDate(n.reg_date) + '</span><span>' + timeAgo(n.reg_date) + '</span><span>조회 ' + reads + '</span></div>'
-    + (bodyHtml ? '<div class="card-body">' + bodyHtml + '</div><button class="card-expand-btn" onclick="toggleExpand(event, this)">더보기</button>' : '')
+    + '<div class="card-body" style="display:none;"></div>'
+    + '<button class="card-expand-btn" onclick="toggleExpand(event, this)">더보기</button>'
     + '</div></div>';
+}
+
+// 카드 클릭 → 본문 로드 (CDN 5분 캐시)
+async function toggleContent(card) {
+  const body = card.querySelector('.card-body');
+  // 이미 로드됨 → 토글
+  if (body.dataset.loaded) {
+    body.style.display = body.style.display === 'none' ? '' : 'none';
+    return;
+  }
+  // 처음 클릭 → API에서 본문 가져오기
+  body.style.display = '';
+  body.innerHTML = '<span style="color:#aaa;font-size:12px;">로딩 중...</span>';
+  try {
+    const resp = await fetch('/api/notice-content?title_no=' + card.dataset.titleno);
+    const data = await resp.json();
+    body.innerHTML = data.content_html || '<span style="color:#ccc;">본문 없음</span>';
+    body.dataset.loaded = '1';
+    if (body.scrollHeight > 160) {
+      const btn = body.nextElementSibling;
+      if (btn) btn.classList.add('visible');
+    }
+  } catch(e) {
+    body.innerHTML = '<span style="color:#f66;">로드 실패</span>';
+  }
 }
 
 function getCardsPerPage() { return 4; }
@@ -579,7 +602,7 @@ function getFiltered() {
   return allNotices;
 }
 
-function renderFromNotices() {
+function render() {
   filteredNotices = getFiltered();
   const perPage = getCardsPerPage();
   totalPages = Math.max(1, Math.ceil(filteredNotices.length / perPage));
@@ -601,14 +624,6 @@ function renderFromNotices() {
     html += '</div></div>';
   }
   container.innerHTML = html;
-
-  container.querySelectorAll('.card-body').forEach(body => {
-    if (body.scrollHeight > 160) {
-      const btn = body.nextElementSibling;
-      if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
-    }
-  });
-
   showCurrentPage();
   document.getElementById('scrollNav').style.display = 'flex';
 }
@@ -621,37 +636,10 @@ function toggleExpand(e, btn) {
 }
 
 function goPage(dir) {
-  // 백그라운드 데이터가 더 있으면 페이지 수 갱신
-  filteredNotices = getFiltered();
-  totalPages = Math.max(1, Math.ceil(filteredNotices.length / getCardsPerPage()));
-
   const next = currentPage + dir;
   if (next < 0 || next >= totalPages) return;
   currentPage = next;
-
-  // 해당 페이지가 DOM에 없으면 추가
-  const existing = document.querySelector('#container .page[data-page="' + next + '"]');
-  if (!existing) {
-    const perPage = getCardsPerPage();
-    const start = next * perPage;
-    const end = Math.min(start + perPage, filteredNotices.length);
-    let html = '<div class="page" data-page="' + next + '"><div class="page-inner">';
-    for (let i = start; i < end; i++) html += buildCardHtml(filteredNotices[i]);
-    html += '</div></div>';
-    document.getElementById('container').insertAdjacentHTML('beforeend', html);
-
-    // 더보기 버튼
-    const newPage = document.querySelector('#container .page[data-page="' + next + '"]');
-    newPage.querySelectorAll('.card-body').forEach(body => {
-      if (body.scrollHeight > 160) {
-        const btn = body.nextElementSibling;
-        if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
-      }
-    });
-  }
-
   showCurrentPage();
-  if (allNotices.length < totalOnServer) loadMore();
 }
 
 function showCurrentPage() {
@@ -686,78 +674,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { passive: false });
 });
 
-window.addEventListener('resize', () => { if (allNotices.length > 0) renderFromNotices(); });
+window.addEventListener('resize', () => { if (allNotices.length > 0) render(); });
 
-// API에서 페이지 단위로 가져오기
-async function fetchNotices(offset, limit) {
-  const resp = await fetch('/api/notices?offset=' + offset + '&limit=' + limit);
-  return resp.json();
-}
-
-// 첫 8개 빠르게 → 나머지 백그라운드
+// 목록 1번 호출 (본문 없이 ~37KB, CDN 60초 캐시)
 async function loadAll() {
   const btn = document.getElementById("refreshBtn");
   btn.disabled = true;
   btn.textContent = "...";
 
   try {
-    // 1) 첫 8개 즉시 로드 (본문 포함)
-    const first = await fetchNotices(0, 8);
-    allNotices = first.notices;
-    totalOnServer = first.total;
+    const resp = await fetch("/api/notices");
+    const data = await resp.json();
+
+    // flat 배열로 변환
+    allNotices = data.map(r => ({
+      bjId: r.bj_id, name: r.bj_name, tag: r.bj_tag,
+      title_no: r.title_no, title_name: r.title_name,
+      reg_date: r.reg_date, read_cnt: r.read_cnt, is_pin: r.is_pin,
+    }));
 
     // BJ_LIST / 태그 구성
+    BJ_LIST = {};
     for (const n of allNotices) {
       if (!BJ_LIST[n.bjId]) BJ_LIST[n.bjId] = { name: n.name, tag: n.tag };
     }
+    ALL_TAGS = [...new Set(Object.values(BJ_LIST).map(v => v.tag))];
+    buildTagFilters();
 
     currentPage = 0;
-    renderFromNotices();
+    render();
     document.getElementById("lastUpdate").textContent = new Date().toLocaleTimeString("ko-KR");
-
-    // 2) 나머지 백그라운드 로드
-    loadMore();
   } catch(e) {
     showToast("실패: " + e.message);
   }
 
   btn.disabled = false;
   btn.textContent = "새로고침";
-}
-
-async function loadMore() {
-  if (isLoadingMore || allNotices.length >= totalOnServer) return;
-  isLoadingMore = true;
-
-  try {
-    const BATCH = 50;
-    let offset = allNotices.length;
-
-    while (offset < totalOnServer) {
-      const batch = await fetchNotices(offset, BATCH);
-      if (!batch.notices || batch.notices.length === 0) break;
-
-      const existIds = new Set(allNotices.map(n => n.title_no));
-      const newOnes = batch.notices.filter(n => !existIds.has(n.title_no));
-
-      for (const n of newOnes) {
-        if (!BJ_LIST[n.bjId]) BJ_LIST[n.bjId] = { name: n.name, tag: n.tag };
-      }
-      allNotices = allNotices.concat(newOnes);
-      offset = allNotices.length;
-    }
-
-    // 다 끝난 후 태그 필터만 조용히 업데이트
-    const tagSet = new Set(Object.values(BJ_LIST).map(v => v.tag));
-    ALL_TAGS = [...tagSet];
-    buildTagFilters();
-    // 페이지 수만 갱신 (화면 리렌더 안 함)
-    filteredNotices = getFiltered();
-    totalPages = Math.max(1, Math.ceil(filteredNotices.length / getCardsPerPage()));
-    updateNav();
-  } catch(e) { /* 백그라운드 실패 무시 */ }
-
-  isLoadingMore = false;
 }
 
 function setupAutoRefresh() {
