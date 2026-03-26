@@ -15,7 +15,7 @@ async function fetchNotices(bjId) {
     const resp = await fetch(url, { headers: HEADERS });
     if (!resp.ok) return [];
     const data = await resp.json();
-    return (data.boards || []).filter((b) => b.is_notice);
+    return data.boards || [];
   } catch {
     return [];
   }
@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
             return {
               bj_id: bjId,
               bj_name: info.name,
-              bj_tag: null,
+              bj_tag: "",
               title_no: n.title_no,
               title_name: n.title_name || "",
               content_html: contentHtml,
