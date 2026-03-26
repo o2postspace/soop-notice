@@ -93,8 +93,6 @@
     transition: all 0.15s;
   }
   .edit-fav-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
-  .filter-btn.tag { border-color: #a29bfe; }
-  .filter-btn.tag.active { background: #a29bfe; color: #fff; border-color: #a29bfe; }
 
   /* 전체 레이아웃 */
   .app-wrap {
@@ -646,8 +644,6 @@
   <button class="filter-btn fav" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
   <div class="divider"></div>
-  <div id="tagFilters"><button class="filter-btn tag" data-filter="tag:보라" onclick="setFilter('tag:보라')">보라</button> <button class="filter-btn tag" data-filter="tag:게임" onclick="setFilter('tag:게임')">게임</button> <button class="filter-btn tag" data-filter="tag:스타" onclick="setFilter('tag:스타')">스타</button> <button class="filter-btn tag" data-filter="tag:스포츠" onclick="setFilter('tag:스포츠')">스포츠</button> <button class="filter-btn tag" data-filter="tag:왁타버스" onclick="setFilter('tag:왁타버스')">왁타버스</button> <button class="filter-btn tag" data-filter="tag:롤" onclick="setFilter('tag:롤')">롤</button> <button class="filter-btn tag" data-filter="tag:여캠" onclick="setFilter('tag:여캠')">여캠</button> <button class="filter-btn tag" data-filter="tag:메이플" onclick="setFilter('tag:메이플')">메이플</button> <button class="filter-btn tag" data-filter="tag:먹방" onclick="setFilter('tag:먹방')">먹방</button> <button class="filter-btn tag" data-filter="tag:하데스" onclick="setFilter('tag:하데스')">하데스</button> <button class="filter-btn tag" data-filter="tag:버츄얼" onclick="setFilter('tag:버츄얼')">버츄얼</button> <button class="filter-btn tag" data-filter="tag:배그" onclick="setFilter('tag:배그')">배그</button> <button class="filter-btn tag" data-filter="tag:발로란트" onclick="setFilter('tag:발로란트')">발로란트</button> <button class="filter-btn tag" data-filter="tag:음악" onclick="setFilter('tag:음악')">음악</button> <button class="filter-btn tag" data-filter="tag:피파" onclick="setFilter('tag:피파')">피파</button></div>
-  <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
 </div>
 
@@ -784,8 +780,7 @@ function openModal() {
   for (const [id, info] of Object.entries(BJ_LIST)) {
     const on = tempFav.includes(id) ? 'on' : '';
     const name = info.name || info;
-    const tag = info.tag || '';
-    list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\''+id+'\')"><div class="check '+on+'">V</div><span>'+escapeHtml(name)+' <small style="color:#999;font-size:11px">'+escapeHtml(tag)+'</small></span></div>';
+    list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\''+id+'\')"><div class="check '+on+'">V</div><span>'+escapeHtml(name)+'</span></div>';
   }
   document.getElementById('modalBg').classList.add('show');
 }
@@ -833,7 +828,7 @@ function buildCardHtml(item) {
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
   const reads = n.count?.read_cnt?.toLocaleString() || '0';
-  const tagBadge = item.tag ? '<span class="card-tag">' + escapeHtml(item.tag) + '</span>' : '';
+  const tagBadge = '';
   const bodyHtml = n.contentHtml || '';
   return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
@@ -863,17 +858,13 @@ function getFilteredNotices(data) {
   const allNotices = [];
   for (const [bjId, info] of Object.entries(data)) {
     for (const n of info.notices) {
-      allNotices.push({ bjId, name: info.name, tag: info.tag, notice: n });
+      allNotices.push({ bjId, name: info.name, notice: n });
     }
   }
   allNotices.sort((a, b) => new Date(b.notice.reg_date) - new Date(a.notice.reg_date));
 
   if (currentFilter === 'all') return allNotices;
   if (currentFilter === 'fav') return allNotices.filter(x => favorites.includes(x.bjId));
-  if (currentFilter.startsWith('tag:')) {
-    const tag = currentFilter.slice(4);
-    return allNotices.filter(x => x.tag === tag);
-  }
   return allNotices;
 }
 
@@ -986,8 +977,7 @@ function openDetail(cardEl) {
   const notice = info.notices.find(n => String(n.title_no) === String(titleNo));
   if (!notice) return;
 
-  const tag = info.tag ? ' <span style="color:#999;font-size:12px">' + escapeHtml(info.tag) + '</span>' : '';
-  document.getElementById('detailName').innerHTML = escapeHtml(info.name) + tag;
+  document.getElementById('detailName').innerHTML = escapeHtml(info.name);
   const pin = notice && notice.is_pin ? '<span class="pin">PIN</span>' : '';
   document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice ? notice.title_name || '' : titleText);
   const reads = notice && notice.count ? notice.count.read_cnt?.toLocaleString() || '0' : '0';
@@ -1133,8 +1123,7 @@ function buildBjListAndTags(data) {
   BJ_LIST = {};
   const tagSet = new Set();
   for (const [bjId, info] of Object.entries(data)) {
-    BJ_LIST[bjId] = { name: info.name, tag: info.tag };
-    if (info.tag) tagSet.add(info.tag);
+    BJ_LIST[bjId] = { name: info.name };
   }
   ALL_TAGS = Array.from(tagSet).sort();
 }
@@ -1149,7 +1138,7 @@ let isLoadingMore = false;
 function mergeData(target, source) {
   for (const bjId in source) {
     if (!target[bjId]) {
-      target[bjId] = { name: source[bjId].name, tag: source[bjId].tag, notices: [] };
+      target[bjId] = { name: source[bjId].name, notices: [] };
     }
     const existIds = new Set(target[bjId].notices.map(n => n.title_no));
     for (const n of source[bjId].notices) {
@@ -1294,8 +1283,7 @@ async function openCalDetail(bjId, titleNo) {
   const bodyEl = document.getElementById('detailBody');
 
   if (notice) {
-    const tag = info.tag ? ' <span style="color:#999;font-size:12px">' + escapeHtml(info.tag) + '</span>' : '';
-    nameEl.innerHTML = escapeHtml(info.name) + tag;
+    nameEl.innerHTML = escapeHtml(info.name);
     titleEl.innerHTML = (notice.is_pin ? '<span class="pin">PIN</span>' : '') + escapeHtml(notice.title_name || '');
     const reads = notice.count?.read_cnt?.toLocaleString() || '0';
     metaEl.innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';

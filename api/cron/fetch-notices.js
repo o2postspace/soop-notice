@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
             return {
               bj_id: bjId,
               bj_name: info.name,
-              bj_tag: info.tag,
+              bj_tag: null,
               title_no: n.title_no,
               title_name: n.title_name || "",
               content_html: contentHtml,

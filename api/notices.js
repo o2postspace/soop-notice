@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
     if (!grouped[row.bj_id]) {
       grouped[row.bj_id] = {
         name: row.bj_name,
-        tag: row.bj_tag,
+        tag: null,
         notices: [],
       };
     }
