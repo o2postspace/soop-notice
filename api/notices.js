@@ -1,14 +1,17 @@
 const { supabase } = require("../lib/supabase");
+const { BJ_LIST } = require("../lib/bj-list");
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
 
+  const validIds = Object.keys(BJ_LIST);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 8));
   const offset = Math.max(0, parseInt(req.query.offset) || 0);
 
   const { data, error, count } = await supabase
     .from("notices")
     .select("*", { count: "exact" })
+    .in("bj_id", validIds)
     .order("reg_date", { ascending: false })
     .range(offset, offset + limit - 1);
 
