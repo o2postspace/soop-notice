@@ -355,10 +355,19 @@
     max-width: 500px;
     width: 90%;
     max-height: 70vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 8px 30px rgba(0,0,0,0.12);
   }
-  .modal-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .modal-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-shrink: 0; }
+  .modal-search {
+    margin-bottom: 12px; flex-shrink: 0;
+  }
+  .modal-search input {
+    width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 13px; outline: none; box-sizing: border-box;
+  }
+  .modal-search input:focus { border-color: #5B6AED; }
   .modal h3 { color: #222; font-size: 16px; }
   .modal-close {
     width: 28px; height: 28px;
@@ -383,8 +392,11 @@
   }
   .modal-bj .check.on { border-color: #ff6b6b; color: #ff6b6b; background: rgba(255,107,107,0.08); }
   .modal-bj span { font-size: 13px; color: #333; }
+  #modalList {
+    overflow-y: auto; flex: 1; min-height: 0;
+  }
   .modal-actions {
-    display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end;
+    display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; flex-shrink: 0;
   }
   .modal-actions button {
     padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none;
@@ -685,6 +697,9 @@
       <h3>본진 BJ 설정</h3>
       <button class="modal-close" onclick="closeModal()">X</button>
     </div>
+    <div class="modal-search">
+      <input type="text" id="modalSearchInput" placeholder="BJ 이름 검색..." oninput="filterModalList()">
+    </div>
     <div id="modalList"></div>
     <div class="modal-actions">
       <button class="btn-save" onclick="saveFav()">저장</button>
@@ -782,7 +797,17 @@ function openModal() {
     const name = info.name || info;
     list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\''+id+'\')"><div class="check '+on+'">V</div><span>'+escapeHtml(name)+'</span></div>';
   }
+  document.getElementById('modalSearchInput').value = '';
   document.getElementById('modalBg').classList.add('show');
+}
+
+function filterModalList() {
+  const keyword = document.getElementById('modalSearchInput').value.trim().toLowerCase();
+  const items = document.querySelectorAll('#modalList .modal-bj');
+  items.forEach(item => {
+    const name = item.querySelector('span').textContent.toLowerCase();
+    item.style.display = name.includes(keyword) ? '' : 'none';
+  });
 }
 
 document.addEventListener('click', (e) => {
