@@ -78,11 +78,15 @@ JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"
       }),
     });
 
-    if (!resp.ok) return [];
+    if (!resp.ok) {
+      console.error("Gemini error:", resp.status, await resp.text().catch(() => ""));
+      return [];
+    }
     const data = await resp.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
     return JSON.parse(text);
-  } catch {
+  } catch(e) {
+    console.error("Parse error:", e.message);
     return [];
   }
 }
@@ -183,16 +187,18 @@ module.exports = async function handler(req, res) {
         const bjEntry = Object.entries(BJ_LIST).find(([, v]) => v.name === bjName);
         if (!bjEntry || !POPULAR_BJ_IDS.includes(bjEntry[0])) continue;
         if (bjEntry[0] === notice.bj_id) continue; // 본인은 이미 저장됨
-        await supabase.from("schedules").upsert({
-          bj_id: bjEntry[0],
-          bj_name: bjName,
-          title_no: notice.title_no,
-          broadcast_start: startStr,
-          broadcast_end: endStr,
-          description: `${notice.bj_name} 합방: ${s.description || ""}`,
-          raw_text: `합방(${notice.bj_name}): ${s.start_time}~${s.end_time || "?"}`,
-          parsed_at: new Date().toISOString(),
-        }, { onConflict: "title_no,broadcast_start" }).catch(() => {});
+        try {
+          await supabase.from("schedules").upsert({
+            bj_id: bjEntry[0],
+            bj_name: bjName,
+            title_no: notice.title_no,
+            broadcast_start: startStr,
+            broadcast_end: endStr,
+            description: `${notice.bj_name} 합방: ${s.description || ""}`,
+            raw_text: `합방(${notice.bj_name}): ${s.start_time}~${s.end_time || "?"}`,
+            parsed_at: new Date().toISOString(),
+          }, { onConflict: "title_no,broadcast_start" });
+        } catch(e) { /* 중복 무시 */ }
         totalParsed++;
       }
     }
