@@ -1102,6 +1102,7 @@ function updateNav() {
 // 키보드: 위/아래, j/k, PageUp/PageDown
 document.addEventListener('keydown', (e) => {
   if (document.getElementById('modalBg').classList.contains('show')) return;
+  if (document.getElementById('detailBg').classList.contains('show')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
   if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
