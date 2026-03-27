@@ -20,9 +20,10 @@ module.exports = async function handler(req, res) {
   sunday.setUTCDate(sunday.getUTCDate() + 6);
   sunday.setUTCHours(23, 59, 59, 999);
 
-  // KST → UTC로 변환해서 쿼리 (DB에 KST가 UTC로 저장됨)
+  // KST 월요일 00:00 = UTC 전날 15:00, KST 일요일 23:59 = UTC 일요일 14:59
   const weekStart = new Date(monday.getTime() - 9 * 60 * 60 * 1000).toISOString();
   const weekEnd = new Date(sunday.getTime() - 9 * 60 * 60 * 1000).toISOString();
+
 
   const { data, error } = await supabase
     .from("schedules")
