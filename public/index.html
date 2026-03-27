@@ -1045,8 +1045,15 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('detailBg').classList.contains('show')) {
+  if (!document.getElementById('detailBg').classList.contains('show')) return;
+  if (e.key === 'Escape') {
     closeDetail();
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    document.querySelector('.detail-body').scrollBy(0, 60);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    document.querySelector('.detail-body').scrollBy(0, -60);
   }
 });
 
