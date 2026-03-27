@@ -14,6 +14,7 @@ const noticesHandler = require("./api/notices");
 const noticeContentHandler = require("./api/notice-content");
 const cronHandler = require("./api/cron/fetch-notices");
 const parseSchedulesHandler = require("./api/cron/parse-schedules");
+const parseCollabsHandler = require("./api/cron/parse-collabs");
 const schedulesHandler = require("./api/schedules");
 
 function mockRes() {
@@ -63,6 +64,15 @@ const server = http.createServer(async (req, res) => {
     const mockR = mockRes();
     const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
     await parseSchedulesHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/cron/parse-collabs") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await parseCollabsHandler(mockReq, mockR);
     res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
     res.end(mockR.body);
     return;
