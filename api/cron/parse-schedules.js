@@ -3,6 +3,9 @@ const { POPULAR_BJ_IDS, BJ_LIST } = require("../../lib/bj-list");
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+// 인기 BJ 이름 목록 (합방 감지용)
+const POPULAR_NAMES = POPULAR_BJ_IDS.map(id => BJ_LIST[id]?.name).filter(Boolean);
+
 function stripHtml(html) {
   return (html || "")
     .replace(/<[^>]+>/g, " ")
@@ -35,6 +38,8 @@ async function parseWithGemini(noticeText, today, imageUrls) {
 텍스트에 시간이 없으면 첨부된 이미지도 확인해.
 오늘: ${today}
 
+인기BJ 목록: ${POPULAR_NAMES.join(', ')}
+
 ${noticeText}
 
 규칙:
@@ -44,11 +49,13 @@ ${noticeText}
 - 본문/이미지에 시간이 명시되지 않으면 start_time: null
 - BJ는 보통 오후~저녁에 방송함. "7시"→19:00, "5시"→17:00, "1시"→13:00, "2시"→14:00 (오전이 명시된 경우만 AM)
 - "오후6시"→18:00, "저녁9시"→21:00, "점심"→12:00, "새벽2시"→02:00, "오전11시"→11:00
+- "좌표" = 해당 BJ 방송으로 가라는 뜻 → 합방 의미
+- 합방 상대가 인기BJ 목록에 있으면 mentioned_bjs에 해당 이름들 추가
 - description: 방송 내용 요약 (합방 상대, 컨텐츠명, 대회명 등 10~20자)
 - "쉽니다", "휴방", "오프" → 빈 배열 []
 - 방송 일정이 아닌 글(일상, 홍보, 경기결과, 모집) → 빈 배열 []
 
-JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"요약"}]`;
+JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"요약","mentioned_bjs":["이름1"]}]`;
 
   // parts: 텍스트 + 이미지 URL
   const parts = [{ text: prompt }];
@@ -90,14 +97,33 @@ module.exports = async function handler(req, res) {
     year: "numeric", month: "2-digit", day: "2-digit",
   }).replace(/\. /g, "-").replace(".", "");
 
-  // 최근 3일 공지 중 인기 BJ 것만 가져오기
+  // 최근 3일 공지 가져오기 (인기 BJ 본인 공지 + 합방 언급 감지용 전체)
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: notices, error } = await supabase
+
+  // 1) 인기 BJ 본인 공지
+  const { data: popularNotices, error } = await supabase
     .from("notices")
     .select("bj_id, bj_name, title_no, title_name, content_html, reg_date")
     .in("bj_id", POPULAR_BJ_IDS)
     .gte("reg_date", threeDaysAgo)
     .order("reg_date", { ascending: false });
+
+  // 2) 다른 BJ 공지 중 인기 BJ 이름이 언급된 것 (합방 감지)
+  const { data: otherNotices } = await supabase
+    .from("notices")
+    .select("bj_id, bj_name, title_no, title_name, content_html, reg_date")
+    .not("bj_id", "in", "(" + POPULAR_BJ_IDS.join(",") + ")")
+    .gte("reg_date", threeDaysAgo)
+    .order("reg_date", { ascending: false })
+    .limit(100);
+
+  // 인기 BJ 이름이 언급된 공지만 필터
+  const collabNotices = (otherNotices || []).filter(n => {
+    const text = (n.title_name || "") + " " + stripHtml(n.content_html);
+    return POPULAR_NAMES.some(name => text.includes(name)) || text.includes("좌표");
+  });
+
+  const notices = [...(popularNotices || []), ...collabNotices];
 
   if (error) {
     return res.status(500).json({ error: error.message });
@@ -138,6 +164,7 @@ module.exports = async function handler(req, res) {
       const endStr = s.end_time ? `${s.date}T${s.end_time}:00+09:00` : null;
       if (!startStr) continue;
 
+      // 공지 작성자 본인 저장
       await supabase.from("schedules").upsert({
         bj_id: notice.bj_id,
         bj_name: notice.bj_name,
@@ -148,8 +175,26 @@ module.exports = async function handler(req, res) {
         raw_text: `${notice.title_name}: ${s.start_time}~${s.end_time || "?"}`,
         parsed_at: new Date().toISOString(),
       }, { onConflict: "title_no,broadcast_start" });
-
       totalParsed++;
+
+      // 언급된 인기 BJ들도 캘린더에 추가
+      const mentioned = s.mentioned_bjs || [];
+      for (const bjName of mentioned) {
+        const bjEntry = Object.entries(BJ_LIST).find(([, v]) => v.name === bjName);
+        if (!bjEntry || !POPULAR_BJ_IDS.includes(bjEntry[0])) continue;
+        if (bjEntry[0] === notice.bj_id) continue; // 본인은 이미 저장됨
+        await supabase.from("schedules").upsert({
+          bj_id: bjEntry[0],
+          bj_name: bjName,
+          title_no: notice.title_no,
+          broadcast_start: startStr,
+          broadcast_end: endStr,
+          description: `${notice.bj_name} 합방: ${s.description || ""}`,
+          raw_text: `합방(${notice.bj_name}): ${s.start_time}~${s.end_time || "?"}`,
+          parsed_at: new Date().toISOString(),
+        }, { onConflict: "title_no,broadcast_start" }).catch(() => {});
+        totalParsed++;
+      }
     }
   }
 
