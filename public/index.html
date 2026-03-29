@@ -908,7 +908,8 @@ function isCardSpan2(item) {
 
 // 4열 × 1행 고정 패킹 (가로 우선 배치)
 function packIntoPages(notices) {
-  const cols = 4;
+  const w = window.innerWidth;
+  const cols = w <= 700 ? 1 : w <= 1200 ? 2 : 4;
   const maxRows = 1;
   const pages = [];
   let i = 0;
