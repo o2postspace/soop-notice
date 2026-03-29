@@ -1055,7 +1055,7 @@ async function copyForFmkorea() {
     const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
     const reads = notice.count?.read_cnt?.toLocaleString() || '0';
     const regDate = formatDate(notice.reg_date);
-    const postUrl = 'https://www.sooplive.com/station/' + detailBjId + '/notice/' + detailTitleNo;
+    const postUrl = 'https://www.sooplive.com/station/' + detailBjId + '/post/' + detailTitleNo;
     const liveUrl = 'https://play.sooplive.com/' + detailBjId;
 
     // 본문 복제 후 이미지 data URL 변환
