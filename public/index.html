@@ -1145,6 +1145,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { passive: false });
 });
 
+// 터치 스와이프로 페이지 전환 (모바일)
+(function() {
+  let startY = 0;
+  let startTime = 0;
+  document.addEventListener('touchstart', (e) => {
+    if (document.getElementById('modalBg').classList.contains('show')) return;
+    if (document.getElementById('detailBg').classList.contains('show')) return;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (document.getElementById('modalBg').classList.contains('show')) return;
+    if (document.getElementById('detailBg').classList.contains('show')) return;
+    const diffY = startY - e.changedTouches[0].clientY;
+    const diffTime = Date.now() - startTime;
+    if (diffTime > 500 || Math.abs(diffY) < 50) return;
+    if (diffY > 0) goPage(1);   // 위로 스와이프 → 다음
+    else goPage(-1);             // 아래로 스와이프 → 이전
+  }, { passive: true });
+})();
+
 // 리사이즈 시 페이지 재구성
 window.addEventListener('resize', () => {
   if (Object.keys(prevData).length > 0) {
