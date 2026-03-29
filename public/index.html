@@ -717,6 +717,9 @@
       <div class="detail-meta" id="detailMeta"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
+    <div style="padding:12px 20px 16px; border-top:1px solid #eee; text-align:center;">
+      <button id="detailCopyBtn" onclick="copyForFmkorea()" style="padding:10px 24px; background:#1859E6; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">📋 펨코 복사</button>
+    </div>
   </div>
 </div>
 
@@ -995,9 +998,13 @@ function toggleExpand(e, btn) {
   btn.textContent = expanded ? '접기' : '더보기';
 }
 
+let detailBjId = '', detailTitleNo = '';
+
 function openDetail(cardEl) {
   const bjId = cardEl.dataset.bjid;
   const titleNo = cardEl.dataset.titleno;
+  detailBjId = bjId;
+  detailTitleNo = titleNo;
   const info = prevData[bjId];
   if (!info) return;
   const notice = info.notices.find(n => String(n.title_no) === String(titleNo));
@@ -1034,6 +1041,118 @@ function openDetail(cardEl) {
   // 메인 페이지 스크롤 잠금
   document.body.style.overflow = 'hidden';
 }
+async function copyForFmkorea() {
+  const btn = document.getElementById('detailCopyBtn');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ 처리 중...';
+  btn.disabled = true;
+
+  try {
+    const info = prevData[detailBjId];
+    const notice = info.notices.find(n => String(n.title_no) === String(detailTitleNo));
+    const name = info.name;
+    const title = notice.title_name || '';
+    const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
+    const reads = notice.count?.read_cnt?.toLocaleString() || '0';
+    const regDate = formatDate(notice.reg_date);
+    const postUrl = 'https://www.sooplive.com/station/' + detailBjId + '/notice/' + detailTitleNo;
+    const liveUrl = 'https://play.sooplive.com/' + detailBjId;
+
+    // 본문 복제 후 이미지 data URL 변환
+    const bodyEl = document.getElementById('detailBody');
+    const clone = bodyEl.cloneNode(true);
+
+    // lazy load 이미지 원본 src 복원
+    clone.querySelectorAll('img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+      img.removeAttribute('data-src');
+    });
+
+    // 이미지 data URL 변환
+    const imgs = clone.querySelectorAll('img');
+    await Promise.all(Array.from(imgs).map(img => {
+      return new Promise(resolve => {
+        if (img.src.startsWith('data:')) return resolve();
+        fetch(img.src).then(r => r.blob()).then(blob => {
+          const reader = new FileReader();
+          reader.onloadend = () => { img.src = reader.result; resolve(); };
+          reader.readAsDataURL(blob);
+        }).catch(() => resolve());
+      });
+    }));
+
+    // 이미지 스타일 정리
+    clone.querySelectorAll('img').forEach(img => {
+      const src = img.src;
+      const alt = img.alt || '';
+      const isGif = src.startsWith('data:image/gif');
+      const origW = img.style.width;
+      const attrs = Array.from(img.attributes);
+      attrs.forEach(a => img.removeAttribute(a.name));
+      img.src = src;
+      img.alt = alt;
+      if (isGif && !origW) {
+        img.style.verticalAlign = 'middle';
+      } else if (origW && origW !== '100%') {
+        img.style.width = origW;
+        img.style.height = 'auto';
+      } else {
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        img.style.maxWidth = '100%';
+      }
+    });
+
+    const bodyHtml = clone.innerHTML;
+
+    // 펨코용 HTML 구성
+    const html = `
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:24px;font-weight:bold;margin:0;line-height:1.2;">
+          ${pin}<span style="vertical-align:middle;">${escapeHtml(title)}</span>
+        </h2>
+      </div>
+      <table style="border:none;border-collapse:collapse;width:100%;max-width:600px;">
+        <tbody><tr>
+          <td style="vertical-align:middle;">
+            <div style="font-size:16px;font-weight:bold;">${escapeHtml(name)}</div>
+            <div style="font-size:12px;color:#888;">
+              <span>${regDate}</span>
+              <span style="margin:0 4px;">·</span>
+              <span>조회수 ${reads}</span>
+            </div>
+          </td>
+        </tr></tbody>
+      </table>
+      <div style="border-top:1px solid #eee;margin:20px 0;"></div>
+      <div style="font-size:14px;line-height:1.6;">${bodyHtml}</div>
+      <div style="margin-top:24px;padding:20px 0;border-top:2px solid #eee;border-bottom:2px solid #eee;text-align:center;">
+        <a href="${postUrl}" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#6c757d;border:1px solid #6c757d;border-radius:4px;">공지사항 바로가기</a>
+        <a href="${liveUrl}" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#1859E6;border:1px solid #1859E6;border-radius:4px;">생방송 바로가기</a>
+      </div>
+    `;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+
+    btn.innerHTML = '✅ 복사 완료!';
+    btn.style.backgroundColor = '#28a745';
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.style.backgroundColor = '#1859E6';
+      btn.disabled = false;
+    }, 2000);
+  } catch(e) {
+    console.error('펨코 복사 오류:', e);
+    btn.innerHTML = '❌ 실패';
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.style.backgroundColor = '#1859E6';
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
 function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
   document.body.style.overflow = '';
