@@ -1205,15 +1205,19 @@ async function loadAll() {
     }
     if (newCount > 0) showToast("새 공지 " + newCount + "개!");
 
+    const isFirstLoad = Object.keys(prevData).length === 0;
     prevData = data;
-    currentPage = 0;
-    renderPages(data);
+
+    if (isFirstLoad) {
+      currentPage = 0;
+      renderPages(data);
+    }
 
     document.getElementById("lastUpdate").textContent =
       new Date().toLocaleTimeString("ko-KR");
 
-    // 2) 나머지 백그라운드 로드
-    loadMore();
+    // 2) 나머지 백그라운드 로드 → 완료 후 렌더링
+    await loadMore();
   } catch(e) {
     showToast("실패: " + e.message);
   }
@@ -1240,12 +1244,9 @@ async function loadMore() {
       loaded = Object.values(prevData).reduce((s, v) => s + v.notices.length, 0);
     }
 
-    // 태그 필터 업데이트, 페이지 수 갱신 (현재 화면 안 건드림)
+    // 태그 필터 업데이트, 전체 데이터로 페이지 재렌더링
     renderTagFilters();
-    filteredNotices = getFilteredNotices(prevData);
-    packedPages = packIntoPages(filteredNotices);
-    totalPages = packedPages.length;
-    updateNav();
+    renderPages(prevData);
   } catch(e) { /* 백그라운드 실패 무시 */ }
 
   isLoadingMore = false;
