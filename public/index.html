@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>숲공지 - SOOP BJ 공지사항 대시보드 | soopnotice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&display=swap" rel="stylesheet">
 <meta name="description" content="숲공지(soopnotice) - SOOP(숲) BJ들의 공지사항을 한 곳에서 모아보는 대시보드. 실시간 방송 일정, 캘린더, 인기 공지를 확인하세요.">
 <meta name="keywords" content="숲공지, soopnotice, SOOP, 숲, 아프리카TV, BJ, 공지사항, 방송일정, 캘린더, 스트리머">
 <meta property="og:title" content="숲공지 - SOOP BJ 공지사항 대시보드">
@@ -35,7 +37,7 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     flex-shrink: 0;
   }
-  header h1 { font-size: 18px; color: #222; font-weight: 700; }
+  header h1 { font-size: 22px; color: #222; font-weight: 700; font-family: 'Noto Serif KR', serif; letter-spacing: 2px; }
   header h1 span { color: #5B6AED; }
   .header-right {
     display: flex;
@@ -1981,18 +1983,35 @@ async function sendFeedback() {
 }
 
 // ===================== 라이브 체크 =====================
+const POPULAR_IDS = ['y1026','devil0108','khm11903','phonics1','rrvv17','yuambo','lshooooo','wnnw','joey1114'];
+
 async function checkLiveStatus() {
   const liveLinks = document.querySelectorAll('.live-link[data-bjid]');
   if (liveLinks.length === 0) return;
-  const bjIds = [...new Set([...liveLinks].map(el => el.dataset.bjid))];
-  try {
-    const resp = await fetch('/api/live-check?ids=' + bjIds.join(','));
-    const data = await resp.json();
+  const allIds = [...new Set([...liveLinks].map(el => el.dataset.bjid))];
+  const popular = allIds.filter(id => POPULAR_IDS.includes(id));
+  const others = allIds.filter(id => !POPULAR_IDS.includes(id));
+
+  function applyResults(data) {
     liveLinks.forEach(el => {
-      if (data[el.dataset.bjid]) el.classList.add('is-live');
-      else el.classList.remove('is-live');
+      if (data[el.dataset.bjid] !== undefined) el.classList.toggle('is-live', data[el.dataset.bjid]);
     });
-  } catch(e) {}
+  }
+
+  // 인기 BJ 먼저 빠르게
+  if (popular.length > 0) {
+    try {
+      const resp = await fetch('/api/live-check?ids=' + popular.join(','));
+      applyResults(await resp.json());
+    } catch(e) {}
+  }
+  // 나머지 백그라운드
+  if (others.length > 0) {
+    try {
+      const resp = await fetch('/api/live-check?ids=' + others.join(','));
+      applyResults(await resp.json());
+    } catch(e) {}
+  }
 }
 
 // 30초마다 라이브 체크
