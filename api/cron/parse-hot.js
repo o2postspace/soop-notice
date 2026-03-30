@@ -29,7 +29,7 @@ ${noticeText}
   - "월요일"~"일요일" → 해당 요일의 실제 날짜로 변환 (오늘 기준 이번주/다음주)
   - "목요일 방송", "수요일에" → 해당 요일 날짜
 - 시간은 반드시 "방송 시작 시간"만 추출 (공지 작성 시간 아님!)
-- 본문에 시간이 명시되지 않지만 "시작합니다", "갑니다", "킵니다", "지금", "바로" 등 즉시 시작 표현이 있으면 → start_time은 공지 작성 시간 기준
+- 본문에 시간이 명시되지 않지만 "시작합니다", "갑니다", "킵니다", "지금", "바로" 등 즉시 시작 표현이 있으면 → start_time은 [작성시간]을 사용
 - 시간 정보가 전혀 없고 즉시 시작도 아니면 start_time: null
 - 상식적으로 시간 판단:
   - BJ는 보통 낮~밤(12시~24시)에 방송함
@@ -100,8 +100,9 @@ module.exports = async function handler(req, res) {
     if (!plainText || plainText.length < 5) continue;
 
     const noticeDate = notice.reg_date ? notice.reg_date.slice(0, 10) : today;
+    const noticeTime = notice.reg_date ? notice.reg_date.slice(11, 16) : "00:00";
     const schedules = await parseWithGemini(
-      `[작성일: ${noticeDate}] [제목: ${notice.title_name}] ${plainText}`,
+      `[작성일: ${noticeDate}] [작성시간: ${noticeTime} KST] [제목: ${notice.title_name}] ${plainText}`,
       today,
       process.env.GEMINI_API_KEY
     );
