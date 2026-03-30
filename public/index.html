@@ -210,11 +210,19 @@
     font-size: 11px;
     font-weight: 700;
     color: #fff;
-    background: #e74c3c;
+    background: #ccc;
     padding: 3px 10px;
     border-radius: 12px;
     text-decoration: none;
     transition: background 0.15s;
+  }
+  .live-link.is-live {
+    background: #e74c3c;
+    animation: livePulse 2s infinite;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
   }
   .live-link:hover {
     background: #c0392b;
@@ -1208,7 +1216,7 @@ function buildCardHtml(item) {
     + '<div class="card-header">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
     + '<a class="soop-link" href="https://www.sooplive.com/station/' + item.bjId + '/post/' + n.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
-    + '<a class="live-link" href="https://play.sooplive.com/' + item.bjId + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
+    + '<a class="live-link" data-bjid="' + item.bjId + '" href="https://play.sooplive.com/' + item.bjId + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
     + '</div>'
     + '<div class="card-content">'
     + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
@@ -1690,6 +1698,9 @@ async function loadAll() {
 
     document.getElementById("lastUpdate").textContent =
       new Date().toLocaleTimeString("ko-KR");
+
+    // 라이브 상태 체크
+    setTimeout(checkLiveStatus, 500);
   } catch(e) {
     showToast("실패: " + e.message);
   }
@@ -1821,7 +1832,7 @@ function renderDayCalendar(data) {
       + '<span class="cal-notice-desc">' + escapeHtml(s.description) + '</span>'
       + (s.reg_date ? '<span class="cal-notice-date">' + formatDate(s.reg_date) + '</span>' : '')
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
-      + '<a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
+      + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
       + '</div>';
@@ -1833,6 +1844,7 @@ function renderDayCalendar(data) {
 
   // 스크롤 감지 → 인덱스 하이라이트
   content.addEventListener('scroll', onCalContentScroll);
+  setTimeout(checkLiveStatus, 500);
 }
 
 function renderHotCalendar(data) {
@@ -1872,7 +1884,7 @@ function renderHotCalendar(data) {
       + (s.reg_date ? '<span class="cal-notice-date">' + formatDate(s.reg_date) + '</span>' : '')
       + '<span class="cal-notice-desc view-count"><span class="vc-icon">👁</span><span class="vc-text">조회수</span>' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span>'
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
-      + '<a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
+      + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:15px;font-weight:600;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
@@ -1882,6 +1894,7 @@ function renderHotCalendar(data) {
 
   data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
   content.addEventListener('scroll', onCalContentScroll);
+  setTimeout(checkLiveStatus, 500);
 }
 
 async function loadNoticeBody(titleNo, index) {
@@ -1955,6 +1968,24 @@ async function sendFeedback() {
     showToast('전송 실패: ' + e.message);
   }
 }
+
+// ===================== 라이브 체크 =====================
+async function checkLiveStatus() {
+  const liveLinks = document.querySelectorAll('.live-link[data-bjid]');
+  if (liveLinks.length === 0) return;
+  const bjIds = [...new Set([...liveLinks].map(el => el.dataset.bjid))];
+  try {
+    const resp = await fetch('/api/live-check?ids=' + bjIds.join(','));
+    const data = await resp.json();
+    liveLinks.forEach(el => {
+      if (data[el.dataset.bjid]) el.classList.add('is-live');
+      else el.classList.remove('is-live');
+    });
+  } catch(e) {}
+}
+
+// 30초마다 라이브 체크
+setInterval(checkLiveStatus, 30000);
 
 loadAll();
 setupAutoRefresh();
