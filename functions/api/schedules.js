@@ -7,15 +7,17 @@ export async function onRequestGet(context) {
 
   const dayOffset = parseInt(url.searchParams.get("day_offset")) || 0;
 
-  // 오늘 (KST 기준) + offset
+  // 하루 기준: 08:00 KST ~ 다음날 08:00 KST
   const now = new Date();
   const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  if (kstNow.getUTCHours() < 8) kstNow.setUTCDate(kstNow.getUTCDate() - 1);
   const targetDay = new Date(kstNow);
   targetDay.setUTCDate(targetDay.getUTCDate() + dayOffset);
-  targetDay.setUTCHours(0, 0, 0, 0);
+  targetDay.setUTCHours(8, 0, 0, 0);
 
   const dayEnd = new Date(targetDay);
-  dayEnd.setUTCHours(23, 59, 59, 999);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  dayEnd.setUTCHours(7, 59, 59, 999);
 
   // KST -> UTC 변환
   const dayStartUTC = new Date(targetDay.getTime() - 9 * 60 * 60 * 1000).toISOString();

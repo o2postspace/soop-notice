@@ -6,15 +6,18 @@ module.exports = async function handler(req, res) {
 
   const dayOffset = parseInt(req.query.day_offset) || 0;
 
-  // 오늘 (KST 기준) + offset
+  // 오늘 (KST 기준) + offset — 하루 기준: 08:00 ~ 다음날 08:00
   const now = new Date();
   const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  // 현재 KST가 08시 이전이면 전날로 판단
+  if (kstNow.getUTCHours() < 8) kstNow.setUTCDate(kstNow.getUTCDate() - 1);
   const targetDay = new Date(kstNow);
   targetDay.setUTCDate(targetDay.getUTCDate() + dayOffset);
-  targetDay.setUTCHours(0, 0, 0, 0);
+  targetDay.setUTCHours(8, 0, 0, 0); // 당일 08:00 KST
 
   const dayEnd = new Date(targetDay);
-  dayEnd.setUTCHours(23, 59, 59, 999);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1); // 다음날 08:00 KST
+  dayEnd.setUTCHours(7, 59, 59, 999);
 
   // KST → UTC 변환
   const dayStartUTC = new Date(targetDay.getTime() - 9 * 60 * 60 * 1000).toISOString();
