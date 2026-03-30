@@ -151,7 +151,7 @@
   .card-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f0f0;
   }
@@ -165,6 +165,7 @@
   }
   .soop-link {
     flex-shrink: 0;
+    margin-left: auto;
     font-size: 11px;
     font-weight: 700;
     color: #fff;
@@ -1171,6 +1172,7 @@ function buildCardHtml(item) {
     + '<div class="card-header">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
     + '<a class="soop-link" href="https://www.sooplive.com/station/' + item.bjId + '/post/' + n.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
+    + '<a class="live-link" href="https://play.sooplive.com/' + item.bjId + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
     + '</div>'
     + '<div class="card-content">'
     + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
