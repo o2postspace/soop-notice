@@ -778,7 +778,8 @@
 
 <div id="calendarContainer" style="display:none;">
   <div class="cal-sub-tabs">
-    <button class="cal-sub-btn active" onclick="switchCalTab('popular')">인기</button>
+    <button class="cal-sub-btn active" data-caltab="popular" onclick="switchCalTab('popular')">인기</button>
+    <button class="cal-sub-btn" data-caltab="hot" onclick="switchCalTab('hot')">HOT</button>
   </div>
   <div class="calendar-nav">
     <button onclick="changeDay(-1)">&#9664; 이전</button>
@@ -1615,24 +1616,30 @@ function switchTab(tab) {
     document.getElementById('scroller').style.display = 'none';
     document.getElementById('scrollNav').style.display = 'none';
     document.getElementById('calendarContainer').style.display = '';
-    loadSchedules(calDayOffset);
+    loadCalendar();
   }
 }
 
 // ===================== 캘린더 (하루 뷰) =====================
 let calDayOffset = 0;
 let calSlots = [];
+let currentCalTab = 'popular';
 
 function changeDay(dir) {
-  if (dir === 0) calDayOffset = 0; // 오늘 버튼
+  if (dir === 0) calDayOffset = 0;
   else calDayOffset += dir;
-  loadSchedules(calDayOffset);
+  loadCalendar();
 }
 
 function switchCalTab(tab) {
-  document.querySelectorAll('.cal-sub-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  loadSchedules(calDayOffset);
+  currentCalTab = tab;
+  document.querySelectorAll('.cal-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.caltab === tab));
+  loadCalendar();
+}
+
+function loadCalendar() {
+  if (currentCalTab === 'hot') loadHotNotices(calDayOffset);
+  else loadSchedules(calDayOffset);
 }
 
 async function loadSchedules(offset) {
@@ -1647,6 +1654,22 @@ async function loadSchedules(offset) {
     document.getElementById('calDateLabel').textContent = data.date + ' (' + data.day_name + ')';
     calSlots = data.slots;
     renderDayCalendar(data);
+  } catch(e) {
+    idx.innerHTML = '<div class="cal-empty-day">로드 실패</div>';
+  }
+}
+
+async function loadHotNotices(offset) {
+  const idx = document.getElementById('calIndex');
+  const content = document.getElementById('calContent');
+  idx.innerHTML = '<div class="cal-notice-loading">불러오는 중...</div>';
+  content.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/hot-notices?day_offset=' + offset);
+    const data = await resp.json();
+    document.getElementById('calDateLabel').textContent = data.date + ' (' + data.day_name + ')';
+    renderHotCalendar(data);
   } catch(e) {
     idx.innerHTML = '<div class="cal-empty-day">로드 실패</div>';
   }
@@ -1697,6 +1720,52 @@ function renderDayCalendar(data) {
   data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
 
   // 스크롤 감지 → 인덱스 하이라이트
+  content.addEventListener('scroll', onCalContentScroll);
+}
+
+function renderHotCalendar(data) {
+  const idx = document.getElementById('calIndex');
+  const content = document.getElementById('calContent');
+
+  if (!data.slots || data.slots.length === 0) {
+    idx.innerHTML = '<div class="cal-empty-day">HOT 공지 없음</div>';
+    content.innerHTML = '<div class="cal-empty-day">조회수 1000 이상 방송 일정이 없습니다</div>';
+    return;
+  }
+
+  // 왼쪽 인덱스 (방송 시간순)
+  let idxHtml = '';
+  data.slots.forEach((s, i) => {
+    const utc = new Date(s.broadcast_start);
+    const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+    const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
+    idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
+      + '<div class="idx-time">' + timeStr + ' <span style="color:#ff4757;font-size:11px;">♥ ' + (s.read_cnt || 0).toLocaleString() + '</span></div>'
+      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
+      + '<div class="idx-desc">' + escapeHtml(s.description || s.title_name || '') + '</div>'
+      + '</div>';
+  });
+  idx.innerHTML = idxHtml;
+
+  // 오른쪽 본문
+  let contentHtml = '';
+  data.slots.forEach((s, i) => {
+    const utc = new Date(s.broadcast_start);
+    const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+    const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
+    contentHtml += '<div class="cal-notice" id="cal-notice-' + i + '">'
+      + '<div class="cal-notice-header">'
+      + '<span class="cal-notice-time">' + timeStr + '</span>'
+      + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
+      + '<span class="cal-notice-desc" style="color:#ff4757;">♥ ' + (s.read_cnt || 0).toLocaleString() + '</span>'
+      + '</div>'
+      + '<div class="cal-notice-title" style="font-size:15px;font-weight:600;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
+      + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
+      + '</div>';
+  });
+  content.innerHTML = contentHtml;
+
+  data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
   content.addEventListener('scroll', onCalContentScroll);
 }
 
