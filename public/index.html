@@ -671,20 +671,6 @@
     margin-left: auto;
     flex-shrink: 0;
   }
-  .cal-notice-footer {
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid #f0f0f0;
-    text-align: right;
-  }
-  .cal-notice-footer .soop-link,
-  .cal-notice-footer .live-link {
-    font-size: 13px;
-    padding: 5px 16px;
-  }
-  .cal-notice-footer .live-link {
-    margin-left: 8px;
-  }
   .cal-notice-body {
     font-size: 14px;
     line-height: 1.8;
@@ -1754,7 +1740,6 @@ function renderDayCalendar(data) {
       + '<a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
-      + '<div class="cal-notice-footer"><a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP에서 원본 보기</a> <a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE 생방송 보러가기</a></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
@@ -1806,7 +1791,6 @@ function renderHotCalendar(data) {
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:15px;font-weight:600;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
-      + '<div class="cal-notice-footer"><a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP에서 원본 보기</a> <a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE 생방송 보러가기</a></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
