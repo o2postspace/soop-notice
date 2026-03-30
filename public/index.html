@@ -362,7 +362,7 @@
     padding: 24px;
     max-width: 500px;
     width: 90%;
-    max-height: 70vh;
+    height: 70vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 8px 30px rgba(0,0,0,0.12);
@@ -776,7 +776,7 @@
     </div>
     <div id="modalList"></div>
     <div class="modal-actions">
-      <button class="btn-save" onclick="saveFav()">저장</button>
+      <button class="btn-save" onclick="saveFav()">저장(Enter)</button>
     </div>
   </div>
 </div>
@@ -799,6 +799,52 @@
 
 <script>
 let BJ_LIST = {};
+const BJ_ORDER = [
+  "y1026","devil0108","lshooooo","khm11903","wnnw","rrvv17","jdm1197","galsa",
+  "phonics1","nila25","aflol","zkwks4413","yuambo","ecvhao","b13246","gyeonjahee",
+  "lyj9306","1004suna","pookygamja","gosegu2","eunyoung1238","sky2713","lovely5959",
+  "lilpa0309","arinbbidol","townboy","jingburger1","viichan6","cotton1217","rkdakstlr911",
+  "tntntn13","ioioiobb","kiss281004","rud9281","pyh3646","rlatldgus","wnstn0905",
+  "under444","dkrn56","smmms2002","nanajam","wodnrdldia","gks2wl","e9dongsung",
+  "lolsos","gudcjf604","hockey05","hyn8210","siiyeon","apple1004l","xoals137",
+  "mj0128","jrdart","595935","sdkels","poos69","suhee0051","gksdidqksxn","daybymin",
+  "legendhyuk","gkdlqk13","thwl9386","cnsgkcnehd74","tjrdbs999","he0901","nmangoquince",
+  "vf3366","rmlrl771","243000","jey422","roket0829","bhw2209","mygomiee","iamquaddurup",
+  "dlsn9911","ogm0905","pubg","kaksjak0730","tleod1818","yeopuu","kimdoenmo","aksen7833",
+  "toryvac","madaomm","danchu17","mingyeolhee","y970308","tmdgus5411","qls930205",
+  "maoruyakr","deathhammer","busky3","qkfhzhals","owozzz","sirianrain","na2un",
+  "qweasd3456","ramzzang","chlrlaud1","aa6232","yjw5067","mawang0216","beadyo97",
+  "yeorumi030","nigttp12","yoonesaem","liloolil","insome0319","larothy","yangdoki",
+  "nangnan","sl0724","afbaseball1","kymakyma","beemong","pushpull2027","gofl2237",
+  "hwt1014","blackchu","chaenna02","clzhf123","kyoonah1217","qn308dud","danz59",
+  "duvl123","caramel007","song1218","yukki62","kus03125","bach023","eugenebaduk",
+  "kmj05317","ksh7637","jaeparkk","lhtlgm","dobby1031","kgoyangyeeee","cjstkdbsl3",
+  "gine7777","gjstn7637","singgyul","dksldi1010","yeveee","cctvno","xodud1898",
+  "dkfka8945","cownsgur123","chunbongtv","rose0957","9mogu9","qooqoo3110","doormomo",
+  "htvv2i","whatcherry4","dlswldus107","sikhye1004","kyaang123","bboringirl","nanamoon777",
+  "s07o24","kisss2","hiyoko040","hichume","gosummer","jaesu111","cococ11","hrlim95",
+  "muse0116","evacc7391","hyundana","rhakdncjs90","2ducksoo","afsoccer1","17282486",
+  "gilming22","kirababy2","dnwnwjdqhr53","wjdfogur98","jungtur","mocamu2","dalta20",
+  "mini8282","kto9472","sie4yu","guqlswls123","navixx","mmange2","wellro314","beyou0728",
+  "chachki","jangjh5409","gio12025","toocat030","soyoung6056","chamingcha","os3n0o",
+  "whiteone325","k0roshi","sunglim001","doodong","zzonii","atl","nunknown314","nmohoho",
+  "llangkko0429","hachi97","dlaalswl22","shandyhan","uouoas12g","sircharlee","luckycontrol",
+  "harumyong","shb0910","lunavely4","lomioeov","wjswpalssla1","naong2bbang","et0726",
+  "freecslol","wja06041","dalchesom","cocomizzang","tus7475","land4968","piano4319",
+  "nerdult","qzaads1","libre1900","kwonjiin1215","iop2554","chuchan","foxyeon",
+  "ddikku0714","hellofreecup","qkrdnxozz","scan1014","dduduji","ddalgishoux","ginko001125",
+  "afmusician","kaam0802","roundpopo","tsukizz6","wjdekgus112","min030606","cherru",
+  "kkyubog","ododk729","kespa","kakazzang","wkdghdtjr99","godnjs8482","lighthoong",
+  "seasonal","ducke77","thswlstjr666","peperopero55","kkeuna","duddj4210","happyness192",
+  "siioyeyo","dalnim419","padott","xirus2","mukbangbj","harxxxne","afmma","usermeeting",
+  "uoip209","aniplustv","nnojoke486","baky1996","riphin0511","afreporter","b4bycthu1hu",
+  "100noru","ruki7","rlaalstnsd","dbstpwls97","imyourr","skylovezzz1","js1123456",
+  "hsj3146","zotnlqkfmwk","cyzhquf","dnjfem4809","ksyjh1687","blueastom","jsjdjdjsj",
+  "djbhc7","djbhc6","ambler","thekaran","hoinida","anddy1234583","alstlr1245","dodldoidi",
+  "idlovehina","saturn512","ollehbk","puma2255","je7857","dionzzz","forevermiri1",
+  "onnmin363","dadada","leotelp","dowon0610","kyunas5","nthkim3022","drdopamine",
+  "soria5","neunho29","song","kd0011","jinhee6820",
+];
 let ALL_TAGS = [];
 let prevData = {};
 let autoTimer = null;
@@ -869,7 +915,10 @@ function openModal() {
   tempFav = [...favorites];
   const list = document.getElementById('modalList');
   list.innerHTML = '';
-  for (const [id, info] of Object.entries(BJ_LIST)) {
+  const ids = BJ_ORDER.length > 0 ? BJ_ORDER : Object.keys(BJ_LIST);
+  for (const id of ids) {
+    const info = BJ_LIST[id];
+    if (!info) continue;
     const on = tempFav.includes(id) ? 'on' : '';
     const name = info.name || info;
     list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\''+id+'\')"><div class="check '+on+'">V</div><span>'+escapeHtml(name)+'</span></div>';
@@ -891,6 +940,13 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'modalBg') closeModal();
 });
 
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.getElementById('modalBg').classList.contains('show')) {
+    e.preventDefault();
+    saveFav();
+  }
+});
+
 function closeModal() {
   document.getElementById('modalBg').classList.remove('show');
 }
@@ -909,7 +965,6 @@ function toggleFav(el, id) {
 function saveFav() {
   favorites = [...tempFav];
   localStorage.setItem('soop_fav', JSON.stringify(favorites));
-  closeModal();
   applyFilter();
   showToast("본진 저장 완료!");
 }
@@ -1351,12 +1406,11 @@ window.addEventListener('resize', () => {
   }
 });
 
-// API 응답에서 BJ_LIST와 ALL_TAGS를 동적으로 구축
+// API 응답에서 BJ_LIST를 동적으로 구축
 function buildBjListAndTags(data) {
-  BJ_LIST = {};
   const tagSet = new Set();
   for (const [bjId, info] of Object.entries(data)) {
-    BJ_LIST[bjId] = { name: info.name };
+    if (!BJ_LIST[bjId]) BJ_LIST[bjId] = { name: info.name };
   }
   ALL_TAGS = Array.from(tagSet).sort();
 }
