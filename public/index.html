@@ -1579,13 +1579,15 @@ document.addEventListener('keydown', (e) => {
   // 캘린더 탭일 때 방향키로 다음/이전 BJ 공지로 이동
   if (currentTab === 'calendar') {
     const active = document.querySelector('.cal-index-item.active');
-    const idx = active ? parseInt(active.dataset.idx) : 0;
+    const idx = active ? parseInt(active.dataset.idx) : -1;
     if (e.key === 'ArrowDown' || e.key === 'j') {
       e.preventDefault();
-      if (document.querySelector('.cal-index-item[data-idx="' + (idx + 1) + '"]')) scrollToNotice(idx + 1);
+      const nextIdx = idx + 1;
+      if (document.querySelector('.cal-index-item[data-idx="' + nextIdx + '"]')) scrollToNotice(nextIdx);
     } else if (e.key === 'ArrowUp' || e.key === 'k') {
       e.preventDefault();
-      if (idx > 0) scrollToNotice(idx - 1);
+      const prevIdx = idx - 1;
+      if (prevIdx >= 0 && document.querySelector('.cal-index-item[data-idx="' + prevIdx + '"]')) scrollToNotice(prevIdx);
     }
     return;
   }
@@ -1895,7 +1897,7 @@ async function loadNoticeBody(titleNo, index) {
 
 function scrollToNotice(index) {
   const el = document.getElementById('cal-notice-' + index);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
 
   // 인덱스 하이라이트
   document.querySelectorAll('.cal-index-item').forEach(item => item.classList.remove('active'));
