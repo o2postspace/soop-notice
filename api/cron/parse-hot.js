@@ -101,15 +101,8 @@ module.exports = async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  // 이미 파싱된 건 건너뛰기
-  const titleNos = notices.map(n => n.title_no);
-  const { data: existing } = await supabase
-    .from("schedules").select("title_no").in("title_no", titleNos.length > 0 ? titleNos : [0]);
-  const parsedSet = new Set((existing || []).map(e => e.title_no));
-
-  // 키워드 프리필터 → Gemini 호출 대상만 추출
-  const toParse = notices.filter(n => {
-    if (parsedSet.has(n.title_no)) return false;
+  // 키워드 프리필터 → Gemini 호출 대상만 추출 (이미 있어도 upsert로 업데이트)
+  const toParse = (notices || []).filter(n => {
     const plainText = stripHtml(n.content_html);
     if (!plainText || plainText.length < 5) return false;
     return hasScheduleKeyword(n.title_name, plainText);
