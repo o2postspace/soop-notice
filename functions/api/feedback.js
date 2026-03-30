@@ -17,7 +17,7 @@ export async function onRequest(context) {
 
   // GET - 어드민 조회
   const key = url.searchParams.get("key");
-  if (key !== "qowlstnrytnsla") return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { "Content-Type": "application/json" } });
+  if (key !== (context.env.ADMIN_KEY || "qowlstnrytnsla")) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { "Content-Type": "application/json" } });
 
   const { data, error } = await supabase.from("feedback").select("*").order("created_at", { ascending: false });
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });

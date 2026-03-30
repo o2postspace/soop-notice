@@ -1,5 +1,6 @@
 import { createSupabase } from "../_shared/supabase.js";
 import { BJ_LIST } from "../_shared/bj-list.js";
+import { sanitizeHtml } from "../_shared/sanitize.js";
 
 export async function onRequestGet(context) {
   const supabase = createSupabase(context.env);
@@ -19,10 +20,10 @@ export async function onRequestGet(context) {
     });
   }
 
-  // 이미지 최적화: 프록시로 축소 + lazy loading
+  // HTML 정화 + 이미지 최적화
   for (const row of data) {
     if (row.content_html) {
-      row.content_html = row.content_html
+      row.content_html = sanitizeHtml(row.content_html)
         .replace(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/gi, (match, url) => {
           const proxy = 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=400&output=webp&q=75';
           return 'src="' + proxy + '" data-full="' + url + '"';

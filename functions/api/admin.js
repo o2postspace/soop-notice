@@ -1,8 +1,7 @@
 import { createSupabase } from "../_shared/supabase.js";
 
-const ADMIN_KEY = "qowlstnrytnsla";
-
 export async function onRequest(context) {
+  const ADMIN_KEY = context.env.ADMIN_KEY || "qowlstnrytnsla";
   const supabase = createSupabase(context.env);
   const url = new URL(context.request.url);
   const key = url.searchParams.get("key");
