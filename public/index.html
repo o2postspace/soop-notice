@@ -236,6 +236,9 @@
     border-radius: 6px;
     margin: 6px 0;
     display: block;
+    background: #f0f0f0;
+    min-height: 30px;
+    content-visibility: auto;
   }
   .card-body img:last-child {
     margin-bottom: 0;
@@ -921,13 +924,11 @@ function buildCardHtml(item) {
   const n = item.notice;
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
-  const reads = n.count?.read_cnt?.toLocaleString() || '0';
-  const tagBadge = '';
-  const bodyHtml = n.contentHtml || '';
+  const reads = (n.read_cnt || n.count?.read_cnt || 0).toLocaleString();
+  const bodyHtml = n.contentHtml || n.content_html || '';
   return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
-    + tagBadge
     + '</div>'
     + '<div class="card-content">'
     + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
@@ -949,18 +950,15 @@ let packedPages = []; // 각 페이지별 카드 인덱스 배열
 
 // 필터 적용 후 공지 목록 생성
 function getFilteredNotices(data) {
-  const allNotices = [];
-  for (const [bjId, info] of Object.entries(data)) {
-    for (const n of info.notices) {
-      allNotices.push({ bjId, name: info.name, notice: n });
-    }
-  }
-  allNotices.sort((a, b) => new Date(b.notice.reg_date) - new Date(a.notice.reg_date));
+  let list = data.map(r => ({
+    bjId: r.bj_id || r.bjId,
+    name: r.bj_name || r.name,
+    notice: r,
+  }));
 
-  if (currentFilter === 'all') return allNotices;
-  if (currentFilter === 'fav') return allNotices.filter(x => favorites.includes(x.bjId));
-  if (currentFilter === 'popular') return allNotices.filter(x => (x.notice.count?.read_cnt || 0) >= 1000);
-  return allNotices;
+  if (currentFilter === 'fav') list = list.filter(x => favorites.includes(x.bjId));
+  else if (currentFilter === 'popular') list = list.filter(x => (x.notice.read_cnt || 0) >= 1000);
+  return list;
 }
 
 // 카드 높이 추정 (본문 없으면 짧음, 있으면 슬롯 꽉 참)
@@ -1009,7 +1007,6 @@ function packIntoPages(notices) {
 function renderPages(data) {
   filteredNotices = getFilteredNotices(data);
   const container = document.getElementById('container');
-  const scroller = document.getElementById('scroller');
 
   if (filteredNotices.length === 0) {
     container.innerHTML = '<div class="page active"><div class="empty-msg">공지가 없습니다</div></div>';
@@ -1019,17 +1016,11 @@ function renderPages(data) {
     return;
   }
 
-  // 화면 높이 기준 본문 최대 높이 계산
-  const pageH = scroller.clientHeight;
-  const padding = 40;
-  const gap = 14;
-  const availH = pageH - padding;
-  const slotH = Math.floor(availH); // 1행 기준 한 슬롯
-  const bodyMax = Math.max(60, slotH - 130);
-
+  // 화면 높이 기준 본문 최대 높이
+  const scroller = document.getElementById('scroller');
+  const bodyMax = Math.max(60, scroller.clientHeight - 170);
   document.documentElement.style.setProperty('--card-body-max', bodyMax + 'px');
 
-  // 4열 × 1행 고정 패킹
   packedPages = packIntoPages(filteredNotices);
   totalPages = packedPages.length;
   currentPage = Math.min(currentPage, totalPages - 1);
@@ -1048,9 +1039,7 @@ function renderPages(data) {
   container.querySelectorAll('.card-body').forEach(body => {
     if (body.scrollHeight > body.clientHeight + 10) {
       const btn = body.nextElementSibling;
-      if (btn && btn.classList.contains('card-expand-btn')) {
-        btn.classList.add('visible');
-      }
+      if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
     }
   });
 
@@ -1068,44 +1057,25 @@ function toggleExpand(e, btn) {
 let detailBjId = '', detailTitleNo = '';
 
 function openDetail(cardEl) {
-  const bjId = cardEl.dataset.bjid;
   const titleNo = cardEl.dataset.titleno;
-  detailBjId = bjId;
-  detailTitleNo = titleNo;
-  const info = prevData[bjId];
-  if (!info) return;
-  const notice = info.notices.find(n => String(n.title_no) === String(titleNo));
+
+  const notice = prevData.find(r => String(r.title_no) === String(titleNo));
   if (!notice) return;
 
-  document.getElementById('detailName').innerHTML = escapeHtml(info.name);
-  const pin = notice && notice.is_pin ? '<span class="pin">PIN</span>' : '';
-  document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice ? notice.title_name || '' : titleText);
-  const reads = notice && notice.count ? notice.count.read_cnt?.toLocaleString() || '0' : '0';
-  document.getElementById('detailMeta').innerHTML = (notice ? '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>' : '');
-  // 본문 삽입 + 이미지 lazy loading
+  document.getElementById('detailName').innerHTML = escapeHtml(notice.bj_name);
+  const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
+  document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
+  const reads = (notice.read_cnt || 0).toLocaleString();
+  document.getElementById('detailMeta').innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
+
   const bodyEl = document.getElementById('detailBody');
-  let html = notice ? (notice.contentHtml || '<p style="color:#999">본문 없음</p>') : '';
-  // img src를 data-src로 바꿔서 lazy load
-  html = html.replace(/<img([^>]*)\ssrc="([^"]+)"/gi, '<img$1 data-src="$2" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"');
+  let html = notice.content_html || '<p style="color:#999">본문 없음</p>';
+  // 모달에서는 원본 이미지로 복원
+  html = html.replace(/src="https:\/\/wsrv\.nl\/[^"]*"(\s*data-full="([^"]+)")/gi, 'src="$2" loading="lazy"');
   bodyEl.innerHTML = html;
   bodyEl.scrollTop = 0;
 
-  // Intersection Observer로 이미지 lazy load
-  const imgs = bodyEl.querySelectorAll('img[data-src]');
-  if (imgs.length > 0) {
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.src = e.target.dataset.src;
-          obs.unobserve(e.target);
-        }
-      });
-    }, { root: bodyEl, rootMargin: '200px' });
-    imgs.forEach(img => obs.observe(img));
-  }
-
   document.getElementById('detailBg').classList.add('show');
-  // 메인 페이지 스크롤 잠금
   document.body.style.overflow = 'hidden';
 }
 async function copyForFmkorea() {
@@ -1392,89 +1362,28 @@ function renderTagFilters() {}
 let totalOnServer = 0;
 let isLoadingMore = false;
 
-// grouped 데이터를 머지 (새 데이터를 기존에 합침)
-function mergeData(target, source) {
-  for (const bjId in source) {
-    if (!target[bjId]) {
-      target[bjId] = { name: source[bjId].name, notices: [] };
-    }
-    const existIds = new Set(target[bjId].notices.map(n => n.title_no));
-    for (const n of source[bjId].notices) {
-      if (!existIds.has(n.title_no)) target[bjId].notices.push(n);
-    }
-  }
-}
-
 async function loadAll() {
   const btn = document.getElementById("refreshBtn");
   btn.disabled = true;
   btn.textContent = "...";
 
   try {
-    // 1) 첫 8개 즉시 로드 (본문 포함)
-    const resp = await fetch("/api/notices?offset=0&limit=8");
-    const json = await resp.json();
-    const data = json.data;
-    totalOnServer = json.total;
+    // 본문 없이 전체 목록 한번에 (~40KB, CDN 캐시)
+    const resp = await fetch("/api/notices");
+    const data = await resp.json();
 
-    buildBjListAndTags(data);
-    renderTagFilters();
-
-    // 새 공지 감지
-    let newCount = 0;
-    for (const bjId in data) {
-      const oldIds = (prevData[bjId]?.notices || []).map(n => n.title_no);
-      for (const n of data[bjId].notices) {
-        if (oldIds.length > 0 && !oldIds.includes(n.title_no)) newCount++;
-      }
-    }
-    if (newCount > 0) showToast("새 공지 " + newCount + "개!");
-
-    const isFirstLoad = Object.keys(prevData).length === 0;
     prevData = data;
-
-    if (isFirstLoad) {
-      currentPage = 0;
-      renderPages(data);
-    }
+    currentPage = 0;
+    renderPages(data);
 
     document.getElementById("lastUpdate").textContent =
       new Date().toLocaleTimeString("ko-KR");
-
-    // 2) 나머지 백그라운드 로드 → 완료 후 렌더링
-    await loadMore();
   } catch(e) {
     showToast("실패: " + e.message);
   }
 
   btn.disabled = false;
   btn.textContent = "새로고침";
-}
-
-async function loadMore() {
-  if (isLoadingMore) return;
-  isLoadingMore = true;
-
-  try {
-    let loaded = Object.values(prevData).reduce((s, v) => s + v.notices.length, 0);
-    const BATCH = 50;
-
-    while (loaded < totalOnServer) {
-      const resp = await fetch('/api/notices?offset=' + loaded + '&limit=' + BATCH);
-      const json = await resp.json();
-      if (!json.data || Object.keys(json.data).length === 0) break;
-
-      mergeData(prevData, json.data);
-      buildBjListAndTags(prevData);
-      loaded = Object.values(prevData).reduce((s, v) => s + v.notices.length, 0);
-    }
-
-    // 태그 필터 업데이트, 전체 데이터로 페이지 재렌더링
-    renderTagFilters();
-    renderPages(prevData);
-  } catch(e) { /* 백그라운드 실패 무시 */ }
-
-  isLoadingMore = false;
 }
 
 function setupAutoRefresh() {
