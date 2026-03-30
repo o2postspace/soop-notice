@@ -33,6 +33,19 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 
+  // title_no 목록으로 notices에서 reg_date 가져오기
+  const titleNos = data.map(r => r.title_no).filter(Boolean);
+  let regDateMap = {};
+  if (titleNos.length > 0) {
+    const { data: notices } = await supabase
+      .from("notices")
+      .select("title_no, reg_date")
+      .in("title_no", titleNos);
+    if (notices) {
+      notices.forEach(n => { regDateMap[n.title_no] = n.reg_date; });
+    }
+  }
+
   // 시간순 flat 배열
   const slots = data.map(row => ({
     bj_id: row.bj_id,
@@ -41,6 +54,7 @@ module.exports = async function handler(req, res) {
     end: row.broadcast_end,
     title_no: row.title_no,
     description: row.description || row.raw_text,
+    reg_date: regDateMap[row.title_no] || null,
   }));
 
   const dateStr = targetDay.toISOString().slice(0, 10);

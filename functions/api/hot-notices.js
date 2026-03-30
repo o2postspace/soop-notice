@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
   if (titleNos.length > 0) {
     const { data: noticeData } = await supabase
       .from("notices")
-      .select("title_no, read_cnt, title_name")
+      .select("title_no, read_cnt, title_name, reg_date")
       .in("title_no", titleNos)
       .gte("read_cnt", 1000);
     for (const n of (noticeData || [])) {
@@ -46,6 +46,7 @@ export async function onRequestGet(context) {
         bj_id: s.bj_id, bj_name: s.bj_name, title_no: s.title_no,
         broadcast_start: s.broadcast_start, description: s.description,
         title_name: notice?.title_name || "", read_cnt: notice?.read_cnt || 0,
+        reg_date: notice?.reg_date || null,
       };
     });
 
