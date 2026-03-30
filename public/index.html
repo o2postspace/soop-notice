@@ -163,6 +163,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .soop-link {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: #5B6AED;
+    padding: 3px 10px;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .soop-link:hover {
+    background: #4a58d6;
+  }
   .card-tag {
     font-size: 10px;
     color: #a29bfe;
@@ -746,8 +760,8 @@
 
 <div class="filter-bar" id="filterBar">
   <span class="label">필터</span>
-  <button class="filter-btn" data-filter="popular" onclick="setFilter('popular')">인기</button>
-  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
+  <button class="filter-btn active" data-filter="popular" onclick="setFilter('popular')">인기</button>
+  <button class="filter-btn" data-filter="all" onclick="setFilter('all')">전체</button>
   <button class="filter-btn" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
@@ -943,7 +957,7 @@ const BJ_ORDER = [
 let ALL_TAGS = [];
 let prevData = [];
 let autoTimer = null;
-let currentFilter = 'all';
+let currentFilter = 'popular';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
 let tempFav = [];
 
@@ -1112,6 +1126,7 @@ function buildCardHtml(item) {
   return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
+    + '<a class="soop-link" href="https://www.sooplive.com/station/' + item.bjId + '/post/' + n.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
     + '</div>'
     + '<div class="card-content">'
     + '<div class="card-title">' + pin + escapeHtml(n.title_name || '') + newBadge + '</div>'
