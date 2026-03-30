@@ -1740,7 +1740,7 @@ function renderHotCalendar(data) {
     const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
     idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
-      + '<div class="idx-time">' + timeStr + ' <span style="color:#ff4757;font-size:11px;">👁 ' + (s.read_cnt || 0).toLocaleString() + '</span></div>'
+      + '<div class="idx-time">' + timeStr + ' <span style="color:#999;font-size:11px;">👁 ' + (s.read_cnt || 0).toLocaleString() + '</span></div>'
       + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
       + '<div class="idx-desc">' + escapeHtml(s.description || s.title_name || '') + '</div>'
       + '</div>';
@@ -1757,7 +1757,7 @@ function renderHotCalendar(data) {
       + '<div class="cal-notice-header">'
       + '<span class="cal-notice-time">' + timeStr + '</span>'
       + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
-      + '<span class="cal-notice-desc" style="color:#ff4757;">👁 ' + (s.read_cnt || 0).toLocaleString() + '</span>'
+      + '<span class="cal-notice-desc" style="color:#999;">👁 ' + (s.read_cnt || 0).toLocaleString() + '</span>'
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:15px;font-weight:600;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
