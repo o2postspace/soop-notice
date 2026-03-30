@@ -520,8 +520,10 @@
   /* 캘린더 */
   #calendarContainer {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
     padding: 16px;
+    display: flex;
+    flex-direction: column;
   }
   .calendar-nav {
     display: flex;
@@ -542,42 +544,98 @@
   .calendar-nav button:hover { background: #4a58d4; }
   #calWeekLabel { font-size: 14px; font-weight: 600; color: #333; }
 
-  .calendar-grid {
-    width: 100%;
-    overflow-x: auto;
-  }
-  .calendar-grid table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-    border-radius: 10px;
+  .cal-daily {
+    display: flex;
+    gap: 16px;
+    flex: 1;
     overflow: hidden;
+  }
+  .cal-index {
+    width: 240px;
+    min-width: 200px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .cal-index-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .cal-index-item:hover { background: #eef0ff; }
+  .cal-index-item.active { background: #5B6AED; color: #fff; }
+  .cal-index-item.active .idx-time { color: #fff; }
+  .cal-index-item.active .idx-desc { color: rgba(255,255,255,0.8); }
+  .idx-time { font-weight: 700; color: #5B6AED; font-size: 14px; }
+  .idx-bj { font-weight: 600; font-size: 13px; margin-top: 2px; }
+  .idx-desc { font-size: 11px; color: #999; margin-top: 2px; }
+  .cal-content {
+    flex: 1;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 12px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-  .calendar-grid th {
-    background: #f8f8ff;
-    padding: 10px 8px;
-    font-size: 12px;
-    color: #666;
-    font-weight: 600;
-    border-bottom: 1px solid #eee;
-    text-align: center;
-  }
-  .calendar-grid th.today { color: #5B6AED; background: #eef0ff; }
-  .calendar-grid td {
-    padding: 6px 8px;
+  .cal-notice {
+    padding: 20px 24px;
     border-bottom: 1px solid #f0f0f0;
-    vertical-align: top;
-    min-width: 100px;
-    font-size: 12px;
   }
-  .calendar-grid td.bj-name-cell {
+  .cal-notice-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .cal-notice-time {
+    background: #5B6AED;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .cal-notice-bj {
     font-weight: 700;
-    color: #5B6AED;
+    font-size: 15px;
+    color: #333;
+  }
+  .cal-notice-desc {
+    font-size: 12px;
+    color: #999;
+    margin-left: auto;
+  }
+  .cal-notice-body {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #444;
+    word-break: break-word;
+  }
+  .cal-notice-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 8px 0;
+    display: block;
+  }
+  .cal-notice-body br + br { display: none; }
+  .cal-notice-body a { color: #5B6AED; }
+  .cal-notice-loading {
+    text-align: center;
+    padding: 20px;
+    color: #aaa;
     font-size: 13px;
-    white-space: nowrap;
-    background: #fafafa;
-    min-width: 80px;
+  }
+  .cal-empty-day {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #ccc;
+    font-size: 14px;
   }
   .cal-sub-tabs {
     display: flex;
@@ -621,7 +679,9 @@
   }
 
   @media (max-width: 700px) {
-    .calendar-grid td, .calendar-grid th { padding: 4px; font-size: 11px; min-width: 60px; }
+    .cal-daily { flex-direction: column; height: auto; }
+    .cal-index { width: 100%; min-width: 0; max-height: 150px; }
+    .cal-content { max-height: 60vh; }
     .tab-btn { padding: 8px 16px; font-size: 13px; }
   }
 </style>
@@ -672,11 +732,15 @@
     <button class="cal-sub-btn active" onclick="switchCalTab('popular')">인기</button>
   </div>
   <div class="calendar-nav">
-    <button onclick="changeWeek(-1)">&#9664; 이전 주</button>
-    <span id="calWeekLabel"></span>
-    <button onclick="changeWeek(1)">다음 주 &#9654;</button>
+    <button onclick="changeDay(-1)">&#9664; 이전</button>
+    <span id="calDateLabel"></span>
+    <button onclick="changeDay(0)" style="font-size:11px;background:#a29bfe;">오늘</button>
+    <button onclick="changeDay(1)">다음 &#9654;</button>
   </div>
-  <div class="calendar-grid" id="calendarGrid"></div>
+  <div class="cal-daily">
+    <div class="cal-index" id="calIndex"></div>
+    <div class="cal-content" id="calContent"></div>
+  </div>
 </div>
 
 </div><!-- app-wrap -->
@@ -685,6 +749,7 @@
 
 <!-- 쇼츠 스타일 페이지 네비게이션 -->
 <div class="scroll-nav" id="scrollNav" style="display:none;">
+  <button onclick="goToTop()" title="맨 위로" style="font-size:14px;">TOP</button>
   <button id="btnPrev" onclick="goPage(-1)" title="이전 페이지">&#9650;</button>
   <div class="nav-counter" id="navCounter"></div>
   <button id="btnNext" onclick="goPage(1)" title="다음 페이지">&#9660;</button>
@@ -1177,6 +1242,13 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+function goToTop() {
+  currentPage = 0;
+  showCurrentPage();
+  const activePage = document.querySelector('#container .page.active');
+  if (activePage) activePage.scrollTop = 0;
+}
+
 function goPage(dir) {
   // 백그라운드 데이터 반영
   filteredNotices = getFilteredNotices(prevData);
@@ -1232,6 +1304,14 @@ document.addEventListener('keydown', (e) => {
   if (document.getElementById('detailBg').classList.contains('show')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
+  // 캘린더 탭일 때 방향키로 본문 스크롤
+  if (currentTab === 'calendar') {
+    const content = document.getElementById('calContent');
+    if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); content.scrollBy(0, 100); }
+    else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); content.scrollBy(0, -100); }
+    return;
+  }
+
   if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
     e.preventDefault();
     goPage(1);
@@ -1255,6 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('wheel', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
     if (document.getElementById('detailBg').classList.contains('show')) return;
+    if (currentTab === 'calendar') return;
     e.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
@@ -1421,154 +1502,124 @@ function switchTab(tab) {
     document.getElementById('scroller').style.display = 'none';
     document.getElementById('scrollNav').style.display = 'none';
     document.getElementById('calendarContainer').style.display = '';
-    loadSchedules(calWeekOffset);
+    loadSchedules(calDayOffset);
   }
 }
 
-// ===================== 캘린더 =====================
-let calWeekOffset = 0;
-const DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
+// ===================== 캘린더 (하루 뷰) =====================
+let calDayOffset = 0;
+let calSlots = [];
 
-function changeWeek(dir) {
-  calWeekOffset += dir;
-  loadSchedules(calWeekOffset);
-}
-
-async function loadSchedules(offset) {
-  const grid = document.getElementById('calendarGrid');
-  grid.innerHTML = '<div class="loading"><div class="spinner"></div> 불러오는 중...</div>';
-
-  try {
-    const resp = await fetch('/api/schedules?week_offset=' + offset);
-    const data = await resp.json();
-    renderCalendar(data);
-  } catch(e) {
-    grid.innerHTML = '<div class="empty-msg">로드 실패</div>';
-  }
-}
-
-// 캘린더 슬롯 클릭 → 공지 상세 모달
-async function openCalDetail(bjId, titleNo) {
-  const info = prevData[bjId];
-  let notice = info ? info.notices.find(n => String(n.title_no) === String(titleNo)) : null;
-
-  // 상세 모달 열기
-  const nameEl = document.getElementById('detailName');
-  const titleEl = document.getElementById('detailTitle');
-  const metaEl = document.getElementById('detailMeta');
-  const bodyEl = document.getElementById('detailBody');
-
-  if (notice) {
-    nameEl.innerHTML = escapeHtml(info.name);
-    titleEl.innerHTML = (notice.is_pin ? '<span class="pin">PIN</span>' : '') + escapeHtml(notice.title_name || '');
-    const reads = notice.count?.read_cnt?.toLocaleString() || '0';
-    metaEl.innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
-    bodyEl.innerHTML = notice.contentHtml || '<p style="color:#999">본문 로딩 중...</p>';
-  } else {
-    nameEl.innerHTML = bjId;
-    titleEl.innerHTML = '';
-    metaEl.innerHTML = '';
-    bodyEl.innerHTML = '<div class="loading"><div class="spinner"></div> 로딩 중...</div>';
-  }
-
-  document.getElementById('detailBg').classList.add('show');
-  document.body.style.overflow = 'hidden';
-  bodyEl.scrollTop = 0;
-
-  // 본문이 없으면 API에서 가져오기
-  if (!notice || !notice.contentHtml) {
-    try {
-      const resp = await fetch('/api/notice-content?title_no=' + titleNo);
-      const data = await resp.json();
-      bodyEl.innerHTML = data.content_html || '<p style="color:#999">본문 없음</p>';
-    } catch(e) {
-      bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
-    }
-  }
+function changeDay(dir) {
+  if (dir === 0) calDayOffset = 0; // 오늘 버튼
+  else calDayOffset += dir;
+  loadSchedules(calDayOffset);
 }
 
 function switchCalTab(tab) {
   document.querySelectorAll('.cal-sub-btn').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
-  loadSchedules(calWeekOffset);
+  loadSchedules(calDayOffset);
 }
 
-function renderCalendar(data) {
-  document.getElementById('calWeekLabel').textContent = data.week_start + ' ~ ' + data.week_end;
+async function loadSchedules(offset) {
+  const idx = document.getElementById('calIndex');
+  const content = document.getElementById('calContent');
+  idx.innerHTML = '<div class="cal-notice-loading">불러오는 중...</div>';
+  content.innerHTML = '';
 
-  const now = new Date();
-  const todayStr = new Date(now.getTime() + 9*60*60*1000).toISOString().slice(0, 10);
-
-  // 주간 날짜 배열
-  const weekDates = [];
-  const startDate = new Date(data.week_start + 'T00:00:00+09:00');
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
-    weekDates.push(d.toISOString().slice(0, 10));
+  try {
+    const resp = await fetch('/api/schedules?day_offset=' + offset);
+    const data = await resp.json();
+    document.getElementById('calDateLabel').textContent = data.date + ' (' + data.day_name + ')';
+    calSlots = data.slots;
+    renderDayCalendar(data);
+  } catch(e) {
+    idx.innerHTML = '<div class="cal-empty-day">로드 실패</div>';
   }
+}
 
-  // 모든 슬롯을 {day, hour, bjName, description} 형태로 변환
-  const allSlots = [];
-  for (const [bjId, info] of Object.entries(data.schedules)) {
-    for (const slot of info.slots) {
-      // schedules는 정상 UTC 저장 → KST로 변환 (+9시간)
-      const utc = new Date(slot.start);
-      const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
-      const dateStr = t.getUTCFullYear() + '-' + String(t.getUTCMonth()+1).padStart(2,'0') + '-' + String(t.getUTCDate()).padStart(2,'0');
-      const dayIdx = weekDates.indexOf(dateStr);
-      if (dayIdx === -1) continue;
-      allSlots.push({
-        dayIdx,
-        hour: t.getUTCHours(),
-        minute: t.getUTCMinutes(),
-        bjId: bjId,
-        bjName: info.name,
-        titleNo: slot.title_no,
-        description: slot.description || '',
-      });
-    }
-  }
+function renderDayCalendar(data) {
+  const idx = document.getElementById('calIndex');
+  const content = document.getElementById('calContent');
 
-  // 사용된 시간대 추출 + 정렬
-  const hoursSet = new Set(allSlots.map(s => s.hour));
-  const hours = [...hoursSet].sort((a, b) => a - b);
-
-  if (hours.length === 0) {
-    document.getElementById('calendarGrid').innerHTML = '<div class="empty-msg">이번 주 일정이 없습니다</div>';
+  if (data.slots.length === 0) {
+    idx.innerHTML = '<div class="cal-empty-day">오늘 일정 없음</div>';
+    content.innerHTML = '<div class="cal-empty-day">등록된 방송 일정이 없습니다</div>';
     return;
   }
 
-  // 테이블 헤더
-  let html = '<table><thead><tr><th>시간</th>';
-  for (let i = 0; i < 7; i++) {
-    const isToday = weekDates[i] === todayStr;
-    const mm = weekDates[i].slice(5, 7);
-    const dd = weekDates[i].slice(8, 10);
-    html += '<th' + (isToday ? ' class="today"' : '') + '>' + DAY_NAMES[i] + '<br>' + mm + '/' + dd + '</th>';
-  }
-  html += '</tr></thead><tbody>';
+  // 왼쪽 인덱스
+  let idxHtml = '';
+  data.slots.forEach((s, i) => {
+    const utc = new Date(s.start);
+    const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+    const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
+    idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
+      + '<div class="idx-time">' + timeStr + '</div>'
+      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
+      + '<div class="idx-desc">' + escapeHtml(s.description) + '</div>'
+      + '</div>';
+  });
+  idx.innerHTML = idxHtml;
 
-  // 시간대별 행
-  for (const h of hours) {
-    html += '<tr><td class="cal-time-cell">' + String(h).padStart(2,'0') + ':00</td>';
-    for (let d = 0; d < 7; d++) {
-      const cellSlots = allSlots.filter(s => s.hour === h && s.dayIdx === d);
-      if (cellSlots.length === 0) {
-        html += '<td><div class="cal-empty">-</div></td>';
-      } else {
-        html += '<td>';
-        for (const s of cellSlots) {
-          html += '<div class="cal-slot" onclick="openCalDetail(\'' + s.bjId + '\',' + s.titleNo + ')" style="cursor:pointer;"><div class="bj">' + escapeHtml(s.bjName) + '</div><div class="desc">' + escapeHtml(s.description) + '</div></div>';
-        }
-        html += '</td>';
-      }
-    }
-    html += '</tr>';
-  }
+  // 오른쪽 본문 (각 슬롯별 공지)
+  let contentHtml = '';
+  data.slots.forEach((s, i) => {
+    const utc = new Date(s.start);
+    const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+    const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
+    contentHtml += '<div class="cal-notice" id="cal-notice-' + i + '">'
+      + '<div class="cal-notice-header">'
+      + '<span class="cal-notice-time">' + timeStr + '</span>'
+      + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
+      + '<span class="cal-notice-desc">' + escapeHtml(s.description) + '</span>'
+      + '</div>'
+      + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
+      + '</div>';
+  });
+  content.innerHTML = contentHtml;
 
-  html += '</tbody></table>';
-  document.getElementById('calendarGrid').innerHTML = html;
+  // 본문 lazy load
+  data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
+
+  // 스크롤 감지 → 인덱스 하이라이트
+  content.addEventListener('scroll', onCalContentScroll);
+}
+
+async function loadNoticeBody(titleNo, index) {
+  const bodyEl = document.getElementById('cal-body-' + index);
+  if (!bodyEl) return;
+  try {
+    const resp = await fetch('/api/notice-content?title_no=' + titleNo);
+    const data = await resp.json();
+    bodyEl.innerHTML = data.content_html || '<p style="color:#999">본문 없음</p>';
+  } catch(e) {
+    bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
+  }
+}
+
+function scrollToNotice(index) {
+  const el = document.getElementById('cal-notice-' + index);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // 인덱스 하이라이트
+  document.querySelectorAll('.cal-index-item').forEach(item => item.classList.remove('active'));
+  const idxItem = document.querySelector('.cal-index-item[data-idx="' + index + '"]');
+  if (idxItem) idxItem.classList.add('active');
+}
+
+function onCalContentScroll() {
+  const content = document.getElementById('calContent');
+  const notices = content.querySelectorAll('.cal-notice');
+  let activeIdx = 0;
+  const scrollTop = content.scrollTop + 50;
+  notices.forEach((n, i) => {
+    if (n.offsetTop <= scrollTop) activeIdx = i;
+  });
+  document.querySelectorAll('.cal-index-item').forEach((item, i) => {
+    item.classList.toggle('active', i === activeIdx);
+  });
 }
 
 loadAll();
