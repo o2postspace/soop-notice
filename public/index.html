@@ -1719,6 +1719,7 @@ function renderDayCalendar(data) {
       + '<span class="cal-notice-time">' + timeStr + '</span>'
       + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
       + '<span class="cal-notice-desc">' + escapeHtml(s.description) + '</span>'
+      + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
       + '</div>';
