@@ -20,6 +20,7 @@ const hotNoticesHandler = require("./api/hot-notices");
 const parseHotHandler = require("./api/cron/parse-hot");
 const feedbackHandler = require("./api/feedback");
 const adminHandler = require("./api/admin");
+const liveCheckHandler = require("./api/live-check");
 
 function mockRes() {
   const res = {
@@ -82,6 +83,15 @@ const server = http.createServer(async (req, res) => {
     }
     const mockReq = { method: req.method, query: Object.fromEntries(url.searchParams), headers: req.headers, body };
     await feedbackHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/live-check") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await liveCheckHandler(mockReq, mockR);
     res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
     res.end(mockR.body);
     return;
