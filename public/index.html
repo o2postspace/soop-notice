@@ -760,6 +760,8 @@
     .cal-index-item .idx-time { font-size: 12px; }
     .cal-content { flex: 1; overflow-y: auto; }
     .cal-notice-header { flex-wrap: wrap; gap: 4px; }
+    .cal-notice-header .soop-link, .cal-notice-header .live-link { order: 10; }
+    .cal-notice-header::after { content: ''; width: 100%; order: 9; }
     .cal-notice-time { font-size: 11px; padding: 2px 8px; }
     .cal-notice-bj { font-size: 13px; }
     .cal-notice-desc { font-size: 10px !important; }
