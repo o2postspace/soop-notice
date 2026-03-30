@@ -67,6 +67,33 @@
     flex-shrink: 0;
   }
   .filter-bar .label { font-size: 12px; color: #999; margin-right: 4px; }
+  .search-box {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .search-box input {
+    padding: 5px 28px 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    font-size: 12px;
+    width: 180px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-box input:focus { border-color: #5B6AED; }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 11px;
+    display: none;
+  }
+  .search-box input:not(:placeholder-shown) + .search-clear { display: block; }
   .filter-btn {
     padding: 4px 12px;
     border-radius: 14px;
@@ -467,6 +494,8 @@
     .page { padding: 10px 8px; }
     header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
     .filter-bar { padding: 8px 14px; }
+    .search-box { margin-left: 0; width: 100%; }
+    .search-box input { width: 100%; }
     .scroll-nav { right: 12px; }
     .scroll-nav button { width: 40px; height: 40px; font-size: 18px; }
     .modal-body { flex-direction: column; }
@@ -802,6 +831,10 @@
   <button class="filter-btn" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
+  <div class="search-box">
+    <input id="searchInput" type="text" placeholder="검색 (제목, 내용, BJ)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
+    <button class="search-clear" onclick="document.getElementById('searchInput').value='';onSearch();">X</button>
+  </div>
 </div>
 
 <div class="page-scroller" id="scroller">
@@ -1204,6 +1237,18 @@ function getFilteredNotices(data) {
 
   if (currentFilter === 'fav') list = list.filter(x => favorites.includes(x.bjId));
   else if (currentFilter === 'popular') list = list.filter(x => (x.notice.read_cnt || 0) >= 1000);
+
+  // 검색 필터
+  const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  if (query) {
+    list = list.filter(x => {
+      const n = x.notice;
+      const title = (n.title_name || '').toLowerCase();
+      const body = (n.content_html || n.contentHtml || '').replace(/<[^>]+>/g, ' ').toLowerCase();
+      const bj = (x.name || '').toLowerCase();
+      return title.includes(query) || body.includes(query) || bj.includes(query);
+    });
+  }
   return list;
 }
 
@@ -1459,6 +1504,15 @@ document.addEventListener('keydown', (e) => {
     document.querySelector('.detail-body').scrollBy(0, -60);
   }
 });
+
+let searchTimer;
+function onSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    currentPage = 0;
+    renderPages(prevData);
+  }, 300);
+}
 
 function goToTop() {
   currentPage = 0;
