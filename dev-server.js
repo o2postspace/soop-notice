@@ -18,6 +18,8 @@ const parseCollabsHandler = require("./api/cron/parse-collabs");
 const schedulesHandler = require("./api/schedules");
 const hotNoticesHandler = require("./api/hot-notices");
 const parseHotHandler = require("./api/cron/parse-hot");
+const feedbackHandler = require("./api/feedback");
+const adminHandler = require("./api/admin");
 
 function mockRes() {
   const res = {
@@ -66,6 +68,29 @@ const server = http.createServer(async (req, res) => {
     const mockR = mockRes();
     const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
     await hotNoticesHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/feedback") {
+    const mockR = mockRes();
+    let body = {};
+    if (req.method === 'POST') {
+      const chunks = []; for await (const c of req) chunks.push(c);
+      try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch {}
+    }
+    const mockReq = { method: req.method, query: Object.fromEntries(url.searchParams), headers: req.headers, body };
+    await feedbackHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/admin") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await adminHandler(mockReq, mockR);
     res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
     res.end(mockR.body);
     return;
