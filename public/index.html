@@ -79,8 +79,8 @@
   }
   .filter-btn:hover { border-color: #5B6AED; color: #5B6AED; }
   .filter-btn.active { background: #5B6AED; color: #fff; border-color: #5B6AED; font-weight: 600; }
-  .filter-btn.fav { border-color: #ff6b6b; }
-  .filter-btn.fav.active { background: #ff6b6b; color: #fff; border-color: #ff6b6b; }
+  .filter-btn.fav { }
+  .filter-btn.fav.active { background: #5B6AED; color: #fff; border-color: #5B6AED; font-weight: 600; }
   .divider { width: 1px; height: 18px; background: #ddd; margin: 0 4px; }
   .edit-fav-btn {
     padding: 4px 10px;
@@ -716,9 +716,9 @@
 
 <div class="filter-bar" id="filterBar">
   <span class="label">필터</span>
-  <button class="filter-btn fav" data-filter="fav" onclick="setFilter('fav')">본진</button>
-  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
   <button class="filter-btn" data-filter="popular" onclick="setFilter('popular')">인기</button>
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
+  <button class="filter-btn" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
 </div>
