@@ -715,6 +715,7 @@
   <span class="label">필터</span>
   <button class="filter-btn fav" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
+  <button class="filter-btn" data-filter="popular" onclick="setFilter('popular')">인기</button>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
 </div>
@@ -958,6 +959,7 @@ function getFilteredNotices(data) {
 
   if (currentFilter === 'all') return allNotices;
   if (currentFilter === 'fav') return allNotices.filter(x => favorites.includes(x.bjId));
+  if (currentFilter === 'popular') return allNotices.filter(x => (x.notice.count?.read_cnt || 0) >= 1000);
   return allNotices;
 }
 
