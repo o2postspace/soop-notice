@@ -16,6 +16,8 @@ const cronHandler = require("./api/cron/fetch-notices");
 const parseSchedulesHandler = require("./api/cron/parse-schedules");
 const parseCollabsHandler = require("./api/cron/parse-collabs");
 const schedulesHandler = require("./api/schedules");
+const hotNoticesHandler = require("./api/hot-notices");
+const parseHotHandler = require("./api/cron/parse-hot");
 
 function mockRes() {
   const res = {
@@ -60,6 +62,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/hot-notices") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await hotNoticesHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
   if (url.pathname === "/api/cron/parse-schedules") {
     const mockR = mockRes();
     const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
@@ -73,6 +84,15 @@ const server = http.createServer(async (req, res) => {
     const mockR = mockRes();
     const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
     await parseCollabsHandler(mockReq, mockR);
+    res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(mockR.body);
+    return;
+  }
+
+  if (url.pathname === "/api/cron/parse-hot") {
+    const mockR = mockRes();
+    const mockReq = { query: Object.fromEntries(url.searchParams), headers: req.headers };
+    await parseHotHandler(mockReq, mockR);
     res.writeHead(mockR.statusCode, { "Content-Type": "application/json; charset=utf-8" });
     res.end(mockR.body);
     return;
