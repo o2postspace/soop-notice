@@ -1123,7 +1123,7 @@ function buildCardHtml(item) {
   const n = item.notice;
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
-  const reads = (n.read_cnt || n.count?.read_cnt || 0).toLocaleString();
+  const reads = (n.read_cnt || n.count?.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const bodyHtml = n.contentHtml || n.content_html || '';
   return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
@@ -1265,7 +1265,7 @@ function openDetail(cardEl) {
   document.getElementById('detailName').innerHTML = escapeHtml(notice.bj_name);
   const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
   document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
-  const reads = (notice.read_cnt || 0).toLocaleString();
+  const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   document.getElementById('detailMeta').innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
 
   const bodyEl = document.getElementById('detailBody');
@@ -1290,7 +1290,7 @@ async function copyForFmkorea() {
     const name = info.name;
     const title = notice.title_name || '';
     const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
-    const reads = notice.count?.read_cnt?.toLocaleString() || '0';
+    const reads = notice.count?.read_cnt?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
     const regDate = formatDate(notice.reg_date);
     const postUrl = 'https://www.sooplive.com/station/' + detailBjId + '/post/' + detailTitleNo;
     const liveUrl = 'https://play.sooplive.com/' + detailBjId;
@@ -1740,7 +1740,7 @@ function renderHotCalendar(data) {
     const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
     idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
-      + '<div class="idx-time">' + timeStr + ' <span style="color:#999;font-size:11px;">👁 ' + (s.read_cnt || 0).toLocaleString() + '</span></div>'
+      + '<div class="idx-time">' + timeStr + ' <span style="color:#999;font-size:11px;letter-spacing:-0.5px;font-family:monospace;">👁' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span></div>'
       + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
       + '<div class="idx-desc">' + escapeHtml(s.description || s.title_name || '') + '</div>'
       + '</div>';
@@ -1757,7 +1757,7 @@ function renderHotCalendar(data) {
       + '<div class="cal-notice-header">'
       + '<span class="cal-notice-time">' + timeStr + '</span>'
       + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
-      + '<span class="cal-notice-desc" style="color:#999;">👁 ' + (s.read_cnt || 0).toLocaleString() + '</span>'
+      + '<span class="cal-notice-desc" style="color:#999;letter-spacing:-0.5px;font-family:monospace;">👁' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span>'
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:15px;font-weight:600;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
