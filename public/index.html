@@ -616,6 +616,20 @@
   .cal-index-item.active { background: #5B6AED; color: #fff; }
   .cal-index-item.active .idx-time { color: #fff; }
   .cal-index-item.active .idx-desc { color: rgba(255,255,255,0.8); }
+  .cal-index-item .idx-soop {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #5B6AED;
+    background: #eef0ff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-decoration: none;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .cal-index-item .idx-soop:hover { background: #d5d0ff; }
+  .cal-index-item.active .idx-soop { color: #5B6AED; background: #fff; }
   .idx-time { font-weight: 700; color: #5B6AED; font-size: 14px; }
   .idx-bj { font-weight: 600; font-size: 13px; margin-top: 2px; }
   .idx-desc { font-size: 11px; color: #999; margin-top: 2px; }
@@ -1702,7 +1716,7 @@ function renderDayCalendar(data) {
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
     idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
       + '<div class="idx-time">' + timeStr + '</div>'
-      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
+      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '<a class="idx-soop" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a></div>'
       + '<div class="idx-desc">' + escapeHtml(s.description) + '</div>'
       + '</div>';
   });
@@ -1719,7 +1733,6 @@ function renderDayCalendar(data) {
       + '<span class="cal-notice-time">' + timeStr + '</span>'
       + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
       + '<span class="cal-notice-desc">' + escapeHtml(s.description) + '</span>'
-      + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
       + '</div>';
@@ -1751,7 +1764,7 @@ function renderHotCalendar(data) {
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
     idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
       + '<div class="idx-time">' + timeStr + ' <span class="view-count"><span class="vc-icon">👁</span><span class="vc-text">조회수</span>' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span></div>'
-      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
+      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '<a class="idx-soop" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a></div>'
       + '<div class="idx-desc">' + escapeHtml(s.description || s.title_name || '') + '</div>'
       + '</div>';
   });
