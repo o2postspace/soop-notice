@@ -1981,18 +1981,35 @@ async function sendFeedback() {
 }
 
 // ===================== 라이브 체크 =====================
+const POPULAR_IDS = ['y1026','devil0108','khm11903','phonics1','rrvv17','yuambo','lshooooo','wnnw','joey1114'];
+
 async function checkLiveStatus() {
   const liveLinks = document.querySelectorAll('.live-link[data-bjid]');
   if (liveLinks.length === 0) return;
-  const bjIds = [...new Set([...liveLinks].map(el => el.dataset.bjid))];
-  try {
-    const resp = await fetch('/api/live-check?ids=' + bjIds.join(','));
-    const data = await resp.json();
+  const allIds = [...new Set([...liveLinks].map(el => el.dataset.bjid))];
+  const popular = allIds.filter(id => POPULAR_IDS.includes(id));
+  const others = allIds.filter(id => !POPULAR_IDS.includes(id));
+
+  function applyResults(data) {
     liveLinks.forEach(el => {
-      if (data[el.dataset.bjid]) el.classList.add('is-live');
-      else el.classList.remove('is-live');
+      if (data[el.dataset.bjid] !== undefined) el.classList.toggle('is-live', data[el.dataset.bjid]);
     });
-  } catch(e) {}
+  }
+
+  // 인기 BJ 먼저 빠르게
+  if (popular.length > 0) {
+    try {
+      const resp = await fetch('/api/live-check?ids=' + popular.join(','));
+      applyResults(await resp.json());
+    } catch(e) {}
+  }
+  // 나머지 백그라운드
+  if (others.length > 0) {
+    try {
+      const resp = await fetch('/api/live-check?ids=' + others.join(','));
+      applyResults(await resp.json());
+    } catch(e) {}
+  }
 }
 
 // 30초마다 라이브 체크
