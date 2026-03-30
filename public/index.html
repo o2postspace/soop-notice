@@ -1803,15 +1803,17 @@ function scrollToNotice(index) {
 function onCalContentScroll() {
   const content = document.getElementById('calContent');
   const notices = content.querySelectorAll('.cal-notice');
+  const contentRect = content.getBoundingClientRect();
   let activeIdx = 0;
-  const scrollTop = content.scrollTop + 50;
+
   notices.forEach((n, i) => {
-    if (n.offsetTop <= scrollTop) activeIdx = i;
+    const rect = n.getBoundingClientRect();
+    if (rect.top <= contentRect.top + contentRect.height / 3) activeIdx = i;
   });
+
   document.querySelectorAll('.cal-index-item').forEach((item, i) => {
     item.classList.toggle('active', i === activeIdx);
   });
-  // 인덱스 항목이 보이도록 스크롤
   const activeItem = document.querySelector('.cal-index-item[data-idx="' + activeIdx + '"]');
   if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 }
