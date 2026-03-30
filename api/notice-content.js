@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
 
   const { data, error } = await supabase
     .from("notices")
-    .select("content_html")
+    .select("content_html, reg_date")
     .eq("title_no", titleNo)
     .single();
 
@@ -19,5 +19,5 @@ module.exports = async function handler(req, res) {
     return res.status(404).json({ error: "Not found" });
   }
 
-  res.status(200).json({ content_html: data.content_html });
+  res.status(200).json({ content_html: data.content_html, reg_date: data.reg_date });
 };
