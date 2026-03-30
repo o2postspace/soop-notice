@@ -1576,11 +1576,17 @@ document.addEventListener('keydown', (e) => {
   if (document.getElementById('detailBg').classList.contains('show')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
-  // 캘린더 탭일 때 방향키로 본문 스크롤
+  // 캘린더 탭일 때 방향키로 다음/이전 BJ 공지로 이동
   if (currentTab === 'calendar') {
-    const content = document.getElementById('calContent');
-    if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); content.scrollBy(0, 100); }
-    else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); content.scrollBy(0, -100); }
+    const active = document.querySelector('.cal-index-item.active');
+    const idx = active ? parseInt(active.dataset.idx) : 0;
+    if (e.key === 'ArrowDown' || e.key === 'j') {
+      e.preventDefault();
+      if (document.querySelector('.cal-index-item[data-idx="' + (idx + 1) + '"]')) scrollToNotice(idx + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+      e.preventDefault();
+      if (idx > 0) scrollToNotice(idx - 1);
+    }
     return;
   }
 
