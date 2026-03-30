@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node dev-server.js"
+    "dev": "node dev-server.js",
+    "pages:dev": "npx wrangler pages dev public --port 3030",
+    "deploy": "npx wrangler pages deploy public"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
     "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.78.0"
   }
 }
