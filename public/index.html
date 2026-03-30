@@ -908,7 +908,7 @@ const BJ_ORDER = [
   {id:"jinhee6820",name:"빵지니"},
 ];
 let ALL_TAGS = [];
-let prevData = {};
+let prevData = [];
 let autoTimer = null;
 let currentFilter = 'all';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
@@ -1489,9 +1489,13 @@ async function loadAll() {
     const resp = await fetch("/api/notices");
     const data = await resp.json();
 
+    const isFirstLoad = prevData.length === 0;
+    // 데이터 변경 여부 확인 (첫 공지 title_no 비교)
+    const changed = isFirstLoad || data.length !== prevData.length ||
+      (data[0]?.title_no !== prevData[0]?.title_no);
     prevData = data;
-    currentPage = 0;
-    renderPages(data);
+    if (isFirstLoad) currentPage = 0;
+    if (changed) renderPages(data);
 
     document.getElementById("lastUpdate").textContent =
       new Date().toLocaleTimeString("ko-KR");
