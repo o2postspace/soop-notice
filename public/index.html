@@ -1921,26 +1921,38 @@ async function loadNoticeBody(titleNo, index) {
   }
 }
 
+let scrollLock = false;
 function scrollToNotice(index) {
+  scrollLock = true;
   const el = document.getElementById('cal-notice-' + index);
   if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
 
   // 인덱스 하이라이트
   document.querySelectorAll('.cal-index-item').forEach(item => item.classList.remove('active'));
   const idxItem = document.querySelector('.cal-index-item[data-idx="' + index + '"]');
-  if (idxItem) idxItem.classList.add('active');
+  if (idxItem) {
+    idxItem.classList.add('active');
+    idxItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+  }
+  setTimeout(() => { scrollLock = false; }, 100);
 }
 
 function onCalContentScroll() {
+  if (scrollLock) return;
   const content = document.getElementById('calContent');
   const notices = content.querySelectorAll('.cal-notice');
   const contentRect = content.getBoundingClientRect();
   let activeIdx = 0;
 
-  notices.forEach((n, i) => {
-    const rect = n.getBoundingClientRect();
-    if (rect.top <= contentRect.top + contentRect.height / 3) activeIdx = i;
-  });
+  // 스크롤이 바닥이면 마지막 항목 active
+  if (content.scrollTop + content.clientHeight >= content.scrollHeight - 10) {
+    activeIdx = notices.length - 1;
+  } else {
+    notices.forEach((n, i) => {
+      const rect = n.getBoundingClientRect();
+      if (rect.top <= contentRect.top + contentRect.height / 3) activeIdx = i;
+    });
+  }
 
   document.querySelectorAll('.cal-index-item').forEach((item, i) => {
     item.classList.toggle('active', i === activeIdx);
