@@ -5,40 +5,29 @@ module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
 
   const validIds = Object.keys(BJ_LIST);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 8));
-  const offset = Math.max(0, parseInt(req.query.offset) || 0);
 
-  const { data, error, count } = await supabase
+  const { data, error } = await supabase
     .from("notices")
-    .select("*", { count: "exact" })
+    .select("*")
     .in("bj_id", validIds)
     .order("reg_date", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .limit(1000);
 
   if (error) {
     return res.status(500).json({ error: error.message });
   }
 
-  // 친구 버전과 동일한 grouped 형식
-  const grouped = {};
+  // 이미지 최적화: 프록시로 축소 + lazy loading
   for (const row of data) {
-    if (!grouped[row.bj_id]) {
-      grouped[row.bj_id] = {
-        name: row.bj_name,
-        tag: null,
-        notices: [],
-      };
+    if (row.content_html) {
+      row.content_html = row.content_html
+        .replace(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/gi, (match, url) => {
+          const proxy = 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=400&output=webp&q=75';
+          return 'src="' + proxy + '" data-full="' + url + '"';
+        })
+        .replace(/<img(?![^>]*loading)/gi, '<img loading="lazy"');
     }
-    grouped[row.bj_id].notices.push({
-      title_no: row.title_no,
-      title_name: row.title_name,
-      contentHtml: row.content_html,
-      reg_date: row.reg_date,
-      count: { read_cnt: row.read_cnt },
-      is_pin: row.is_pin,
-      is_notice: true,
-    });
   }
 
-  res.status(200).json({ data: grouped, offset, limit, total: count });
+  res.status(200).json(data);
 };
