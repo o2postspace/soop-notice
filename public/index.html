@@ -1755,7 +1755,7 @@ function renderDayCalendar(data) {
       + '<span class="cal-notice-time">' + timeStr + '</span>'
       + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
       + '<span class="cal-notice-desc">' + escapeHtml(s.description) + '</span>'
-      + '<span class="cal-notice-date" id="cal-date-' + i + '"></span>'
+      + (s.reg_date ? '<span class="cal-notice-date">' + formatDate(s.reg_date) + '</span>' : '')
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '<a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
@@ -1805,7 +1805,7 @@ function renderHotCalendar(data) {
       + '<div class="cal-notice-header">'
       + '<span class="cal-notice-time">' + timeStr + '</span>'
       + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
-      + '<span class="cal-notice-date" id="cal-date-' + i + '"></span>'
+      + (s.reg_date ? '<span class="cal-notice-date">' + formatDate(s.reg_date) + '</span>' : '')
       + '<span class="cal-notice-desc view-count"><span class="vc-icon">👁</span><span class="vc-text">조회수</span>' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span>'
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '<a class="live-link" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
@@ -1827,10 +1827,6 @@ async function loadNoticeBody(titleNo, index) {
     const resp = await fetch('/api/notice-content?title_no=' + titleNo);
     const data = await resp.json();
     bodyEl.innerHTML = data.content_html || '<p style="color:#999">본문 없음</p>';
-    if (data.reg_date) {
-      const dateEl = document.getElementById('cal-date-' + index);
-      if (dateEl) dateEl.textContent = formatDate(data.reg_date);
-    }
   } catch(e) {
     bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
   }

@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
   if (titleNos.length > 0) {
     const { data: noticeData } = await supabase
       .from("notices")
-      .select("title_no, read_cnt, title_name")
+      .select("title_no, read_cnt, title_name, reg_date")
       .in("title_no", titleNos)
       .gte("read_cnt", 1000);
     for (const n of (noticeData || [])) {
@@ -53,6 +53,7 @@ module.exports = async function handler(req, res) {
         description: s.description,
         title_name: notice?.title_name || "",
         read_cnt: notice?.read_cnt || 0,
+        reg_date: notice?.reg_date || null,
       };
     });
 
