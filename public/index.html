@@ -360,7 +360,7 @@
     border: 1px solid #e0e0e0;
     border-radius: 12px;
     padding: 24px;
-    max-width: 500px;
+    max-width: 700px;
     width: 90%;
     height: 70vh;
     display: flex;
@@ -368,6 +368,25 @@
     box-shadow: 0 8px 30px rgba(0,0,0,0.12);
   }
   .modal-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-shrink: 0; }
+  .modal-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
+  .modal-left { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .modal-right {
+    width: 180px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0;
+    border-left: 1px solid #eee; padding-left: 16px;
+  }
+  .modal-right-header {
+    font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; flex-shrink: 0;
+  }
+  .modal-right-header span { color: #5B6AED; margin-left: 4px; }
+  #favList { overflow-y: auto; flex: 1; min-height: 0; }
+  .fav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0; font-size: 12px; color: #333; border-bottom: 1px solid #f5f5f5;
+  }
+  .fav-item .fav-remove {
+    color: #ccc; cursor: pointer; font-size: 14px; padding: 0 4px;
+  }
+  .fav-item .fav-remove:hover { color: #ff6b6b; }
   .modal-search {
     margin-bottom: 12px; flex-shrink: 0;
   }
@@ -408,8 +427,11 @@
   }
   .modal-actions button {
     padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none;
+    transition: all 0.3s;
   }
-  .btn-save { background: #5B6AED; color: #fff; font-weight: 600; }
+  .btn-save { background: #5B6AED; color: #fff; font-weight: 600; min-width: 80px; }
+  .btn-save.saving { background: #aaa; pointer-events: none; }
+  .btn-save.saved { background: #27ae60; }
   .btn-cancel { background: #eee; color: #666; }
 
   @media (max-width: 600px) {
@@ -418,6 +440,8 @@
     .filter-bar { padding: 8px 14px; }
     .scroll-nav { right: 12px; }
     .scroll-nav button { width: 40px; height: 40px; font-size: 18px; }
+    .modal-body { flex-direction: column; }
+    .modal-right { width: auto; border-left: none; border-top: 1px solid #eee; padding-left: 0; padding-top: 12px; max-height: 120px; }
   }
 
   /* 공지 상세보기 모달 */
@@ -771,12 +795,20 @@
       <h3>본진 BJ 설정</h3>
       <button class="modal-close" onclick="closeModal()">X</button>
     </div>
-    <div class="modal-search">
-      <input type="text" id="modalSearchInput" placeholder="BJ 이름 검색..." oninput="filterModalList()">
+    <div class="modal-body">
+      <div class="modal-left">
+        <div class="modal-search">
+          <input type="text" id="modalSearchInput" placeholder="BJ 이름 검색..." oninput="filterModalList()">
+        </div>
+        <div id="modalList"></div>
+      </div>
+      <div class="modal-right">
+        <div class="modal-right-header">내 본진 <span id="favCount">0</span></div>
+        <div id="favList"></div>
+      </div>
     </div>
-    <div id="modalList"></div>
     <div class="modal-actions">
-      <button class="btn-save" onclick="saveFav()">저장(Enter)</button>
+      <button class="btn-save" id="btnSave" onclick="saveFav()">저장</button>
     </div>
   </div>
 </div>
@@ -982,6 +1014,9 @@ function openModal() {
     list.innerHTML += '<div class="modal-bj" onclick="toggleFav(this,\''+bj.id+'\')"><div class="check '+on+'">V</div><span>'+escapeHtml(bj.name)+'</span></div>';
   }
   document.getElementById('modalSearchInput').value = '';
+  renderFavList();
+  document.getElementById('btnSave').className = 'btn-save';
+  document.getElementById('btnSave').textContent = '저장';
   document.getElementById('modalBg').classList.add('show');
 }
 
@@ -998,12 +1033,6 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'modalBg') closeModal();
 });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && document.getElementById('modalBg').classList.contains('show')) {
-    e.preventDefault();
-    saveFav();
-  }
-});
 
 function closeModal() {
   document.getElementById('modalBg').classList.remove('show');
@@ -1018,13 +1047,48 @@ function toggleFav(el, id) {
     tempFav.push(id);
     check.classList.add('on');
   }
+  renderFavList();
+}
+
+function renderFavList() {
+  const list = document.getElementById('favList');
+  const count = document.getElementById('favCount');
+  list.innerHTML = '';
+  count.textContent = tempFav.length;
+  for (const id of tempFav) {
+    const bj = BJ_ORDER.find(b => b.id === id);
+    const name = bj ? bj.name : (BJ_LIST[id]?.name || id);
+    list.innerHTML += '<div class="fav-item"><span>'+escapeHtml(name)+'</span><span class="fav-remove" onclick="removeFav(\''+id+'\')">X</span></div>';
+  }
+}
+
+function removeFav(id) {
+  tempFav = tempFav.filter(x => x !== id);
+  renderFavList();
+  const items = document.querySelectorAll('#modalList .modal-bj');
+  items.forEach(item => {
+    if (item.getAttribute('onclick').includes("'"+id+"'")) {
+      item.querySelector('.check').classList.remove('on');
+    }
+  });
 }
 
 function saveFav() {
-  favorites = [...tempFav];
-  localStorage.setItem('soop_fav', JSON.stringify(favorites));
-  applyFilter();
-  showToast("본진 저장 완료!");
+  const btn = document.getElementById('btnSave');
+  btn.classList.add('saving');
+  btn.textContent = '...';
+  setTimeout(() => {
+    favorites = [...tempFav];
+    localStorage.setItem('soop_fav', JSON.stringify(favorites));
+    applyFilter();
+    btn.classList.remove('saving');
+    btn.classList.add('saved');
+    btn.textContent = 'V 저장완료';
+    setTimeout(() => {
+      btn.classList.remove('saved');
+      btn.textContent = '저장';
+    }, 1200);
+  }, 400);
 }
 
 // 이미지가 많거나 큰 본문인지 판별
