@@ -688,9 +688,10 @@
   }
 
   @media (max-width: 700px) {
-    .cal-daily { flex-direction: column; height: auto; }
-    .cal-index { width: 100%; min-width: 0; max-height: 150px; }
-    .cal-content { max-height: 60vh; }
+    .cal-daily { flex-direction: column; }
+    .cal-index { width: 100%; min-width: 0; max-height: 120px; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row; gap: 8px; flex-shrink: 0; padding-bottom: 8px; }
+    .cal-index-item { min-width: 140px; flex-shrink: 0; }
+    .cal-content { flex: 1; overflow-y: auto; }
     .tab-btn { padding: 8px 16px; font-size: 13px; }
   }
 </style>
@@ -1653,6 +1654,9 @@ function onCalContentScroll() {
   document.querySelectorAll('.cal-index-item').forEach((item, i) => {
     item.classList.toggle('active', i === activeIdx);
   });
+  // 인덱스 항목이 보이도록 스크롤
+  const activeItem = document.querySelector('.cal-index-item[data-idx="' + activeIdx + '"]');
+  if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 }
 
 loadAll();
