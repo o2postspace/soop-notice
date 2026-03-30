@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+  h1 { font-size: 20px; color: #5B6AED; margin-bottom: 16px; }
+  h2 { font-size: 16px; color: #333; margin: 20px 0 12px; }
+  .login { max-width: 300px; margin: 100px auto; text-align: center; }
+  .login input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+  .login button { width: 100%; padding: 10px; background: #5B6AED; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .admin { max-width: 900px; margin: 0 auto; display: none; }
+  .tabs { display: flex; gap: 0; margin-bottom: 16px; }
+  .tab { padding: 10px 24px; border: none; background: #eee; color: #666; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .tab.active { background: #5B6AED; color: #fff; }
+  .tab:first-child { border-radius: 6px 0 0 6px; }
+  .tab:last-child { border-radius: 0 6px 6px 0; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .item { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); display: flex; align-items: flex-start; gap: 12px; }
+  .item-content { flex: 1; }
+  .item-subject { font-weight: 700; font-size: 14px; color: #333; }
+  .item-body { font-size: 12px; color: #666; margin-top: 4px; white-space: pre-wrap; }
+  .item-meta { font-size: 11px; color: #aaa; margin-top: 4px; }
+  .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .btn-sm { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
+  .btn-del { background: #ff4757; color: #fff; }
+  .btn-edit { background: #5B6AED; color: #fff; }
+  .empty { text-align: center; color: #bbb; padding: 30px; }
+  .add-form { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .add-form input, .add-form select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-right: 6px; margin-bottom: 6px; }
+  .add-form button { padding: 6px 16px; background: #5B6AED; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="login" id="loginBox">
+  <h1>관리자 로그인</h1>
+  <input type="password" id="keyInput" placeholder="비밀키 입력" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">확인</button>
+</div>
+
+<div class="admin" id="adminBox">
+  <h1>관리자 페이지</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="showPanel('feedback')">건의사항</button>
+    <button class="tab" onclick="showPanel('schedules')">캘린더 관리</button>
+  </div>
+
+  <div class="panel active" id="panel-feedback">
+    <div id="feedbackList"></div>
+  </div>
+
+  <div class="panel" id="panel-schedules">
+    <h2>일정 추가</h2>
+    <div class="add-form">
+      <input id="addBj" placeholder="BJ 이름" style="width:120px;">
+      <input id="addDate" type="date">
+      <input id="addTime" type="time">
+      <input id="addDesc" placeholder="설명" style="width:200px;">
+      <button onclick="addSchedule()">추가</button>
+    </div>
+    <h2>최근 일정</h2>
+    <div id="scheduleList"></div>
+  </div>
+</div>
+
+<script>
+let adminKey = '';
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showPanel(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === (name === 'feedback' ? 0 : 1)));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'schedules') loadSchedules();
+}
+
+async function login() {
+  adminKey = document.getElementById('keyInput').value;
+  try {
+    const resp = await fetch('/api/feedback?key=' + encodeURIComponent(adminKey));
+    if (!resp.ok) { alert('비밀키가 틀립니다'); return; }
+    const data = await resp.json();
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('adminBox').style.display = 'block';
+    renderFeedback(data);
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+function renderFeedback(data) {
+  if (data.length === 0) {
+    document.getElementById('feedbackList').innerHTML = '<div class="empty">건의사항이 없습니다</div>';
+    return;
+  }
+  document.getElementById('feedbackList').innerHTML = data.map(d =>
+    '<div class="item"><div class="item-content"><div class="item-subject">' + esc(d.subject) + '</div><div class="item-body">' + esc(d.body) + '</div><div class="item-meta">' + new Date(d.created_at).toLocaleString('ko-KR') + '</div></div></div>'
+  ).join('');
+}
+
+async function loadSchedules() {
+  const resp = await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-schedules');
+  const data = await resp.json();
+  if (!data.length) {
+    document.getElementById('scheduleList').innerHTML = '<div class="empty">일정이 없습니다</div>';
+    return;
+  }
+  document.getElementById('scheduleList').innerHTML = data.map(d => {
+    const t = new Date(new Date(d.broadcast_start).getTime() + 9*60*60*1000);
+    const timeStr = t.getUTCFullYear() + '-' + String(t.getUTCMonth()+1).padStart(2,'0') + '-' + String(t.getUTCDate()).padStart(2,'0') + ' ' + String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
+    return '<div class="item"><div class="item-content"><div class="item-subject">' + esc(d.bj_name) + ' — ' + timeStr + '</div><div class="item-body">' + esc(d.description) + '</div><div class="item-meta">ID: ' + d.id + ' | ' + esc(d.raw_text) + '</div></div><div class="item-actions"><button class="btn-sm btn-del" onclick="delSchedule(' + d.id + ')">삭제</button></div></div>';
+  }).join('');
+}
+
+async function delSchedule(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-schedule&id=' + id);
+  loadSchedules();
+}
+
+async function addSchedule() {
+  const bj = document.getElementById('addBj').value.trim();
+  const date = document.getElementById('addDate').value;
+  const time = document.getElementById('addTime').value;
+  const desc = document.getElementById('addDesc').value.trim();
+  if (!bj || !date || !time) { alert('BJ이름, 날짜, 시간을 입력하세요'); return; }
+  const start = date + 'T' + time + ':00+09:00';
+  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-schedule&bj_name=' + encodeURIComponent(bj) + '&broadcast_start=' + encodeURIComponent(start) + '&description=' + encodeURIComponent(desc));
+  document.getElementById('addBj').value = '';
+  document.getElementById('addDesc').value = '';
+  loadSchedules();
+}
+</script>
+</body>
+</html>
