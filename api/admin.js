@@ -1,6 +1,6 @@
 const { supabase } = require("../lib/supabase");
 
-const ADMIN_KEY = "qowlstnrytnsla";
+const ADMIN_KEY = process.env.ADMIN_KEY || "qowlstnrytnsla";
 
 module.exports = async function handler(req, res) {
   if (req.query.key !== ADMIN_KEY) return res.status(403).json({ error: "Forbidden" });
