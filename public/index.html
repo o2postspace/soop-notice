@@ -1105,6 +1105,18 @@ function escapeHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+// 이모티콘 링크 무력화 (SOOP 이모티콘 구매페이지 이동 방지)
+function neutralizeEmoticonLinks(container) {
+  container.querySelectorAll('a').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    if (href.includes('emoticon') || href.includes('emot') || href.includes('itemshop')) {
+      a.removeAttribute('href');
+      a.style.pointerEvents = 'none';
+      a.style.cursor = 'default';
+    }
+  });
+}
+
 // 필터
 function setFilter(f) {
   currentFilter = f;
@@ -1346,6 +1358,7 @@ function renderPages(data) {
     html += '</div></div>';
   }
   container.innerHTML = html;
+  container.querySelectorAll('.card-body').forEach(b => neutralizeEmoticonLinks(b));
 
   // 긴 본문에만 "더보기" 버튼 표시
   container.querySelectorAll('.card-body').forEach(body => {
@@ -1385,6 +1398,7 @@ function openDetail(cardEl) {
   // 모달에서는 원본 이미지로 복원
   html = html.replace(/src="https:\/\/wsrv\.nl\/[^"]*"(\s*data-full="([^"]+)")/gi, 'src="$2" loading="lazy"');
   bodyEl.innerHTML = html;
+  neutralizeEmoticonLinks(bodyEl);
   bodyEl.scrollTop = 0;
 
   document.getElementById('detailBg').classList.add('show');
@@ -1916,6 +1930,7 @@ async function loadNoticeBody(titleNo, index) {
     const resp = await fetch('/api/notice-content?title_no=' + titleNo);
     const data = await resp.json();
     bodyEl.innerHTML = data.content_html || '<p style="color:#999">본문 없음</p>';
+    neutralizeEmoticonLinks(bodyEl);
   } catch(e) {
     bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
   }
