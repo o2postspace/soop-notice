@@ -850,8 +850,8 @@
 </header>
 
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
-  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
+  <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
+  <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
 </div>
 
 <div class="filter-bar" id="filterBar">
@@ -1804,7 +1804,7 @@ function setupAutoRefresh() {
 }
 
 // ===================== 탭 전환 =====================
-let currentTab = 'notices';
+let currentTab = 'calendar';
 
 function switchTab(tab) {
   currentTab = tab;
@@ -2105,13 +2105,14 @@ setInterval(checkLiveStatus, 30000);
 
 loadAll();
 setupAutoRefresh();
+switchTab('calendar');
 
 // Pull-to-refresh (모바일 맨 위에서 아래로 당기기)
 (function() {
   var ptrStartY = 0;
   var ptrTriggered = false;
   document.addEventListener('touchstart', function(e) {
-    if (window.scrollY === 0 && currentTab === 'notices' && !document.getElementById('detailBg').classList.contains('show')) {
+    if (window.scrollY === 0 && !document.getElementById('detailBg').classList.contains('show')) {
       ptrStartY = e.touches[0].clientY;
       ptrTriggered = false;
     } else {
