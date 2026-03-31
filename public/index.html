@@ -635,12 +635,19 @@
     display: flex;
     flex-direction: column;
   }
+  .cal-right {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
   .calendar-nav {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
   }
   .calendar-nav button {
     background: #5B6AED;
@@ -802,6 +809,8 @@
 
   @media (max-width: 700px) {
     .cal-daily { flex-direction: column; }
+    .cal-right { flex: 1; overflow: hidden; }
+    .calendar-nav { margin-bottom: 8px; }
     .cal-index { width: 100%; min-width: 0; max-height: 120px; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row; gap: 8px; flex-shrink: 0; padding-bottom: 8px; }
     .vc-icon { display: none; }
     .vc-text { display: inline; }
@@ -866,15 +875,17 @@
 </div>
 
 <div id="calendarContainer" style="display:none;">
-  <div class="calendar-nav">
-    <button onclick="changeDay(-1)">&#9664; 이전</button>
-    <span id="calDateLabel"></span>
-    <button onclick="changeDay(0)" style="font-size:11px;background:#a29bfe;">오늘</button>
-    <button onclick="changeDay(1)">다음 &#9654;</button>
-  </div>
   <div class="cal-daily">
     <div class="cal-index" id="calIndex"></div>
-    <div class="cal-content" id="calContent"></div>
+    <div class="cal-right">
+      <div class="calendar-nav">
+        <button onclick="changeDay(-1)">&#9664; 이전</button>
+        <span id="calDateLabel"></span>
+        <button onclick="changeDay(0)" style="font-size:11px;background:#a29bfe;">오늘</button>
+        <button onclick="changeDay(1)">다음 &#9654;</button>
+      </div>
+      <div class="cal-content" id="calContent"></div>
+    </div>
   </div>
 </div>
 
