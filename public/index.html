@@ -1997,14 +1997,16 @@ async function loadNoticeBody(titleNo, index) {
 let scrollLock = false;
 function scrollToNotice(index) {
   scrollLock = true;
+  const container = document.getElementById('calContent');
   const el = document.getElementById('cal-notice-' + index);
-  if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
+  if (el && container) {
+    container.scrollTop = el.offsetTop - container.offsetTop;
+  }
 
   // 인덱스 하이라이트
   document.querySelectorAll('.cal-index-item').forEach(item => item.classList.remove('active'));
   const idxItem = document.querySelector('.cal-index-item[data-idx="' + index + '"]');
   if (idxItem) {
-    idxItem.classList.add('active');
     idxItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
   }
   setTimeout(() => { scrollLock = false; }, 100);
