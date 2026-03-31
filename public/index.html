@@ -1117,6 +1117,30 @@ function escapeHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+function sanitizeHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "")
+    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
+    .replace(/src\s*=\s*["']data:(?!image\/)[^"']*["']/gi, 'src=""')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<(object|embed|form|input|button|textarea|select)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<(object|embed|form|input|button|textarea|select)[^>]*\/?>/gi, "")
+    .replace(/expression\s*\([^)]*\)/gi, "")
+    .replace(/style\s*=\s*["'][^"']*url\s*\([^)]*\)[^"']*["']/gi, "");
+}
+
+function optimizeImages(html) {
+  if (!html) return "";
+  return html
+    .replace(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/gi, function(match, url) {
+      var proxy = 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=400&output=webp&q=75';
+      return 'src="' + proxy + '" data-full="' + url + '"';
+    })
+    .replace(/<img(?![^>]*loading)/gi, '<img loading="lazy"');
+}
+
 // 이모티콘 링크 무력화 (SOOP 이모티콘 구매페이지 이동 방지)
 function neutralizeEmoticonLinks(container) {
   container.querySelectorAll('a').forEach(a => {
@@ -1535,8 +1559,12 @@ function closeDetail() {
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
-  if (card && !e.target.closest('.card-expand-btn') && !e.target.closest('a') && !document.getElementById('detailBg').classList.contains('show')) {
-    openDetail(card);
+  if (card && !e.target.closest('.card-expand-btn') && !e.target.closest('a')) {
+    if (document.getElementById('detailBg').classList.contains('show')) {
+      closeDetail();
+    } else {
+      openDetail(card);
+    }
   }
 });
 document.addEventListener('keydown', (e) => {
@@ -1725,6 +1753,13 @@ async function loadAll() {
     // 본문 없이 전체 목록 한번에 (~40KB, CDN 캐시)
     const resp = await fetch("/api/notices");
     const data = await resp.json();
+
+    // 프론트엔드에서 HTML 정화 + 이미지 최적화
+    for (const row of data) {
+      if (row.content_html) {
+        row.content_html = optimizeImages(sanitizeHtml(row.content_html));
+      }
+    }
 
     const isFirstLoad = prevData.length === 0;
     // 데이터 변경 여부 확인 (첫 공지 title_no 비교)
@@ -1941,7 +1976,7 @@ async function loadNoticeBody(titleNo, index) {
   try {
     const resp = await fetch('/api/notice-content?title_no=' + titleNo);
     const data = await resp.json();
-    bodyEl.innerHTML = data.content_html || '<p style="color:#999">본문 없음</p>';
+    bodyEl.innerHTML = optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
     neutralizeEmoticonLinks(bodyEl);
   } catch(e) {
     bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
