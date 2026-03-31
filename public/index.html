@@ -1556,30 +1556,24 @@ function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
   document.body.style.overflow = '';
 }
-// 모바일: 모달 본문 탭하면 닫기 (스크롤은 무시) - 이벤트 위임
-var modalTouchStartY = 0;
-var modalTouchStartTime = 0;
-document.getElementById('detailBg').addEventListener('touchstart', function(e) {
-  if (e.target.closest('.detail-body')) {
-    modalTouchStartY = e.touches[0].clientY;
-    modalTouchStartTime = Date.now();
-  }
+// 모바일: 모달 본문 탭하면 닫기 (스크롤은 무시)
+var modalScrolled = false;
+document.getElementById('detailBody').addEventListener('touchmove', function() {
+  modalScrolled = true;
 }, {passive: true});
-document.getElementById('detailBg').addEventListener('touchend', function(e) {
-  if (!e.target.closest('.detail-body')) return;
-  var dy = Math.abs(e.changedTouches[0].clientY - modalTouchStartY);
-  var dt = Date.now() - modalTouchStartTime;
-  if (dy < 10 && dt < 300 && !e.target.closest('a') && !e.target.closest('button') && !e.target.closest('img')) {
-    closeDetail();
-  }
+document.getElementById('detailBody').addEventListener('touchstart', function() {
+  modalScrolled = false;
 }, {passive: true});
+document.getElementById('detailBody').addEventListener('click', function(e) {
+  if (modalScrolled) return;
+  if (e.target.closest('a') || e.target.closest('button') || e.target.closest('img')) return;
+  closeDetail();
+});
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
   if (card && !e.target.closest('.card-expand-btn') && !e.target.closest('a')) {
-    if (document.getElementById('detailBg').classList.contains('show')) {
-      closeDetail();
-    } else {
+    if (!document.getElementById('detailBg').classList.contains('show')) {
       openDetail(card);
     }
   }
