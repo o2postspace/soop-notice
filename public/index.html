@@ -1556,6 +1556,24 @@ function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
   document.body.style.overflow = '';
 }
+// 모바일: 모달 본문 탭하면 닫기 (스크롤은 무시)
+(function() {
+  var touchStartY = 0;
+  var touchStartTime = 0;
+  var detailBody = document.querySelector('.detail-body');
+  detailBody.addEventListener('touchstart', function(e) {
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, {passive: true});
+  detailBody.addEventListener('touchend', function(e) {
+    var dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+    var dt = Date.now() - touchStartTime;
+    // 짧은 탭: 이동 10px 미만, 300ms 미만, 링크/버튼 아님
+    if (dy < 10 && dt < 300 && !e.target.closest('a') && !e.target.closest('button') && !e.target.closest('img')) {
+      closeDetail();
+    }
+  }, {passive: true});
+})();
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
