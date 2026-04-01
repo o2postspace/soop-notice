@@ -47,10 +47,29 @@
   <div class="tabs">
     <button class="tab active" onclick="showPanel('feedback')">건의사항</button>
     <button class="tab" onclick="showPanel('schedules')">캘린더 관리</button>
+    <button class="tab" onclick="showPanel('updates')">업데이트 관리</button>
   </div>
 
   <div class="panel active" id="panel-feedback">
     <div id="feedbackList"></div>
+  </div>
+
+  <div class="panel" id="panel-updates">
+    <h2>업데이트 작성</h2>
+    <div class="add-form">
+      <select id="updateCategory">
+        <option value="업데이트">업데이트</option>
+        <option value="건의수용">건의수용</option>
+        <option value="버그수정">버그수정</option>
+        <option value="공지">공지</option>
+      </select>
+      <input id="updateTitle" placeholder="제목" style="width:250px;">
+      <br>
+      <textarea id="updateContent" placeholder="내용" style="width:100%;height:100px;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;margin:6px 0;resize:vertical;"></textarea>
+      <button onclick="addUpdate()">작성</button>
+    </div>
+    <h2>작성 목록</h2>
+    <div id="updateList"></div>
   </div>
 
   <div class="panel" id="panel-schedules">
@@ -73,10 +92,13 @@ let adminKey = '';
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function showPanel(name) {
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === (name === 'feedback' ? 0 : 1)));
+  const tabs = document.querySelectorAll('.tab');
+  const names = ['feedback', 'schedules', 'updates'];
+  tabs.forEach((t, i) => t.classList.toggle('active', names[i] === name));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   if (name === 'schedules') loadSchedules();
+  if (name === 'updates') loadUpdateList();
 }
 
 async function login() {
@@ -119,6 +141,35 @@ async function delSchedule(id) {
   if (!confirm('삭제하시겠습니까?')) return;
   await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-schedule&id=' + id);
   loadSchedules();
+}
+
+async function loadUpdateList() {
+  const resp = await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-updates');
+  const data = await resp.json();
+  if (!data.length) {
+    document.getElementById('updateList').innerHTML = '<div class="empty">작성된 업데이트가 없습니다</div>';
+    return;
+  }
+  document.getElementById('updateList').innerHTML = data.map(d =>
+    '<div class="item"><div class="item-content"><div class="item-subject">[' + esc(d.category) + '] ' + esc(d.title) + '</div><div class="item-body">' + esc(d.content) + '</div><div class="item-meta">' + new Date(d.created_at).toLocaleString('ko-KR') + '</div></div><div class="item-actions"><button class="btn-sm btn-del" onclick="delUpdate(' + d.id + ')">삭제</button></div></div>'
+  ).join('');
+}
+
+async function addUpdate() {
+  const category = document.getElementById('updateCategory').value;
+  const title = document.getElementById('updateTitle').value.trim();
+  const content = document.getElementById('updateContent').value.trim();
+  if (!title || !content) { alert('제목과 내용을 입력하세요'); return; }
+  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-update&title=' + encodeURIComponent(title) + '&content=' + encodeURIComponent(content) + '&category=' + encodeURIComponent(category));
+  document.getElementById('updateTitle').value = '';
+  document.getElementById('updateContent').value = '';
+  loadUpdateList();
+}
+
+async function delUpdate(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-update&id=' + id);
+  loadUpdateList();
 }
 
 async function addSchedule() {

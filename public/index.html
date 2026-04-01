@@ -975,6 +975,60 @@
     background: #fafafa;
   }
 
+  /* 업데이트 */
+  #updatesContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .update-item {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .update-item .update-category {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: #5B6AED;
+    padding: 2px 10px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .update-item .update-category.cat-건의수용 { background: #27ae60; }
+  .update-item .update-category.cat-버그수정 { background: #e67e22; }
+  .update-item .update-category.cat-공지 { background: #e74c3c; }
+  .update-item .update-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 6px;
+  }
+  .update-item .update-content {
+    font-size: 13px;
+    color: #555;
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+  .update-item .update-date {
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 8px;
+  }
+  .updates-empty {
+    text-align: center;
+    color: #bbb;
+    padding: 60px 0;
+    font-size: 14px;
+  }
+  html.dark .update-item { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .update-item .update-title { color: #e0e0e0; }
+  html.dark .update-item .update-content { color: #b0b0b0; }
+  html.dark .update-item .update-date { color: #666; }
+
   @media (max-width: 700px) {
     .cal-daily { flex-direction: column; }
     .cal-left { width: 100%; min-width: 0; flex-shrink: 0; }
@@ -1023,6 +1077,7 @@
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
+  <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
 </div>
 
 <div class="filter-bar" id="filterBar">
@@ -1062,6 +1117,10 @@
     </div>
     <div class="cal-content" id="calContent"></div>
   </div>
+</div>
+
+<div id="updatesContainer" style="display:none;">
+  <div id="updatesList" class="updates-list"></div>
 </div>
 
 </div><!-- app-wrap -->
@@ -2002,17 +2061,22 @@ function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
+  document.getElementById('filterBar').style.display = 'none';
+  document.getElementById('scroller').style.display = 'none';
+  document.getElementById('scrollNav').style.display = 'none';
+  document.getElementById('calendarContainer').style.display = 'none';
+  document.getElementById('updatesContainer').style.display = 'none';
+
   if (tab === 'notices') {
     document.getElementById('filterBar').style.display = '';
     document.getElementById('scroller').style.display = '';
-    document.getElementById('calendarContainer').style.display = 'none';
     if (prevData) renderPages(prevData);
   } else if (tab === 'calendar') {
-    document.getElementById('filterBar').style.display = 'none';
-    document.getElementById('scroller').style.display = 'none';
-    document.getElementById('scrollNav').style.display = 'none';
     document.getElementById('calendarContainer').style.display = '';
     loadCalendar();
+  } else if (tab === 'updates') {
+    document.getElementById('updatesContainer').style.display = '';
+    loadUpdates();
   }
 }
 
@@ -2270,6 +2334,32 @@ async function sendFeedback() {
     }
   } catch(e) {
     showToast('전송 실패: ' + e.message);
+  }
+}
+
+// ===================== 업데이트 탭 =====================
+async function loadUpdates() {
+  const container = document.getElementById('updatesList');
+  container.innerHTML = '<div class="updates-empty">불러오는 중...</div>';
+  try {
+    const resp = await fetch('/api/updates');
+    const data = await resp.json();
+    if (!data.length) {
+      container.innerHTML = '<div class="updates-empty">업데이트 소식이 없습니다</div>';
+      return;
+    }
+    container.innerHTML = data.map(d => {
+      const catClass = 'cat-' + (d.category || '업데이트');
+      const date = new Date(d.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+      return '<div class="update-item">'
+        + '<span class="update-category ' + catClass + '">' + escapeHtml(d.category || '업데이트') + '</span>'
+        + '<div class="update-title">' + escapeHtml(d.title) + '</div>'
+        + '<div class="update-content">' + escapeHtml(d.content) + '</div>'
+        + '<div class="update-date">' + date + '</div>'
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="updates-empty">로드 실패</div>';
   }
 }
 

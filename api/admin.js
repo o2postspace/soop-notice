@@ -64,5 +64,36 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(data);
   }
 
+  // 업데이트 목록
+  if (action === "list-updates") {
+    const { data, error } = await supabase.from("updates").select("*")
+      .order("created_at", { ascending: false }).limit(50);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  // 업데이트 추가
+  if (action === "add-update") {
+    const { title, content, category } = req.query;
+    if (!title || !content) return res.status(400).json({ error: "title, content required" });
+    const { error } = await supabase.from("updates").insert({
+      title,
+      content,
+      category: category || "업데이트",
+      created_at: new Date().toISOString(),
+    });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
+  // 업데이트 삭제
+  if (action === "delete-update") {
+    const id = parseInt(req.query.id);
+    if (!id) return res.status(400).json({ error: "id required" });
+    const { error } = await supabase.from("updates").delete().eq("id", id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ error: "Unknown action" });
 };

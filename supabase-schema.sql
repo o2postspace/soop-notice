@@ -33,3 +33,19 @@ create policy "서비스 역할만 쓰기 가능"
 create policy "서비스 역할만 수정 가능"
   on notices for update
   using (true);
+
+-- 업데이트 소식 테이블
+create table updates (
+  id bigserial primary key,
+  title text not null,
+  content text not null,
+  category text default '업데이트',
+  created_at timestamptz default now()
+);
+
+alter table updates enable row level security;
+
+create policy "누구나 읽기 가능" on updates for select using (true);
+create policy "서비스 역할만 쓰기 가능" on updates for insert with check (true);
+create policy "서비스 역할만 수정 가능" on updates for update using (true);
+create policy "서비스 역할만 삭제 가능" on updates for delete using (true);
