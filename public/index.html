@@ -119,6 +119,7 @@
   html.dark .card-expand-btn:hover { background: #303030; }
   html.dark .card-tag { background: #2a2a2a; border-color: #444; color: #a29bfe; }
   html.dark .live-link { background: #444; }
+  html.dark .live-link.is-live { background: #e74c3c; }
   html.dark .empty-msg { background: #1e1e1e; color: #555; }
   html.dark .loading { color: #5B6AED; }
   html.dark .loading .spinner { border-color: #333; border-top-color: #5B6AED; }
@@ -2004,8 +2005,8 @@ function switchTab(tab) {
   if (tab === 'notices') {
     document.getElementById('filterBar').style.display = '';
     document.getElementById('scroller').style.display = '';
-    document.getElementById('scrollNav').style.display = totalPages > 0 ? 'flex' : 'none';
     document.getElementById('calendarContainer').style.display = 'none';
+    if (prevData) renderPages(prevData);
   } else if (tab === 'calendar') {
     document.getElementById('filterBar').style.display = 'none';
     document.getElementById('scroller').style.display = 'none';
