@@ -158,6 +158,7 @@
   html.dark .detail-body img { background: #2a2a2a; }
   html.dark .detail-close { background: #1e1e1e; border-color: #444; color: #777; }
   html.dark .detail-close:hover { border-color: #ff6b6b; color: #ff6b6b; }
+  html.dark .detail-footer { border-top-color: #333 !important; }
   /* 다크모드 캘린더 */
   html.dark #calWeekLabel { color: #e0e0e0; }
   html.dark .cal-index-item { background: #1e1e1e; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
@@ -1114,7 +1115,7 @@
       <div class="detail-meta" id="detailMeta"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
-    <div style="padding:12px 20px 16px; border-top:1px solid #eee; text-align:center;">
+    <div class="detail-footer" style="padding:12px 20px 16px; border-top:1px solid #eee; text-align:center;">
       <button id="detailCopyBtn" onclick="copyForFmkorea()" style="padding:10px 24px; background:#1859E6; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">📋 펨코 복사</button>
     </div>
   </div>
@@ -1604,7 +1605,7 @@ function openDetail(cardEl) {
   if (!notice) return;
 
   const bjId = notice.bj_id || cardEl.dataset.bjid;
-  document.getElementById('detailName').innerHTML = escapeHtml(notice.bj_name);
+  document.getElementById('detailName').innerHTML = '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + bjId.slice(0,2) + '/' + bjId + '/' + bjId + '.jpg" alt="" style="vertical-align:middle;margin-right:6px;" onerror="this.style.display=\'none\'">' + escapeHtml(notice.bj_name);
   document.getElementById('detailLinks').innerHTML =
     '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP</a>' +
     '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE</a>';
