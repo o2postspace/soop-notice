@@ -1069,10 +1069,12 @@
 <!-- 공지 상세보기 모달 -->
 <div class="detail-bg" id="detailBg">
   <div class="detail-modal" style="position:relative;">
-    <button class="detail-close" onclick="closeDetail()">X</button>
+    <div style="display:flex;align-items:center;gap:6px;position:absolute;top:12px;right:12px;">
+      <span id="detailLinks" style="display:inline-flex;gap:6px;"></span>
+      <button class="detail-close" onclick="closeDetail()" style="position:static;">X</button>
+    </div>
     <div class="detail-header">
       <div class="detail-name" id="detailName"></div>
-      <div id="detailLinks" style="display:inline-flex;gap:6px;margin-top:4px;"></div>
       <div class="detail-title" id="detailTitle"></div>
       <div class="detail-meta" id="detailMeta"></div>
     </div>
