@@ -128,6 +128,8 @@
   html.dark .scroll-nav button:hover { background: #5B6AED; color: #fff; }
   html.dark .scroll-nav button:disabled:hover { background: #1e1e1e; color: #5B6AED; }
   html.dark .scroll-nav .nav-counter { background: #1e1e1e; color: #999; box-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+  html.dark .cal-nav-btn { background: #1e1e1e; color: #5B6AED; box-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+  html.dark .cal-nav-btn:hover { background: #5B6AED; color: #fff; }
   html.dark .tab-bar { background: #1e1e1e; border-bottom-color: #333; }
   html.dark .tab-btn { color: #666; }
   html.dark .tab-btn:hover { color: #5B6AED; }
@@ -816,6 +818,27 @@
   .calendar-nav button:hover { background: #4a58d4; }
   #calWeekLabel { font-size: 14px; font-weight: 600; color: #333; }
 
+  .cal-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    color: #5B6AED;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cal-nav-btn:hover { background: #5B6AED; color: #fff; }
+  .cal-nav-prev { left: 4px; }
+  .cal-nav-next { right: 4px; }
   .cal-daily {
     display: flex;
     gap: 16px;
@@ -1031,7 +1054,9 @@
   </div>
 </div>
 
-<div id="calendarContainer" style="display:none;">
+<div id="calendarContainer" style="display:none;position:relative;">
+  <button class="cal-nav-btn cal-nav-prev" onclick="calNavPrev()" title="이전">&#9664;</button>
+  <button class="cal-nav-btn cal-nav-next" onclick="calNavNext()" title="다음">&#9654;</button>
   <div class="cal-daily">
     <div class="cal-left">
       <div class="calendar-nav">
@@ -1847,15 +1872,15 @@ document.addEventListener('keydown', (e) => {
   if (document.getElementById('detailBg').classList.contains('show')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
-  // 캘린더 탭일 때 방향키로 다음/이전 공지로 이동
+  // 캘린더 탭일 때 좌우 방향키로 다음/이전 공지로 이동
   if (currentTab === 'calendar') {
     const active = document.querySelector('.cal-index-item.active');
     const idx = active ? parseInt(active.dataset.idx) : -1;
-    if (e.key === 'ArrowDown' || e.key === 'j') {
+    if (e.key === 'ArrowRight' || e.key === 'j') {
       e.preventDefault();
       const nextIdx = idx + 1;
       if (document.querySelector('.cal-index-item[data-idx="' + nextIdx + '"]')) scrollToNotice(nextIdx);
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    } else if (e.key === 'ArrowLeft' || e.key === 'k') {
       e.preventDefault();
       const prevIdx = idx - 1;
       if (prevIdx >= 0 && document.querySelector('.cal-index-item[data-idx="' + prevIdx + '"]')) scrollToNotice(prevIdx);
@@ -1863,10 +1888,10 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+  if (e.key === 'ArrowRight' || e.key === 'j' || e.key === 'PageDown') {
     e.preventDefault();
     goPage(1);
-  } else if (e.key === 'k' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+  } else if (e.key === 'ArrowLeft' || e.key === 'k' || e.key === 'PageUp') {
     e.preventDefault();
     goPage(-1);
   } else if (e.key === 'Home') {
@@ -1880,21 +1905,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// 마우스 휠로 페이지 전환
-document.addEventListener('DOMContentLoaded', () => {
-  let wheelLock = false;
-  document.addEventListener('wheel', (e) => {
-    if (document.getElementById('modalBg').classList.contains('show')) return;
-    if (document.getElementById('detailBg').classList.contains('show')) return;
-    if (currentTab === 'calendar') return;
-    e.preventDefault();
-    if (wheelLock) return;
-    wheelLock = true;
-    if (e.deltaY > 0) goPage(1);
-    else if (e.deltaY < 0) goPage(-1);
-    setTimeout(() => { wheelLock = false; }, 400);
-  }, { passive: false });
-});
+// 본문 상하 스크롤 허용 — 페이지 전환은 좌우 방향키/스와이프/버튼으로
 
 // 터치 좌우 스와이프로 페이지 전환 (모바일)
 (function() {
@@ -2186,6 +2197,19 @@ async function loadNoticeBody(titleNo, index) {
 }
 
 let scrollLock = false;
+function calNavNext() {
+  const active = document.querySelector('.cal-index-item.active');
+  const idx = active ? parseInt(active.dataset.idx) : -1;
+  const nextIdx = idx + 1;
+  if (document.querySelector('.cal-index-item[data-idx="' + nextIdx + '"]')) scrollToNotice(nextIdx);
+}
+function calNavPrev() {
+  const active = document.querySelector('.cal-index-item.active');
+  const idx = active ? parseInt(active.dataset.idx) : -1;
+  const prevIdx = idx - 1;
+  if (prevIdx >= 0 && document.querySelector('.cal-index-item[data-idx="' + prevIdx + '"]')) scrollToNotice(prevIdx);
+}
+
 function scrollToNotice(index) {
   scrollLock = true;
   const container = document.getElementById('calContent');
