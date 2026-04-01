@@ -264,7 +264,7 @@
   .app-wrap {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100vh;
   }
 
   /* 페이지 컨테이너 */
@@ -1923,25 +1923,27 @@ function updateNav() {
   document.getElementById('btnNext').disabled = (currentPage >= totalPages - 1);
 }
 
-// 키보드: 위/아래, j/k, PageUp/PageDown
-document.addEventListener('keydown', (e) => {
+// 키보드: 좌/우, j/k, PageUp/PageDown
+window.addEventListener('keydown', (e) => {
   if (document.getElementById('modalBg').classList.contains('show')) return;
   if (document.getElementById('detailBg').classList.contains('show')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
   // 캘린더 탭일 때 좌우 방향키로 다음/이전 공지로 이동
   if (currentTab === 'calendar') {
+    const items = document.querySelectorAll('.cal-index-item');
+    if (items.length === 0) return;
     const active = document.querySelector('.cal-index-item.active');
     const idx = active ? parseInt(active.dataset.idx) : -1;
     if (e.key === 'ArrowRight' || e.key === 'j') {
       e.preventDefault();
       scrollLock = false;
-      const nextIdx = idx + 1;
+      const nextIdx = idx < 0 ? 0 : idx + 1;
       if (document.querySelector('.cal-index-item[data-idx="' + nextIdx + '"]')) scrollToNotice(nextIdx);
     } else if (e.key === 'ArrowLeft' || e.key === 'k') {
       e.preventDefault();
       scrollLock = false;
-      const prevIdx = idx - 1;
+      const prevIdx = idx < 0 ? 0 : idx - 1;
       if (prevIdx >= 0 && document.querySelector('.cal-index-item[data-idx="' + prevIdx + '"]')) scrollToNotice(prevIdx);
     }
     return;
@@ -1966,7 +1968,7 @@ document.addEventListener('keydown', (e) => {
 
 // 본문 상하 스크롤 허용 — 페이지 전환은 좌우 방향키/스와이프/버튼으로
 
-// 터치 좌우 스와이프로 페이지 전환 (모바일)
+// 터치 좌우 스와이프로 페이지/캘린더 전환 (모바일)
 (function() {
   let startX = 0;
   let startY = 0;
@@ -1974,7 +1976,6 @@ document.addEventListener('keydown', (e) => {
   document.addEventListener('touchstart', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
     if (document.getElementById('detailBg').classList.contains('show')) return;
-    if (currentTab !== 'notices') return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     startTime = Date.now();
@@ -1983,14 +1984,17 @@ document.addEventListener('keydown', (e) => {
   document.addEventListener('touchend', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
     if (document.getElementById('detailBg').classList.contains('show')) return;
-    if (currentTab !== 'notices') return;
     const diffX = startX - e.changedTouches[0].clientX;
     const diffY = Math.abs(startY - e.changedTouches[0].clientY);
     const diffTime = Date.now() - startTime;
-    // 좌우 스와이프: 수평 50px 이상, 수직보다 커야 함, 500ms 이내
     if (diffTime > 500 || Math.abs(diffX) < 50 || diffY > Math.abs(diffX)) return;
-    if (diffX > 0) goPage(1);   // 왼쪽 스와이프 → 다음
-    else goPage(-1);             // 오른쪽 스와이프 → 이전
+    if (currentTab === 'notices') {
+      if (diffX > 0) goPage(1);
+      else goPage(-1);
+    } else if (currentTab === 'calendar') {
+      if (diffX > 0) calNavNext();
+      else calNavPrev();
+    }
   }, { passive: true });
 })();
 
@@ -2286,9 +2290,10 @@ function scrollToNotice(index) {
   document.querySelectorAll('.cal-index-item').forEach(item => item.classList.remove('active'));
   const idxItem = document.querySelector('.cal-index-item[data-idx="' + index + '"]');
   if (idxItem) {
+    idxItem.classList.add('active');
     idxItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
   }
-  setTimeout(() => { scrollLock = false; }, 100);
+  setTimeout(() => { scrollLock = false; }, 300);
 }
 
 function onCalContentScroll() {
