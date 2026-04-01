@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>숲공지 - SOOP BJ 공지사항 대시보드 | soopnotice</title>
+<title>숲공지 - SOOP 스트리머 공지사항 대시보드 | soopnotice</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9843361612343210" crossorigin="anonymous"></script>
-<meta name="description" content="숲공지(soopnotice) - SOOP(숲) BJ들의 공지사항을 한 곳에서 모아보는 대시보드. 실시간 방송 일정, 캘린더, 인기 공지를 확인하세요.">
-<meta name="keywords" content="숲공지, soopnotice, SOOP, 숲, 아프리카TV, BJ, 공지사항, 방송일정, 캘린더, 스트리머">
-<meta property="og:title" content="숲공지 - SOOP BJ 공지사항 대시보드">
-<meta property="og:description" content="SOOP BJ들의 공지사항을 한 곳에서. 실시간 방송 일정과 캘린더를 확인하세요.">
+<meta name="description" content="숲공지(soopnotice) - SOOP(숲) 스트리머들의 공지사항을 한 곳에서 모아보는 대시보드. 실시간 방송 일정, 캘린더, 인기 공지를 확인하세요.">
+<meta name="keywords" content="숲공지, soopnotice, SOOP, 숲, 아프리카TV, 스트리머, 공지사항, 방송일정, 캘린더">
+<meta property="og:title" content="숲공지 - SOOP 스트리머 공지사항 대시보드">
+<meta property="og:description" content="SOOP 스트리머들의 공지사항을 한 곳에서. 실시간 방송 일정과 캘린더를 확인하세요.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://soopnotice.com">
 <meta property="og:site_name" content="숲공지">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="숲공지 - SOOP BJ 공지사항 대시보드">
-<meta name="twitter:description" content="SOOP BJ들의 공지사항을 한 곳에서. 실시간 방송 일정과 캘린더.">
+<meta name="twitter:title" content="숲공지 - SOOP 스트리머 공지사항 대시보드">
+<meta name="twitter:description" content="SOOP 스트리머들의 공지사항을 한 곳에서. 실시간 방송 일정과 캘린더.">
 <link rel="canonical" href="https://soopnotice.com">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -862,7 +862,7 @@
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
   <div class="search-box">
-    <input id="searchInput" type="text" placeholder="검색 (제목, 내용, BJ)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
+    <input id="searchInput" type="text" placeholder="검색 (제목, 내용, 스트리머)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
     <button class="search-clear" onclick="document.getElementById('searchInput').value='';onSearch();">X</button>
   </div>
 </div>
@@ -906,13 +906,13 @@
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <div class="modal-top">
-      <h3>본진 BJ 설정</h3>
+      <h3>본진 스트리머 설정</h3>
       <button class="modal-close" onclick="closeModal()">X</button>
     </div>
     <div class="modal-body">
       <div class="modal-left">
         <div class="modal-search">
-          <input type="text" id="modalSearchInput" placeholder="BJ 이름 검색..." oninput="filterModalList()">
+          <input type="text" id="modalSearchInput" placeholder="스트리머 이름 검색..." oninput="filterModalList()">
         </div>
         <div id="modalList"></div>
       </div>
@@ -1664,7 +1664,7 @@ document.addEventListener('keydown', (e) => {
   if (document.getElementById('detailBg').classList.contains('show')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
-  // 캘린더 탭일 때 방향키로 다음/이전 BJ 공지로 이동
+  // 캘린더 탭일 때 방향키로 다음/이전 공지로 이동
   if (currentTab === 'calendar') {
     const active = document.querySelector('.cal-index-item.active');
     const idx = active ? parseInt(active.dataset.idx) : -1;
