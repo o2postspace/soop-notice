@@ -1680,7 +1680,7 @@ function openDetail(cardEl) {
   document.getElementById('detailName').innerHTML = '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + bjId.slice(0,2) + '/' + bjId + '/' + bjId + '.jpg" alt="" style="vertical-align:middle;margin-right:6px;" onerror="this.style.display=\'none\'">' + escapeHtml(notice.bj_name);
   document.getElementById('detailLinks').innerHTML =
     '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP</a>' +
-    '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE</a>';
+    '<a class="live-link" data-bjid="' + bjId + '" href="https://play.sooplive.com/' + bjId + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE</a>';
   const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
   document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
   const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1693,6 +1693,13 @@ function openDetail(cardEl) {
   bodyEl.innerHTML = html;
   neutralizeEmoticonLinks(bodyEl);
   bodyEl.scrollTop = 0;
+
+  // 카드의 라이브 상태를 모달에도 반영
+  const cardLive = cardEl.querySelector('.live-link.is-live');
+  if (cardLive) {
+    const detailLive = document.querySelector('#detailLinks .live-link');
+    if (detailLive) detailLive.classList.add('is-live');
+  }
 
   document.getElementById('detailBg').classList.add('show');
   document.body.style.overflow = 'hidden';
