@@ -67,6 +67,120 @@
     border-radius: 4px; font-size: 11px;
   }
 
+  /* 다크모드 토글 */
+  .dark-toggle {
+    position: relative;
+    width: 36px; height: 20px;
+    background: #ccc;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .dark-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+  }
+  .dark-toggle.on { background: #5B6AED; }
+  .dark-toggle.on::after { transform: translateX(16px); }
+
+  /* 다크모드 */
+  html.dark, html.dark body { background: #121212; color: #e0e0e0; }
+  html.dark header { background: #1e1e1e; border-bottom-color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+  html.dark header h1 { color: #e0e0e0; }
+  html.dark header h1 img { content: url('/logo-dark.png'); }
+  html.dark #lastUpdate { color: #777; }
+  html.dark .auto-refresh { color: #777; }
+  html.dark .auto-refresh select { background: #2a2a2a; color: #ccc; border-color: #444; }
+  html.dark .filter-bar { background: #1e1e1e; border-bottom-color: #333; }
+  html.dark .filter-bar .label { color: #777; }
+  html.dark .filter-btn { border-color: #444; color: #999; }
+  html.dark .filter-btn:hover { border-color: #5B6AED; color: #5B6AED; }
+  html.dark .filter-btn.active { background: #5B6AED; color: #fff; border-color: #5B6AED; }
+  html.dark .divider { background: #444; }
+  html.dark .edit-fav-btn { border-color: #555; color: #777; }
+  html.dark .edit-fav-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+  html.dark .search-box input { background: #2a2a2a; color: #ccc; border-color: #444; }
+  html.dark .search-box input:focus { border-color: #5B6AED; }
+  html.dark .search-clear { color: #666; }
+  html.dark .card { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+  html.dark .card-header { border-bottom-color: #333; }
+  html.dark .card-title { color: #e0e0e0; }
+  html.dark .card-meta { color: #666; }
+  html.dark .card-body { color: #b0b0b0; }
+  html.dark .card-body img { background: #2a2a2a; }
+  html.dark .card-expand-btn { background: #252525; color: #5B6AED; border-top-color: #333; }
+  html.dark .card-expand-btn:hover { background: #303030; }
+  html.dark .card-tag { background: #2a2a2a; border-color: #444; color: #a29bfe; }
+  html.dark .live-link { background: #444; }
+  html.dark .empty-msg { background: #1e1e1e; color: #555; }
+  html.dark .loading { color: #5B6AED; }
+  html.dark .loading .spinner { border-color: #333; border-top-color: #5B6AED; }
+  html.dark .toast { background: #1e1e1e; border-color: #5B6AED; color: #5B6AED; box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
+  html.dark .scroll-nav button { background: #1e1e1e; color: #5B6AED; box-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+  html.dark .scroll-nav button:hover { background: #5B6AED; color: #fff; }
+  html.dark .scroll-nav button:disabled:hover { background: #1e1e1e; color: #5B6AED; }
+  html.dark .scroll-nav .nav-counter { background: #1e1e1e; color: #999; box-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+  html.dark .tab-bar { background: #1e1e1e; border-bottom-color: #333; }
+  html.dark .tab-btn { color: #666; }
+  html.dark .tab-btn:hover { color: #5B6AED; }
+  html.dark .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
+  /* 다크모드 모달 */
+  html.dark .modal-bg { background: rgba(0,0,0,0.7); }
+  html.dark .modal { background: #1e1e1e; border-color: #333; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
+  html.dark .modal h3 { color: #e0e0e0; }
+  html.dark .modal-close { border-color: #444; color: #777; }
+  html.dark .modal-close:hover { border-color: #ff6b6b; color: #ff6b6b; }
+  html.dark .modal-right { border-left-color: #333; }
+  html.dark .modal-right-header { color: #999; }
+  html.dark .modal-search input { background: #2a2a2a; color: #ccc; border-color: #444; }
+  html.dark .modal-search input:focus { border-color: #5B6AED; }
+  html.dark .modal-bj span { color: #ccc; }
+  html.dark .modal-bj:hover { background: #252525; }
+  html.dark .modal-bj .check { border-color: #555; }
+  html.dark .fav-item { color: #ccc; border-bottom-color: #333; }
+  html.dark .fav-item .fav-remove { color: #555; }
+  html.dark .btn-cancel { background: #333; color: #999; }
+  /* 다크모드 상세 모달 */
+  html.dark .detail-bg { background: rgba(0,0,0,0.8); }
+  html.dark .detail-modal { background: #1e1e1e; box-shadow: 0 12px 48px rgba(0,0,0,0.7); }
+  html.dark .detail-header { border-bottom-color: #333; }
+  html.dark .detail-header .detail-title { color: #e0e0e0; }
+  html.dark .detail-header .detail-meta { color: #666; }
+  html.dark .detail-body { color: #b0b0b0; }
+  html.dark .detail-body img { background: #2a2a2a; }
+  html.dark .detail-close { background: #1e1e1e; border-color: #444; color: #777; }
+  html.dark .detail-close:hover { border-color: #ff6b6b; color: #ff6b6b; }
+  /* 다크모드 캘린더 */
+  html.dark #calWeekLabel { color: #e0e0e0; }
+  html.dark .cal-index-item { background: #1e1e1e; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+  html.dark .cal-index-item:hover { background: #2a2a2a; }
+  html.dark .cal-index-item.active { background: #5B6AED; }
+  html.dark .cal-content { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .cal-notice { border-bottom-color: #333; }
+  html.dark .cal-notice-bj { color: #e0e0e0; }
+  html.dark .cal-notice-desc { color: #666; }
+  html.dark .cal-notice-body { color: #b0b0b0; }
+  html.dark .cal-slot { background: #2a2a2a; color: #ccc; }
+  html.dark .cal-slot .bj { color: #5B6AED; }
+  html.dark .cal-slot .desc { color: #888; }
+  html.dark .cal-time-cell { background: #181818; color: #5B6AED; }
+  html.dark .cal-empty { color: #444; }
+  html.dark .cal-empty-day { color: #444; }
+  html.dark .cal-sub-btn { border-color: #a29bfe; color: #a29bfe; }
+  html.dark .cal-sub-btn:hover { background: #2a2a2a; }
+  html.dark .cal-sub-btn.active { background: #a29bfe; color: #fff; }
+  html.dark .cal-notice-date { color: #666; }
+  html.dark .idx-time { color: #5B6AED; }
+  html.dark .idx-desc { color: #666; }
+
   /* 필터 바 */
   .filter-bar {
     background: #fff;
@@ -835,6 +949,10 @@
   <h1><img src="/logo.png" alt="숲공지"></h1>
   <div class="header-right">
     <div class="auto-refresh">
+      다크모드
+      <button class="dark-toggle" id="darkToggle"></button>
+    </div>
+    <div class="auto-refresh">
       자동갱신
       <select id="intervalSelect">
         <option value="0">끄기</option>
@@ -1074,6 +1192,20 @@ let autoTimer = null;
 let currentFilter = 'popular';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
 let tempFav = [];
+
+// 다크모드
+(function initDark() {
+  const saved = localStorage.getItem('soop_dark');
+  const on = saved === '1';
+  if (on) document.documentElement.classList.add('dark');
+  const btn = document.getElementById('darkToggle');
+  if (on) btn.classList.add('on');
+  btn.addEventListener('click', () => {
+    const isOn = document.documentElement.classList.toggle('dark');
+    btn.classList.toggle('on', isOn);
+    localStorage.setItem('soop_dark', isOn ? '1' : '0');
+  });
+})();
 
 // DB에 KST가 +00:00으로 저장되어 있으므로 UTC 기준으로 계산
 function parseKST(dateStr) {
