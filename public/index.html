@@ -1066,6 +1066,7 @@
     <button class="detail-close" onclick="closeDetail()">X</button>
     <div class="detail-header">
       <div class="detail-name" id="detailName"></div>
+      <div id="detailLinks" style="display:inline-flex;gap:6px;margin-top:4px;"></div>
       <div class="detail-title" id="detailTitle"></div>
       <div class="detail-meta" id="detailMeta"></div>
     </div>
@@ -1558,7 +1559,11 @@ function openDetail(cardEl) {
   const notice = prevData.find(r => String(r.title_no) === String(titleNo));
   if (!notice) return;
 
+  const bjId = notice.bj_id || cardEl.dataset.bjid;
   document.getElementById('detailName').innerHTML = escapeHtml(notice.bj_name);
+  document.getElementById('detailLinks').innerHTML =
+    '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP</a>' +
+    '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE</a>';
   const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
   document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
   const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
