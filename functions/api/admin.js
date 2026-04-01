@@ -53,5 +53,29 @@ export async function onRequest(context) {
     return error ? err(error.message) : json(data);
   }
 
+  if (action === "list-updates") {
+    const { data, error } = await supabase.from("updates").select("*")
+      .order("created_at", { ascending: false }).limit(50);
+    return error ? err(error.message) : json(data);
+  }
+
+  if (action === "add-update") {
+    const title = url.searchParams.get("title");
+    const content = url.searchParams.get("content");
+    const category = url.searchParams.get("category") || "업데이트";
+    if (!title || !content) return err("title, content required", 400);
+    const { error } = await supabase.from("updates").insert({
+      title, content, category, created_at: new Date().toISOString(),
+    });
+    return error ? err(error.message) : json({ ok: true });
+  }
+
+  if (action === "delete-update") {
+    const id = parseInt(url.searchParams.get("id"));
+    if (!id) return err("id required", 400);
+    const { error } = await supabase.from("updates").delete().eq("id", id);
+    return error ? err(error.message) : json({ ok: true });
+  }
+
   return err("Unknown action", 400);
 }
