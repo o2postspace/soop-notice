@@ -49,16 +49,22 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // 시간순 flat 배열
-  const slots = data.map(row => ({
-    bj_id: row.bj_id,
-    bj_name: BJ_LIST[row.bj_id]?.name || row.bj_name,
-    start: row.broadcast_start,
-    end: row.broadcast_end,
-    title_no: row.title_no,
-    description: row.description || row.raw_text,
-    reg_date: regDateMap[row.title_no] || null,
-  }));
+  // 시간순 flat 배열 → title_no 기준 중복 제거 (첫 번째 시간만)
+  const seen = new Set();
+  const slots = [];
+  for (const row of data) {
+    if (seen.has(row.title_no)) continue;
+    seen.add(row.title_no);
+    slots.push({
+      bj_id: row.bj_id,
+      bj_name: BJ_LIST[row.bj_id]?.name || row.bj_name,
+      start: row.broadcast_start,
+      end: row.broadcast_end,
+      title_no: row.title_no,
+      description: row.description || row.raw_text,
+      reg_date: regDateMap[row.title_no] || null,
+    });
+  }
 
   const dateStr = targetDay.toISOString().slice(0, 10);
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];

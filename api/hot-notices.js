@@ -43,22 +43,25 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // 조회수 1000+ 인 것만 필터 + 방송 시간순
-  const slots = (scheduleData || [])
-    .filter(s => hotTitleNos.has(s.title_no))
-    .map(s => {
-      const notice = hotTitleNos.get(s.title_no);
-      return {
-        bj_id: s.bj_id,
-        bj_name: s.bj_name,
-        title_no: s.title_no,
-        broadcast_start: s.broadcast_start,
-        description: s.description,
-        title_name: notice?.title_name || "",
-        read_cnt: notice?.read_cnt || 0,
-        reg_date: notice?.reg_date || null,
-      };
+  // 조회수 1000+ 인 것만 필터 + title_no 중복 제거 (첫 번째 시간만)
+  const seen = new Set();
+  const slots = [];
+  for (const s of (scheduleData || [])) {
+    if (!hotTitleNos.has(s.title_no)) continue;
+    if (seen.has(s.title_no)) continue;
+    seen.add(s.title_no);
+    const notice = hotTitleNos.get(s.title_no);
+    slots.push({
+      bj_id: s.bj_id,
+      bj_name: s.bj_name,
+      title_no: s.title_no,
+      broadcast_start: s.broadcast_start,
+      description: s.description,
+      title_name: notice?.title_name || "",
+      read_cnt: notice?.read_cnt || 0,
+      reg_date: notice?.reg_date || null,
     });
+  }
 
   const dateStr = targetDay.toISOString().slice(0, 10);
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
