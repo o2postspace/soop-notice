@@ -315,6 +315,14 @@
     padding: 10px 14px;
     border-bottom: 1px solid #f0f0f0;
   }
+  .card-profile {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #eee;
+  }
+  html.dark .card-profile { background: #333; }
   .card-name {
     font-weight: 700;
     font-size: 13px;
@@ -1414,6 +1422,7 @@ function buildCardHtml(item) {
   const bodyHtml = n.contentHtml || n.content_html || '';
   return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
+    + '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + item.bjId.slice(0,2) + '/' + item.bjId + '/' + item.bjId + '.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
     + '<a class="soop-link" href="https://www.sooplive.com/station/' + item.bjId + '/post/' + n.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
     + '<a class="live-link" data-bjid="' + item.bjId + '" href="https://play.sooplive.com/' + item.bjId + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
