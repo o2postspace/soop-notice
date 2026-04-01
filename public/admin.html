@@ -56,7 +56,7 @@
   <div class="panel" id="panel-schedules">
     <h2>일정 추가</h2>
     <div class="add-form">
-      <input id="addBj" placeholder="BJ 이름" style="width:120px;">
+      <input id="addBj" placeholder="스트리머 이름" style="width:120px;">
       <input id="addDate" type="date">
       <input id="addTime" type="time">
       <input id="addDesc" placeholder="설명" style="width:200px;">
@@ -126,7 +126,7 @@ async function addSchedule() {
   const date = document.getElementById('addDate').value;
   const time = document.getElementById('addTime').value;
   const desc = document.getElementById('addDesc').value.trim();
-  if (!bj || !date || !time) { alert('BJ이름, 날짜, 시간을 입력하세요'); return; }
+  if (!bj || !date || !time) { alert('스트리머 이름, 날짜, 시간을 입력하세요'); return; }
   const start = date + 'T' + time + ':00+09:00';
   await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-schedule&bj_name=' + encodeURIComponent(bj) + '&broadcast_start=' + encodeURIComponent(start) + '&description=' + encodeURIComponent(desc));
   document.getElementById('addBj').value = '';
