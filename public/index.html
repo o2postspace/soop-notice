@@ -496,14 +496,31 @@
   /* 쇼츠 스타일 네비게이션 버튼 */
   .scroll-nav {
     position: fixed;
-    right: 24px;
-    bottom: 50%;
-    transform: translateY(50%);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 150;
+  }
+  .scroll-nav button {
+    pointer-events: auto;
+  }
+  .scroll-nav .nav-prev-wrap {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    z-index: 150;
+  }
+  .scroll-nav .nav-next-wrap {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
   }
   .scroll-nav button {
     width: 48px;
@@ -538,6 +555,11 @@
     color: #5B6AED;
   }
   .scroll-nav .nav-counter {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     text-align: center;
     font-size: 11px;
     color: #666;
@@ -645,8 +667,9 @@
     .filter-bar { padding: 8px 14px; }
     .search-box { margin-left: 0; width: 100%; }
     .search-box input { width: 100%; }
-    .scroll-nav { right: 12px; }
-    .scroll-nav button { width: 40px; height: 40px; font-size: 18px; }
+    .scroll-nav button { width: 36px; height: 36px; font-size: 16px; }
+    .scroll-nav .nav-prev-wrap { left: 4px; }
+    .scroll-nav .nav-next-wrap { right: 4px; }
     .modal-body { flex-direction: column; }
     .modal-right { width: auto; border-left: none; border-top: 1px solid #eee; padding-left: 0; padding-top: 12px; max-height: 120px; }
   }
@@ -1029,10 +1052,14 @@
 
 <!-- 쇼츠 스타일 페이지 네비게이션 -->
 <div class="scroll-nav" id="scrollNav" style="display:none;">
-  <button onclick="goToTop()" title="맨 위로" style="font-size:14px;">TOP</button>
-  <button id="btnPrev" onclick="goPage(-1)" title="이전 페이지">&#9650;</button>
+  <div class="nav-prev-wrap">
+    <button onclick="goToTop()" title="맨앞" style="font-size:11px;width:40px;height:32px;border-radius:8px;">맨앞</button>
+    <button id="btnPrev" onclick="goPage(-1)" title="이전 페이지">&#9664;</button>
+  </div>
+  <div class="nav-next-wrap">
+    <button id="btnNext" onclick="goPage(1)" title="다음 페이지">&#9654;</button>
+  </div>
   <div class="nav-counter" id="navCounter"></div>
-  <button id="btnNext" onclick="goPage(1)" title="다음 페이지">&#9660;</button>
 </div>
 
 <!-- 본진 설정 모달 -->
@@ -1868,13 +1895,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { passive: false });
 });
 
-// 터치 스와이프로 페이지 전환 (모바일)
+// 터치 좌우 스와이프로 페이지 전환 (모바일)
 (function() {
+  let startX = 0;
   let startY = 0;
   let startTime = 0;
   document.addEventListener('touchstart', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
     if (document.getElementById('detailBg').classList.contains('show')) return;
+    if (currentTab !== 'notices') return;
+    startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     startTime = Date.now();
   }, { passive: true });
@@ -1882,11 +1912,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('touchend', (e) => {
     if (document.getElementById('modalBg').classList.contains('show')) return;
     if (document.getElementById('detailBg').classList.contains('show')) return;
-    const diffY = startY - e.changedTouches[0].clientY;
+    if (currentTab !== 'notices') return;
+    const diffX = startX - e.changedTouches[0].clientX;
+    const diffY = Math.abs(startY - e.changedTouches[0].clientY);
     const diffTime = Date.now() - startTime;
-    if (diffTime > 500 || Math.abs(diffY) < 50) return;
-    if (diffY > 0) goPage(1);   // 위로 스와이프 → 다음
-    else goPage(-1);             // 아래로 스와이프 → 이전
+    // 좌우 스와이프: 수평 50px 이상, 수직보다 커야 함, 500ms 이내
+    if (diffTime > 500 || Math.abs(diffX) < 50 || diffY > Math.abs(diffX)) return;
+    if (diffX > 0) goPage(1);   // 왼쪽 스와이프 → 다음
+    else goPage(-1);             // 오른쪽 스와이프 → 이전
   }, { passive: true });
 })();
 
