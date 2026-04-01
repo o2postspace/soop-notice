@@ -5,17 +5,17 @@ export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const dayOffset = parseInt(url.searchParams.get("day_offset")) || 0;
 
-  // 하루 기준: 08:00 KST ~ 다음날 08:00 KST
+  // 하루 기준: 06:00 KST ~ 다음날 06:00 KST
   const now = new Date();
   const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  if (kstNow.getUTCHours() < 8) kstNow.setUTCDate(kstNow.getUTCDate() - 1);
+  if (kstNow.getUTCHours() < 6) kstNow.setUTCDate(kstNow.getUTCDate() - 1);
   const targetDay = new Date(kstNow);
   targetDay.setUTCDate(targetDay.getUTCDate() + dayOffset);
-  targetDay.setUTCHours(8, 0, 0, 0);
+  targetDay.setUTCHours(6, 0, 0, 0);
 
   const dayEnd = new Date(targetDay);
   dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
-  dayEnd.setUTCHours(7, 59, 59, 999);
+  dayEnd.setUTCHours(5, 59, 59, 999);
 
   const dayStartUTC = new Date(targetDay.getTime() - 9 * 60 * 60 * 1000).toISOString();
   const dayEndUTC = new Date(dayEnd.getTime() - 9 * 60 * 60 * 1000).toISOString();
