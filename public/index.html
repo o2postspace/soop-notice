@@ -258,14 +258,10 @@
 
   /* 전체 레이아웃 */
   .app-wrap {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
   }
 
   /* 페이지 컨테이너 */
   .page-scroller {
-    flex: 1;
     position: relative;
   }
 
@@ -277,11 +273,6 @@
   }
   .page.active {
     display: flex;
-    animation: pageFadeIn 0.3s ease;
-  }
-  @keyframes pageFadeIn {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
   }
   .page-inner {
     max-width: 1800px;
@@ -533,7 +524,6 @@
     font-size: 22px;
     cursor: pointer;
     box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -541,15 +531,10 @@
   .scroll-nav button:hover {
     background: #5B6AED;
     color: #fff;
-    transform: scale(1.1);
-  }
-  .scroll-nav button:active {
-    transform: scale(0.95);
   }
   .scroll-nav button:disabled {
     opacity: 0.3;
     cursor: default;
-    transform: none;
   }
   .scroll-nav button:disabled:hover {
     background: #fff;
