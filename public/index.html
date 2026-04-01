@@ -267,15 +267,13 @@
   /* 페이지 컨테이너 */
   .page-scroller {
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
     position: relative;
   }
 
   /* 각 페이지 */
   .page {
     display: none;
-    height: 100%;
-    overflow-y: auto;
     padding: 20px 16px;
     justify-content: center;
   }
@@ -1878,10 +1876,12 @@ document.addEventListener('keydown', (e) => {
     const idx = active ? parseInt(active.dataset.idx) : -1;
     if (e.key === 'ArrowRight' || e.key === 'j') {
       e.preventDefault();
+      scrollLock = false;
       const nextIdx = idx + 1;
       if (document.querySelector('.cal-index-item[data-idx="' + nextIdx + '"]')) scrollToNotice(nextIdx);
     } else if (e.key === 'ArrowLeft' || e.key === 'k') {
       e.preventDefault();
+      scrollLock = false;
       const prevIdx = idx - 1;
       if (prevIdx >= 0 && document.querySelector('.cal-index-item[data-idx="' + prevIdx + '"]')) scrollToNotice(prevIdx);
     }
