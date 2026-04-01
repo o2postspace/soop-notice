@@ -1405,7 +1405,9 @@ function renderPages(data) {
   });
 
   showCurrentPage();
-  document.getElementById('scrollNav').style.display = 'flex';
+  if (currentTab === 'notices') {
+    document.getElementById('scrollNav').style.display = 'flex';
+  }
 }
 
 function toggleExpand(e, btn) {
