@@ -1,10 +1,10 @@
 import { CREW_LIST } from "../_shared/crew-list.js";
 
 const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/gviz/tq?tqx=out:csv&gid=0";
+  "https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/gviz/tq?tqx=out:csv&gid=296314716";
 
 const CREW_ALIAS = { "버컴": "버컴퍼니", "흥신소": "홍신소" };
-const NAME_ALIAS = { "마늘빵": "습늘빵", "팸도은": "쨈도은", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요", "용형": "일하는용형" };
+const NAME_ALIAS = { "마늘빵": "습늘빵", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요" };
 
 function parseLine(line) {
   const result = [];
@@ -25,38 +25,36 @@ function parseLine(line) {
   return result;
 }
 
-function parseCSV(text) {
-  const lines = text.trim().split("\n");
-  const headers = parseLine(lines[0]);
-  return lines.slice(1).map(line => {
-    const vals = parseLine(line);
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
-    return obj;
-  });
-}
+function toInt(v) { const n = parseInt(v, 10); return isNaN(n) ? null : n; }
 
 async function getCrewWithSheet() {
   const resp = await fetch(SHEET_CSV_URL);
   if (!resp.ok) throw new Error("Sheet fetch failed");
   const text = await resp.text();
-  const rows = parseCSV(text);
+  const lines = text.trim().split("\n");
 
+  // 인덱스 기반 파싱
+  // 0:←, 1:길드, 2:직업, 3:스트리머, 4:스킬, 5:Lv, 6:무기, 7:잠재, 8:투구, 9:상의, 10:하의, 11:신발
   const map = {};
-  for (const row of rows) {
-    const crewName = CREW_ALIAS[row["길드"]] || row["길드"];
-    const memberName = NAME_ALIAS[row["스트리머"]] || row["스트리머"];
-    const level = parseInt(row["Lv"], 10);
-    const toInt = v => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    const crew = (cols[1] || "").trim();
+    const streamer = (cols[3] || "").trim();
+    if (!crew || !streamer || crew === "평균") continue;
+
+    const crewName = CREW_ALIAS[crew] || crew;
+    const memberName = NAME_ALIAS[streamer] || streamer;
+
     map[crewName + ":" + memberName] = {
-      job: row["직업"] || null,
-      skill: row["스킬"] || null,
-      level: isNaN(level) ? null : level,
-      weapon: toInt(row["무기"]),
-      helmet: toInt(row["투구"]),
-      armor: toInt(row["상의"]),
-      pants: toInt(row["하의"]),
-      boots: toInt(row["신발"]),
+      job: cols[2]?.trim() || null,
+      skill: cols[4]?.trim() || null,
+      level: toInt(cols[5]),
+      weapon: toInt(cols[6]),
+      potential: cols[7]?.trim() || null,
+      helmet: toInt(cols[8]),
+      armor: toInt(cols[9]),
+      pants: toInt(cols[10]),
+      boots: toInt(cols[11]),
     };
   }
 

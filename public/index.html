@@ -3174,6 +3174,7 @@ function renderCrew(crews) {
         html += '<div class="crew-member-info">';
         if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + '">' + escapeHtml(m.job) + '</span>';
         if (m.level != null) html += '<span class="crew-member-level">Lv.' + m.level + '</span>';
+        if (m.potential) html += '<span class="crew-equip" style="color:#e84393;background:#fde8f0;font-size:7px;">' + escapeHtml(m.potential) + '</span>';
         html += '</div>';
       }
       var equips = [];
