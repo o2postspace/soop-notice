@@ -1,6 +1,18 @@
 import { createSupabase } from "../../_shared/supabase.js";
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const ALERT_EMAIL = "kck106@naver.com";
+
+async function sendAlert(subject, body, resendKey) {
+  if (!resendKey) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+      body: JSON.stringify({ from: "SOOP Notice <onboarding@resend.dev>", to: ALERT_EMAIL, subject, text: body }),
+    });
+  } catch {}
+}
 
 function stripHtml(html) {
   return (html || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
@@ -29,7 +41,7 @@ async function fetchImageAsBase64(url) {
   } catch { return null; }
 }
 
-async function parseWithGemini(noticeText, images, today, apiKey) {
+async function parseWithGemini(noticeText, images, today, apiKey, resendKey) {
   if (!apiKey) return [];
   const prompt = `SOOP BJ의 공지사항에서 "방송 시작 시간"을 추출해. 공지를 올린 시간이 아니라 실제 방송 시작 시간이야.
 텍스트와 이미지 모두 확인해서 일정을 추출해.
@@ -51,10 +63,17 @@ JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.1 } }),
     });
-    if (!resp.ok) return [];
+    if (!resp.ok) {
+      if (resp.status === 429) await sendAlert("[SOOP] Gemini 무료 한도 초과", `Gemini API 429 에러\n시간: ${new Date().toISOString()}`, resendKey);
+      else await sendAlert("[SOOP] Gemini API 에러", `Gemini API ${resp.status} 에러\n시간: ${new Date().toISOString()}`, resendKey);
+      return [];
+    }
     const data = await resp.json();
     return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "[]");
-  } catch { return []; }
+  } catch (e) {
+    await sendAlert("[SOOP] parse-hot 에러", `파싱 중 에러\n시간: ${new Date().toISOString()}\n에러: ${e.message}`, resendKey);
+    return [];
+  }
 }
 
 export async function onRequest(context) {
@@ -66,7 +85,10 @@ export async function onRequest(context) {
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: notices, error } = await supabase.from("notices").select("bj_id, bj_name, title_no, title_name, content_html, reg_date, read_cnt").gte("reg_date", threeDaysAgo).gte("read_cnt", 1000).order("reg_date", { ascending: false }).limit(50);
-  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  if (error) {
+    await sendAlert("[SOOP] Supabase 에러", `notices 조회 실패\n시간: ${new Date().toISOString()}\n에러: ${error.message}`, context.env.RESEND_API_KEY);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
 
   const titleNos = notices.map(n => n.title_no);
   const { data: existing } = await supabase.from("schedules").select("title_no").in("title_no", titleNos.length > 0 ? titleNos : [0]);
@@ -80,7 +102,7 @@ export async function onRequest(context) {
     const noticeDate = notice.reg_date ? notice.reg_date.slice(0, 10) : today;
     const imageUrls = extractImageUrls(notice.content_html);
     const imageParts = (await Promise.all(imageUrls.map(fetchImageAsBase64))).filter(Boolean);
-    const schedules = await parseWithGemini(`[작성일: ${noticeDate}] [제목: ${notice.title_name}] ${plainText}`, imageParts, today, context.env.GEMINI_API_KEY);
+    const schedules = await parseWithGemini(`[작성일: ${noticeDate}] [제목: ${notice.title_name}] ${plainText}`, imageParts, today, context.env.GEMINI_API_KEY, context.env.RESEND_API_KEY);
     await new Promise(r => setTimeout(r, 1000));
     if (schedules.length === 0) continue;
     for (const s of schedules) {

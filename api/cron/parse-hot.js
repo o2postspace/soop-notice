@@ -2,6 +2,24 @@ const { supabase } = require("../../lib/supabase");
 const { POPULAR_BJ_IDS, BJ_LIST } = require("../../lib/bj-list");
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const ALERT_EMAIL = "kck106@naver.com";
+
+async function sendAlert(subject, body) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        from: "SOOP Notice <onboarding@resend.dev>",
+        to: ALERT_EMAIL,
+        subject,
+        text: body,
+      }),
+    });
+  } catch {}
+}
 
 const POPULAR_NAMES = POPULAR_BJ_IDS.map(id => BJ_LIST[id]?.name).filter(Boolean);
 
@@ -101,10 +119,20 @@ JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"
         generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
       }),
     });
-    if (!resp.ok) return [];
+    if (!resp.ok) {
+      if (resp.status === 429) {
+        await sendAlert("[SOOP] Gemini 무료 한도 초과", `Gemini API 429 에러 - 무료 티어 한도 초과됨\n시간: ${new Date().toISOString()}`);
+      } else {
+        await sendAlert("[SOOP] Gemini API 에러", `Gemini API ${resp.status} 에러\n시간: ${new Date().toISOString()}\n응답: ${await resp.text().catch(() => "")}`);
+      }
+      return [];
+    }
     const data = await resp.json();
     return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "[]");
-  } catch { return []; }
+  } catch (e) {
+    await sendAlert("[SOOP] parse-hot 에러", `파싱 중 에러 발생\n시간: ${new Date().toISOString()}\n에러: ${e.message}`);
+    return [];
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -128,7 +156,10 @@ module.exports = async function handler(req, res) {
     .order("reg_date", { ascending: false })
     .limit(300);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    await sendAlert("[SOOP] Supabase 에러", `notices 조회 실패\n시간: ${new Date().toISOString()}\n에러: ${error.message}`);
+    return res.status(500).json({ error: error.message });
+  }
 
   // 키워드 프리필터 → Gemini 호출 대상만 추출 (이미 있어도 upsert로 업데이트)
   const toParse = (notices || []).filter(n => {
