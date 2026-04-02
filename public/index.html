@@ -1449,9 +1449,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     justify-content: center;
   }
   .crew-equip {
-    font-size: 8px;
-    font-weight: 700;
-    padding: 1px 4px;
+    font-size: 7px;
+    font-weight: 600;
+    padding: 1px 3px;
     border-radius: 3px;
     white-space: nowrap;
   }
@@ -3113,11 +3113,11 @@ function renderCrew(crews) {
         html += '</div>';
       }
       var equips = [];
-      if (m.weapon) equips.push('<span class="crew-equip equip-weapon">&#9876;' + m.weapon + '</span>');
-      if (m.helmet) equips.push('<span class="crew-equip equip-helmet">&#9891;' + m.helmet + '</span>');
-      if (m.armor) equips.push('<span class="crew-equip equip-armor">&#9899;' + m.armor + '</span>');
-      if (m.pants) equips.push('<span class="crew-equip equip-pants">&#9898;' + m.pants + '</span>');
-      if (m.boots) equips.push('<span class="crew-equip equip-boots">&#128095;' + m.boots + '</span>');
+      if (m.weapon) equips.push('<span class="crew-equip equip-weapon">무기' + m.weapon + '</span>');
+      if (m.helmet) equips.push('<span class="crew-equip equip-helmet">투구' + m.helmet + '</span>');
+      if (m.armor) equips.push('<span class="crew-equip equip-armor">상의' + m.armor + '</span>');
+      if (m.pants) equips.push('<span class="crew-equip equip-pants">하의' + m.pants + '</span>');
+      if (m.boots) equips.push('<span class="crew-equip equip-boots">신발' + m.boots + '</span>');
       if (equips.length) html += '<div class="crew-member-equips">' + equips.join('') + '</div>';
       if (hasId) {
         html += '<div class="crew-member-btns">';
