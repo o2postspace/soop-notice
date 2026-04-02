@@ -147,6 +147,27 @@ module.exports = async function handler(req, res) {
 
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
+  // 글쓴이와 다른 BJ로 잘못 저장된 스케줄 정리
+  const { data: allSchedules } = await supabase.from("schedules")
+    .select("id, bj_id, title_no")
+    .gte("broadcast_start", threeDaysAgo);
+  if (allSchedules && allSchedules.length > 0) {
+    const titleNos = [...new Set(allSchedules.map(s => s.title_no))];
+    const { data: noticeOwners } = await supabase.from("notices")
+      .select("title_no, bj_id")
+      .in("title_no", titleNos);
+    if (noticeOwners) {
+      const ownerMap = {};
+      noticeOwners.forEach(n => { ownerMap[n.title_no] = n.bj_id; });
+      const badIds = allSchedules
+        .filter(s => ownerMap[s.title_no] && ownerMap[s.title_no] !== s.bj_id)
+        .map(s => s.id);
+      if (badIds.length > 0) {
+        await supabase.from("schedules").delete().in("id", badIds);
+      }
+    }
+  }
+
   // 조회수 1000+ 공지 (전체 BJ, 300개)
   const { data: notices, error } = await supabase
     .from("notices")
@@ -206,16 +227,27 @@ module.exports = async function handler(req, res) {
       }, { onConflict: "title_no,broadcast_start" });
       totalParsed++;
 
-      // 언급된 인기 BJ들도 캘린더에 추가
+      // 언급된 인기 BJ들도 캘린더에 추가 (원본 레코드가 이미 있으면 건너뜀)
       for (const bjName of (s.mentioned_bjs || [])) {
         const bjEntry = Object.entries(BJ_LIST).find(([, v]) => v.name === bjName);
         if (!bjEntry) continue;
         if (bjEntry[0] === notice.bj_id) continue;
+
+        // 해당 BJ의 자체 공지가 있는지 확인 → 있으면 그걸 우선
+        const { data: ownNotice } = await supabase.from("notices")
+          .select("title_no")
+          .eq("bj_id", bjEntry[0])
+          .gte("reg_date", new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
+          .order("reg_date", { ascending: false })
+          .limit(1);
+        const collabTitleNo = ownNotice?.[0]?.title_no || null;
+        if (!collabTitleNo) continue; // 자체 공지 없으면 스킵
+
         try {
           await supabase.from("schedules").upsert({
             bj_id: bjEntry[0],
             bj_name: bjName,
-            title_no: notice.title_no,
+            title_no: collabTitleNo,
             broadcast_start: startStr,
             broadcast_end: endStr,
             description: `${notice.bj_name} 합방: ${s.description || ""}`,

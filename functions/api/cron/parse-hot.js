@@ -84,6 +84,18 @@ export async function onRequest(context) {
   const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, "-").replace(".", "");
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
+  // 글쓴이와 다른 BJ로 잘못 저장된 스케줄 정리
+  const { data: allSch } = await supabase.from("schedules").select("id, bj_id, title_no").gte("broadcast_start", threeDaysAgo);
+  if (allSch && allSch.length > 0) {
+    const tNos = [...new Set(allSch.map(s => s.title_no))];
+    const { data: owners } = await supabase.from("notices").select("title_no, bj_id").in("title_no", tNos);
+    if (owners) {
+      const om = {}; owners.forEach(n => { om[n.title_no] = n.bj_id; });
+      const badIds = allSch.filter(s => om[s.title_no] && om[s.title_no] !== s.bj_id).map(s => s.id);
+      if (badIds.length > 0) await supabase.from("schedules").delete().in("id", badIds);
+    }
+  }
+
   const { data: notices, error } = await supabase.from("notices").select("bj_id, bj_name, title_no, title_name, content_html, reg_date, read_cnt").gte("reg_date", threeDaysAgo).gte("read_cnt", 1000).order("reg_date", { ascending: false }).limit(50);
   if (error) {
     await sendAlert("[SOOP] Supabase 에러", `notices 조회 실패\n시간: ${new Date().toISOString()}\n에러: ${error.message}`, context.env.RESEND_API_KEY);
