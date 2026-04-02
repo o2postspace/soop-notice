@@ -684,8 +684,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   @media (max-width: 600px) {
     header { display: none; }
     .page { padding: 10px 8px; }
-    .filter-bar { padding: 8px 14px; }
-    .search-box { margin-left: 0; width: 100%; }
+    .filter-bar { padding: 8px 14px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    .filter-btn { flex-shrink: 0; }
+    .edit-fav-btn { flex-shrink: 0; }
+    .search-box { margin-left: 0; width: 100%; flex-shrink: 0; }
     .search-box input { width: 100%; }
     .scroll-nav button { width: 36px; height: 36px; font-size: 16px; }
     .scroll-nav .nav-prev { left: 4px; }
