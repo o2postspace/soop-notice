@@ -1541,9 +1541,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <span class="label">필터</span>
   <button class="filter-btn active" data-filter="popular" onclick="setFilter('popular')">인기</button>
   <button class="filter-btn" data-filter="all" onclick="setFilter('all')">전체</button>
-  <button class="filter-btn" data-filter="isedol" onclick="setFilter('isedol')">이세돌</button>
   <button class="filter-btn" data-filter="yb" onclick="setFilter('yb')">YB</button>
-  <button class="filter-btn" data-filter="c9" onclick="setFilter('c9')">씨나인</button>
   <button class="filter-btn" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
@@ -1785,14 +1783,6 @@ let autoTimer = null;
 
 // 그룹 필터 멤버 정의
 const GROUP_MEMBERS = {
-  isedol: [
-    "inehine",      // 아이네
-    "jingburger1",  // 징버거
-    "lilpa0309",    // 릴파
-    "gosegu2",      // 고세구
-    "viichan6",     // 비챤
-    "cotton1217",   // 주르르
-  ],
   yb: [
     "yuambo",       // 염보성
     "gksdidqksxn",  // 준밧드
@@ -1816,32 +1806,6 @@ const GROUP_MEMBERS = {
     "harumyong",    // 하루묭.
     "ogm0905",      // 오뀨!
     "luckycontrol", // 고속도로호준
-  ],
-  c9: [
-    "y1026",        // 철구
-    "rlekfu6",      // 박재혁
-    "byflash",      // 이영호
-    "rlaxordyd",    // 김택용
-    "jk890202",     // 김윤중
-    "dbsdydx",      // 윤용태
-    "mwhdgus",      // 윤진규
-    "jmc06170",     // 왜냐맨장민철
-    "byromantic",   // 최재성
-    "kuyol",        // 강구열
-    "yjk011599",    // 나무늘봉순
-    "vlfvlf789",    // 빵훈이
-    "tjgpdus97",    // 요닝
-    "qpqpro",       // 디임
-    "zalalz",       // 오조은
-    "yochba0402",   // 졈니
-    "rhf104",       // 란란
-    "mew030709",    // 남수댕
-    "moguleave",    // 모리
-    "ouo20411",     // 히댕
-    "imducko3o",    // 오리꿍
-    "queen030",     // 효짱
-    "dlwldyal1004", // 이지다
-    "eunjo0105",    // 은조
   ],
 };
 let currentFilter = 'popular';
