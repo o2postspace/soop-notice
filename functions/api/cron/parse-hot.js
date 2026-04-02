@@ -6,9 +6,33 @@ function stripHtml(html) {
   return (html || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
 }
 
-async function parseWithGemini(noticeText, today, apiKey) {
+function extractImageUrls(html) {
+  const urls = [];
+  const regex = /<img[^>]+src=["']([^"']+)["']/gi;
+  let match;
+  while ((match = regex.exec(html || "")) !== null) {
+    if (match[1].startsWith("http")) urls.push(match[1]);
+  }
+  return urls.slice(0, 5);
+}
+
+async function fetchImageAsBase64(url) {
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return null;
+    const contentType = (resp.headers.get("content-type") || "image/jpeg").split(";")[0];
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return { inlineData: { mimeType: contentType, data: btoa(binary) } };
+  } catch { return null; }
+}
+
+async function parseWithGemini(noticeText, images, today, apiKey) {
   if (!apiKey) return [];
   const prompt = `SOOP BJ의 공지사항에서 "방송 시작 시간"을 추출해. 공지를 올린 시간이 아니라 실제 방송 시작 시간이야.
+텍스트와 이미지 모두 확인해서 일정을 추출해.
 오늘: ${today}
 ${noticeText}
 규칙:
@@ -21,10 +45,11 @@ ${noticeText}
 - "쉽니다", "휴방" → 빈 배열 []
 - 방송 일정 아닌 글 → 빈 배열 []
 JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"요약"}]`;
+  const parts = [{ text: prompt }, ...images];
   try {
     const resp = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.1 } }),
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.1 } }),
     });
     if (!resp.ok) return [];
     const data = await resp.json();
@@ -53,7 +78,9 @@ export async function onRequest(context) {
     const plainText = stripHtml(notice.content_html);
     if (!plainText || plainText.length < 5) continue;
     const noticeDate = notice.reg_date ? notice.reg_date.slice(0, 10) : today;
-    const schedules = await parseWithGemini(`[작성일: ${noticeDate}] [제목: ${notice.title_name}] ${plainText}`, today, context.env.GEMINI_API_KEY);
+    const imageUrls = extractImageUrls(notice.content_html);
+    const imageParts = (await Promise.all(imageUrls.map(fetchImageAsBase64))).filter(Boolean);
+    const schedules = await parseWithGemini(`[작성일: ${noticeDate}] [제목: ${notice.title_name}] ${plainText}`, imageParts, today, context.env.GEMINI_API_KEY);
     await new Promise(r => setTimeout(r, 1000));
     if (schedules.length === 0) continue;
     for (const s of schedules) {
