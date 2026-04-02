@@ -132,6 +132,19 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return jsonResp(res, 500, { error: e.message }); }
   }
 
+  // --- /api/crew ---
+  if (url.pathname === "/api/crew") {
+    const { CREW_LIST } = require("./lib/crew-list");
+    const { getCrewWithSheet } = require("./lib/fetch-sheet");
+    try {
+      const data = await getCrewWithSheet(CREW_LIST);
+      return jsonResp(res, 200, data);
+    } catch (e) {
+      console.error("Sheet fetch error:", e.message);
+      return jsonResp(res, 200, CREW_LIST);
+    }
+  }
+
   // --- /api/live-check ---
   if (url.pathname === "/api/live-check") {
     const bjIds = (url.searchParams.get("ids") || "").split(",").filter(Boolean).slice(0, 50);
