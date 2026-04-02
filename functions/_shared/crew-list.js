@@ -68,7 +68,7 @@ export const CREW_LIST = [
       { id: "nyanyavkr2",     name: "냐냐" },
       { id: "sie4yu",         name: "유시에" },
       { id: "hibby1004",      name: "너보링" },
-      { id: "callmeharuby",   name: "하루비" },
+      { id: "dionzzz",        name: "하루비" },
       { id: "kkyubog",        name: "뀨복" },
     ],
   },
