@@ -1330,6 +1330,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .ranking-table td { color: #ddd; border-bottom-color: #2a2a2a; }
   html.dark .ranking-table tr:hover { background: #252530; }
   html.dark .rank-crew-title { border-bottom-color: #333; }
+  @media (max-width: 700px) {
+    .ranking-table th, .ranking-table td { padding: 4px 6px; font-size: 10px; }
+    .ranking-table .col-equip { display: none; }
+    .ranking-table .col-crew { display: none; }
+    .rank-profile { width: 22px; height: 22px; margin-right: 4px; }
+  }
   .crew-grid {
     max-width: 1800px;
     margin: 0 auto;
@@ -3289,7 +3295,7 @@ function renderPowerRanking(crews) {
   // 개인 파워 TOP 20
   html += '<div class="ranking-section">';
   html += '<div class="ranking-header">개인 파워 TOP 20</div>';
-  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>스트리머</th><th>직업</th><th>Lv</th><th>장비</th><th>파워</th><th>크루</th></tr></thead><tbody>';
+  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>스트리머</th><th>직업</th><th>Lv</th><th class="col-equip">장비</th><th>파워</th><th class="col-crew">크루</th></tr></thead><tbody>';
   allMembers.slice(0, 20).forEach((m, i) => {
     const profileUrl = m.id ? 'https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg' : '';
     const equipParts = [];
@@ -3307,9 +3313,9 @@ function renderPowerRanking(crews) {
     if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + ';font-size:9px;padding:1px 6px;">' + escapeHtml(m.job) + '</span>';
     html += '</td>';
     html += '<td>Lv.' + m.level + '</td>';
-    html += '<td>' + (equipParts.length ? equipParts.join(' ') : '-') + '</td>';
+    html += '<td class="col-equip">' + (equipParts.length ? equipParts.join(' ') : '-') + '</td>';
     html += '<td><b>' + m.power + '</b></td>';
-    html += '<td><span class="rank-crew-badge" style="background:' + m.crewColor + '">' + escapeHtml(m.crewName) + '</span></td>';
+    html += '<td class="col-crew"><span class="rank-crew-badge" style="background:' + m.crewColor + '">' + escapeHtml(m.crewName) + '</span></td>';
     html += '</tr>';
   });
   html += '</tbody></table></div>';
