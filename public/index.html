@@ -339,7 +339,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     border-bottom: 1px solid #f0f0f0;
   }
   .card-profile {
-    width: 28px; height: 28px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -882,7 +882,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   .cal-index-item.active .idx-time { color: #fff; }
   .cal-index-item.active .idx-desc { color: rgba(255,255,255,0.8); }
   .idx-time { font-weight: 700; color: #5B6AED; font-size: 14px; }
-  .idx-bj { font-weight: 600; font-size: 13px; margin-top: 2px; }
+  .idx-bj { font-weight: 600; font-size: 13px; margin-top: 2px; display: flex; align-items: center; }
   .idx-desc { font-size: 11px; color: #999; margin-top: 2px; }
   .cal-content {
     flex: 1;
@@ -913,6 +913,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     font-weight: 700;
     font-size: 15px;
     color: #333;
+    display: flex;
+    align-items: center;
   }
   .cal-notice-desc {
     font-size: 12px;
@@ -2522,6 +2524,11 @@ function findCurrentTimeSlotIndex(slots, timeField) {
   return slots.length - 1;
 }
 
+function bjProfileImg(bjId, size) {
+  size = size || 24;
+  return '<img src="https://profile.img.sooplive.co.kr/LOGO/' + bjId.slice(0,2) + '/' + bjId + '/' + bjId + '.jpg" alt="" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#333;vertical-align:middle;margin-right:4px;" loading="lazy" onerror="this.style.display=\'none\'">';
+}
+
 function renderDayCalendar(data) {
   const idx = document.getElementById('calIndex');
   const content = document.getElementById('calContent');
@@ -2541,7 +2548,7 @@ function renderDayCalendar(data) {
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
     idxHtml += '<div class="cal-index-item' + (i === initIdx ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
       + '<div class="idx-time">' + timeStr + '</div>'
-      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
+      + '<div class="idx-bj">' + bjProfileImg(s.bj_id, 28) + escapeHtml(s.bj_name) + '</div>'
       + '<div class="idx-desc">' + escapeHtml(s.description) + '</div>'
       + '</div>';
   });
@@ -2556,7 +2563,7 @@ function renderDayCalendar(data) {
     contentHtml += '<div class="cal-notice" id="cal-notice-' + i + '">'
       + '<div class="cal-notice-header">'
       + '<span class="cal-notice-time">' + timeStr + '</span>'
-      + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
+      + '<span class="cal-notice-bj">' + bjProfileImg(s.bj_id, 32) + escapeHtml(s.bj_name) + '</span>'
       + '<span class="cal-notice-desc">' + escapeHtml(s.description) + '</span>'
       + (s.reg_date ? '<span class="cal-notice-date">' + formatDate(s.reg_date) + '</span>' : '')
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
@@ -2597,7 +2604,7 @@ function renderHotCalendar(data) {
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
     idxHtml += '<div class="cal-index-item' + (i === initIdx ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
       + '<div class="idx-time">' + timeStr + ' <span class="view-count"><span class="vc-icon">👁</span><span class="vc-text">조회수</span>' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span></div>'
-      + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
+      + '<div class="idx-bj">' + bjProfileImg(s.bj_id, 28) + escapeHtml(s.bj_name) + '</div>'
       + '<div class="idx-desc">' + escapeHtml(s.description || s.title_name || '') + '</div>'
       + '</div>';
   });
@@ -2612,13 +2619,13 @@ function renderHotCalendar(data) {
     contentHtml += '<div class="cal-notice" id="cal-notice-' + i + '">'
       + '<div class="cal-notice-header">'
       + '<span class="cal-notice-time">' + timeStr + '</span>'
-      + '<span class="cal-notice-bj">' + escapeHtml(s.bj_name) + '</span>'
+      + '<span class="cal-notice-bj">' + bjProfileImg(s.bj_id, 32) + escapeHtml(s.bj_name) + '</span>'
       + (s.reg_date ? '<span class="cal-notice-date">' + formatDate(s.reg_date) + '</span>' : '')
       + '<span class="cal-notice-desc view-count"><span class="vc-icon">👁</span><span class="vc-text">조회수</span>' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span>'
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
-      + '<div class="cal-notice-title" style="font-size:15px;font-weight:600;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
+      + '<div class="cal-notice-title" style="font-size:20px;font-weight:700;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
       + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
       + '</div>';
   });
