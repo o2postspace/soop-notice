@@ -10,7 +10,7 @@ export async function onRequestGet(context) {
     .select("*")
     .in("bj_id", validIds)
     .order("reg_date", { ascending: false })
-    .limit(1000);
+    .limit(3000);
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
