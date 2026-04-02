@@ -1316,6 +1316,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <span class="label">필터</span>
   <button class="filter-btn active" data-filter="popular" onclick="setFilter('popular')">인기</button>
   <button class="filter-btn" data-filter="all" onclick="setFilter('all')">전체</button>
+  <button class="filter-btn" data-filter="isedol" onclick="setFilter('isedol')">이세돌</button>
+  <button class="filter-btn" data-filter="yb" onclick="setFilter('yb')">YB</button>
   <button class="filter-btn" data-filter="fav" onclick="setFilter('fav')">본진</button>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
@@ -1548,6 +1550,42 @@ const BJ_ORDER = [
 let ALL_TAGS = [];
 let prevData = [];
 let autoTimer = null;
+
+// 그룹 필터 멤버 정의
+const GROUP_MEMBERS = {
+  isedol: [
+    "inehine",      // 아이네
+    "jingburger1",  // 징버거
+    "lilpa0309",    // 릴파
+    "gosegu2",      // 고세구
+    "viichan6",     // 비챤
+    "cotton1217",   // 주르르
+  ],
+  yb: [
+    "yuambo",       // 염보성
+    "gksdidqksxn",  // 준밧드
+    "under444",     // 주보리
+    "dlaalswl22",   // 임밍지
+    "hiyoko040",    // 히요코
+    "xx00uxx",      // 윤하랑
+    "1004suna",     // 임아니
+    "he0901",       // 해기_
+    "scan1014",     // Scan유승곤
+    "wjswpalssla1", // 전제민
+    "joey1114",     // 저라뎃
+    "kmj05317",     // 우리밍_
+    "xodud1898",    // 태영
+    "candyrang00",  // 하랑e
+    "son4069",      // 빡지니
+    "rhakdncjs90",  // 으냉이
+    "rlatldgus",    // 오메킴승현2
+    "dkwkal",       // 당크
+    "zzonii",       // 한쪼니
+    "harumyong",    // 하루묭.
+    "ogm0905",      // 오뀨!
+    "luckycontrol", // 고속도로호준
+  ],
+};
 let currentFilter = 'popular';
 let favorites = JSON.parse(localStorage.getItem('soop_fav') || '[]');
 let tempFav = [];
@@ -1799,6 +1837,7 @@ function getFilteredNotices(data) {
 
   if (currentFilter === 'fav') list = list.filter(x => favorites.includes(x.bjId));
   else if (currentFilter === 'popular') list = list.filter(x => (x.notice.read_cnt || 0) >= 1000);
+  else if (GROUP_MEMBERS[currentFilter]) list = list.filter(x => GROUP_MEMBERS[currentFilter].includes(x.bjId));
 
   // 검색 필터
   const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
