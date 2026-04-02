@@ -1055,6 +1055,200 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .update-item .update-content { color: #b0b0b0; }
   html.dark .update-item .update-date { color: #666; }
 
+  /* 주간 캘린더 */
+  #weeklyContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+  .weekly-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .weekly-nav button {
+    background: #5B6AED;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .weekly-nav button:hover { background: #4a58d4; }
+  .weekly-nav span { font-weight: 700; font-size: 15px; }
+
+  .weekly-days {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .weekly-day {
+    flex: 1;
+    min-width: 160px;
+  }
+  .weekly-day-header {
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 0;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: #f4f4f8;
+    color: #444;
+  }
+  .weekly-day-header.today {
+    background: #5B6AED;
+    color: #fff;
+  }
+  .weekly-day-header .day-date {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.7;
+  }
+  .weekly-day-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .wk-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .wk-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(91,106,237,0.15);
+  }
+  .wk-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .wk-time {
+    background: #5B6AED;
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+  .wk-views {
+    color: #999;
+    font-size: 11px;
+    margin-left: auto;
+  }
+  .wk-bj {
+    font-weight: 700;
+    font-size: 14px;
+    color: #222;
+    margin-bottom: 4px;
+  }
+  .wk-desc {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .weekly-empty {
+    text-align: center;
+    color: #bbb;
+    font-size: 12px;
+    padding: 24px 0;
+  }
+
+  /* 주간 다크모드 */
+  html.dark #weeklyContainer { }
+  html.dark .weekly-day-header { background: #2a2a2e; color: #bbb; }
+  html.dark .weekly-day-header.today { background: #5B6AED; color: #fff; }
+  html.dark .wk-card { background: #1e1e22; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  html.dark .wk-card:hover { box-shadow: 0 4px 12px rgba(91,106,237,0.25); }
+  html.dark .wk-bj { color: #e0e0e0; }
+  html.dark .wk-desc { color: #888; }
+
+  /* 주간 모달 */
+  .wk-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .wk-modal {
+    background: #fff;
+    border-radius: 16px;
+    width: 92%;
+    max-width: 680px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 28px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+    position: relative;
+  }
+  .wk-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #aaa;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wk-modal-close:hover { background: #f0f0f0; color: #333; }
+  .wk-modal-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .wk-modal-top .wk-time { font-size: 14px; padding: 4px 12px; }
+  .wk-modal-top .wk-bj { font-size: 17px; margin-bottom: 0; }
+  .wk-modal-top .wk-views { font-size: 13px; }
+  .wk-modal-links { margin-left: auto; display: flex; gap: 6px; }
+  .wk-modal-links a {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    color: #fff;
+  }
+  .wk-modal-links .soop-link { background: #5B6AED; }
+  .wk-modal-links .live-link { background: #e74c3c; }
+  .wk-modal-body { line-height: 1.8; font-size: 14px; }
+
+  html.dark .wk-modal { background: #1e1e22; color: #e0e0e0; }
+  html.dark .wk-modal-close { color: #555; }
+  html.dark .wk-modal-close:hover { background: #2a2a2e; color: #ccc; }
+
+  @media (max-width: 700px) {
+    .weekly-days { flex-direction: column; }
+    .weekly-day { min-width: 0; }
+    .wk-modal { width: 95%; padding: 18px; }
+  }
+
   @media (max-width: 700px) {
     .cal-daily { flex-direction: column; }
     .cal-left { width: 100%; min-width: 0; flex-shrink: 0; }
@@ -1112,6 +1306,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
+  <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
   <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
 </div>
 
@@ -1152,6 +1347,16 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div class="cal-content" id="calContent"></div>
   </div>
+</div>
+
+<div id="weeklyContainer" style="display:none;">
+  <div class="weekly-nav">
+    <button onclick="changeWeek(-1)">&#9664; 이전 주</button>
+    <span id="weekLabel"></span>
+    <button onclick="changeWeek(0)" style="font-size:11px;background:#a29bfe;">이번 주</button>
+    <button onclick="changeWeek(1)">다음 주 &#9654;</button>
+  </div>
+  <div class="weekly-days" id="weeklyDays"></div>
 </div>
 
 <div id="updatesContainer" style="display:none;">
@@ -2124,6 +2329,7 @@ function switchTab(tab) {
   document.getElementById('scroller').style.display = 'none';
   document.getElementById('scrollNav').style.display = 'none';
   document.getElementById('calendarContainer').style.display = 'none';
+  document.getElementById('weeklyContainer').style.display = 'none';
   document.getElementById('updatesContainer').style.display = 'none';
 
   if (tab === 'notices') {
@@ -2133,9 +2339,118 @@ function switchTab(tab) {
   } else if (tab === 'calendar') {
     document.getElementById('calendarContainer').style.display = '';
     loadCalendar();
+  } else if (tab === 'weekly') {
+    document.getElementById('weeklyContainer').style.display = '';
+    loadWeekly();
   } else if (tab === 'updates') {
     document.getElementById('updatesContainer').style.display = '';
     loadUpdates();
+  }
+}
+
+// ===================== 주간 캘린더 =====================
+let weekOffset = 0;
+
+function changeWeek(dir) {
+  if (dir === 0) weekOffset = 0;
+  else weekOffset += dir;
+  loadWeekly();
+}
+
+function getWeekDayOffsets() {
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  if (kstNow.getUTCHours() < 6) kstNow.setUTCDate(kstNow.getUTCDate() - 1);
+  const dow = kstNow.getUTCDay();
+  const monOff = -(dow === 0 ? 6 : dow - 1) + (weekOffset * 7);
+  const offsets = [];
+  for (let i = 0; i < 7; i++) offsets.push(monOff + i);
+  return offsets;
+}
+
+async function loadWeekly() {
+  const container = document.getElementById('weeklyDays');
+  container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">로딩 중...</div>';
+
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  if (kstNow.getUTCHours() < 6) kstNow.setUTCDate(kstNow.getUTCDate() - 1);
+
+  const offsets = getWeekDayOffsets();
+  const dayNames = ['월','화','수','목','금','토','일'];
+
+  // 주간 라벨
+  const first = new Date(kstNow); first.setUTCDate(first.getUTCDate() + offsets[0]);
+  const last = new Date(kstNow); last.setUTCDate(last.getUTCDate() + offsets[6]);
+  document.getElementById('weekLabel').textContent =
+    first.toISOString().slice(5, 10).replace('-','/') + ' ~ ' + last.toISOString().slice(5, 10).replace('-','/');
+
+  // 7일 병렬 로드
+  const weekData = await Promise.all(offsets.map(off =>
+    fetch('/api/hot-notices?day_offset=' + off).then(r => r.json()).catch(() => ({ slots: [] }))
+  ));
+
+  let html = '';
+  offsets.forEach((off, i) => {
+    const d = new Date(kstNow); d.setUTCDate(d.getUTCDate() + off);
+    const dateStr = String(d.getUTCMonth()+1) + '/' + String(d.getUTCDate());
+    const isToday = off === 0;
+    const slots = (weekData[i].slots || []).filter(s => (s.read_cnt || 0) >= 3000);
+
+    html += '<div class="weekly-day">';
+    html += '<div class="weekly-day-header' + (isToday ? ' today' : '') + '">'
+      + dayNames[i] + ' <span class="day-date">' + dateStr + '</span></div>';
+    html += '<div class="weekly-day-body">';
+
+    if (slots.length === 0) {
+      html += '<div class="weekly-empty">일정 없음</div>';
+    } else {
+      slots.forEach(s => {
+        const utc = new Date(s.broadcast_start);
+        const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+        const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
+        const views = (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        const desc = escapeHtml(s.title_name || s.description || '');
+        html += '<div class="wk-card" onclick="openWkModal(\'' + s.bj_id + '\',\'' + escapeHtml(s.bj_name).replace(/'/g,'\\\'') + '\',' + s.title_no + ',\'' + timeStr + '\',' + (s.read_cnt||0) + ')">'
+          + '<div class="wk-card-top"><span class="wk-time">' + timeStr + '</span><span class="wk-views">👁 ' + views + '</span></div>'
+          + '<div class="wk-bj">' + escapeHtml(s.bj_name) + '</div>'
+          + '<div class="wk-desc">' + desc + '</div>'
+          + '</div>';
+      });
+    }
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
+  const views = readCnt.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const overlay = document.createElement('div');
+  overlay.className = 'wk-modal-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div class="wk-modal">'
+    + '<button class="wk-modal-close" onclick="this.closest(\'.wk-modal-overlay\').remove()">&times;</button>'
+    + '<div class="wk-modal-top">'
+    + '<span class="wk-time">' + timeStr + '</span>'
+    + '<span class="wk-bj">' + bjName + '</span>'
+    + '<span class="wk-views">👁 ' + views + '</span>'
+    + '<div class="wk-modal-links">'
+    + '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank">SOOP</a>'
+    + '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank">LIVE</a>'
+    + '</div>'
+    + '</div>'
+    + '<div class="wk-modal-body"><div style="text-align:center;padding:30px;color:#999;">로딩 중...</div></div>'
+    + '</div>';
+  document.body.appendChild(overlay);
+
+  try {
+    const resp = await fetch('/api/notice-content?title_no=' + titleNo);
+    const data = await resp.json();
+    overlay.querySelector('.wk-modal-body').innerHTML =
+      optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
+    neutralizeEmoticonLinks(overlay.querySelector('.wk-modal-body'));
+  } catch {
+    overlay.querySelector('.wk-modal-body').innerHTML = '<p style="color:#f66;">로드 실패</p>';
   }
 }
 
