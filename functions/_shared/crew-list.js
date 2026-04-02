@@ -134,7 +134,7 @@ export const CREW_LIST = [
       { id: "tdnlamuron",     name: "다시바" },
       { id: "morgan427",      name: "숙희" },
       { id: "hhr001234",      name: "어쩜냥이" },
-      { id: "ksue336",        name: "슈니" },
+      { id: "k4187421",       name: "슈니" },
       { id: "jo0ju492",       name: "에망" },
       { id: "yeyo25",         name: "예요예요" },
       { id: "nslah830",       name: "피치" },
