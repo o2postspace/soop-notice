@@ -47,12 +47,16 @@ async function getCrewWithSheet() {
     const crewName = CREW_ALIAS[row["길드"]] || row["길드"];
     const memberName = NAME_ALIAS[row["스트리머"]] || row["스트리머"];
     const level = parseInt(row["Lv"], 10);
-    const weapon = row["무기"] ? parseInt(row["무기"], 10) : null;
+    const toInt = v => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
     map[crewName + ":" + memberName] = {
       job: row["직업"] || null,
       skill: row["스킬"] || null,
       level: isNaN(level) ? null : level,
-      weapon,
+      weapon: toInt(row["무기"]),
+      helmet: toInt(row["투구"]),
+      armor: toInt(row["상의"]),
+      pants: toInt(row["하의"]),
+      boots: toInt(row["신발"]),
     };
   }
 

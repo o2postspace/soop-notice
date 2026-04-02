@@ -1442,14 +1442,24 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     border-radius: 4px;
   }
   /* 직업 색상은 JS에서 inline으로 설정 */
-  .crew-member-weapon {
-    font-size: 9px;
-    font-weight: 700;
-    color: #e67e22;
-    background: #fef3e2;
-    padding: 1px 5px;
-    border-radius: 4px;
+  .crew-member-equips {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
+  .crew-equip {
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .equip-weapon { color: #e67e22; background: #fef3e2; }
+  .equip-helmet { color: #2980b9; background: #ebf5fb; }
+  .equip-armor  { color: #27ae60; background: #eafaf1; }
+  .equip-pants  { color: #8e44ad; background: #f4ecf7; }
+  .equip-boots  { color: #c0392b; background: #fdedec; }
   .crew-member-skill {
     font-size: 8px;
     color: #999;
@@ -1480,7 +1490,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .crew-member-profile { background: #333; }
   html.dark .crew-member-name { color: #ddd; }
   html.dark .crew-member-level { background: #2a2a3a; color: #7B8AFF; }
-  html.dark .crew-member-weapon { background: #3a2a1a; color: #f0a050; }
+  html.dark .equip-weapon { background: #3a2a1a; color: #f0a050; }
+  html.dark .equip-helmet { background: #1a2a3a; color: #5dade2; }
+  html.dark .equip-armor  { background: #1a3a2a; color: #58d68d; }
+  html.dark .equip-pants  { background: #2a1a3a; color: #bb8fce; }
+  html.dark .equip-boots  { background: #3a1a1a; color: #ec7063; }
   html.dark .crew-btn-live { background: #444; }
 
   @media (max-width: 700px) {
@@ -3096,9 +3110,15 @@ function renderCrew(crews) {
         html += '<div class="crew-member-info">';
         if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + '">' + escapeHtml(m.job) + '</span>';
         if (m.level != null) html += '<span class="crew-member-level">Lv.' + m.level + '</span>';
-        if (m.weapon) html += '<span class="crew-member-weapon">' + m.weapon + '강</span>';
         html += '</div>';
       }
+      var equips = [];
+      if (m.weapon) equips.push('<span class="crew-equip equip-weapon">&#9876;' + m.weapon + '</span>');
+      if (m.helmet) equips.push('<span class="crew-equip equip-helmet">&#9891;' + m.helmet + '</span>');
+      if (m.armor) equips.push('<span class="crew-equip equip-armor">&#9899;' + m.armor + '</span>');
+      if (m.pants) equips.push('<span class="crew-equip equip-pants">&#9898;' + m.pants + '</span>');
+      if (m.boots) equips.push('<span class="crew-equip equip-boots">&#128095;' + m.boots + '</span>');
+      if (equips.length) html += '<div class="crew-member-equips">' + equips.join('') + '</div>';
       if (hasId) {
         html += '<div class="crew-member-btns">';
         html += '<a class="crew-btn crew-btn-soop" href="https://www.sooplive.com/' + m.id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">SOOP</a>';
