@@ -3235,48 +3235,69 @@ function switchCrewTab(tab) {
   if (tab === 'ranking' && crewData) renderPowerRanking(crewData);
 }
 
+function calcPower(m) {
+  return (m.level || 0) * 3
+    + (m.weapon || 0) * 15
+    + (m.helmet || 0) * 12
+    + (m.armor || 0) * 8
+    + (m.pants || 0) * 8
+    + (m.boots || 0) * 8
+    + (m.skill === '4차' ? 20 : m.skill === '3차' ? 10 : 0);
+}
+
 function renderPowerRanking(crews) {
   const el = document.getElementById('powerRanking');
-  // 전체 멤버 레벨 랭킹
   const allMembers = [];
   crews.forEach(crew => {
     crew.members.forEach(m => {
-      if (m.level != null) allMembers.push({ ...m, crewName: crew.name, crewColor: crew.color });
+      if (m.level != null) allMembers.push({ ...m, power: calcPower(m), crewName: crew.name, crewColor: crew.color });
     });
   });
-  allMembers.sort((a, b) => b.level - a.level);
+  allMembers.sort((a, b) => b.power - a.power);
 
-  // 크루 평균 랭킹
+  // 크루 평균 파워 랭킹
   const crewAvgs = crews.map(crew => {
-    const levels = crew.members.map(m => m.level).filter(l => l != null);
-    const avg = levels.length > 0 ? levels.reduce((a, b) => a + b, 0) / levels.length : 0;
-    const total = levels.reduce((a, b) => a + b, 0);
-    return { name: crew.name, color: crew.color, avg, total, count: levels.length };
+    const members = crew.members.filter(m => m.level != null).map(m => ({ ...m, power: calcPower(m) }));
+    const avgPower = members.length > 0 ? members.reduce((a, m) => a + m.power, 0) / members.length : 0;
+    const totalPower = members.reduce((a, m) => a + m.power, 0);
+    return { name: crew.name, color: crew.color, avg: avgPower, total: totalPower, count: members.length };
   }).sort((a, b) => b.avg - a.avg);
 
   let html = '';
 
+  // 계산식
+  html += '<div style="text-align:center;font-size:11px;color:#999;margin-bottom:12px;line-height:1.6;">';
+  html += '<b style="color:#666;">파워 계산식</b><br>';
+  html += '레벨×3 + 무기×15 + 투구×12 + 상의×8 + 하의×8 + 신발×8 + 스킬(4차=20, 3차=10)';
+  html += '</div>';
+
   // 크루 평균 랭킹
   html += '<div class="ranking-section">';
-  html += '<div class="ranking-header">크루 평균 레벨 랭킹</div>';
-  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>크루</th><th>인원</th><th>평균 Lv</th><th>총합</th></tr></thead><tbody>';
+  html += '<div class="ranking-header">크루 파워 랭킹</div>';
+  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>크루</th><th>인원</th><th>평균 파워</th><th>총 파워</th></tr></thead><tbody>';
   crewAvgs.forEach((c, i) => {
     html += '<tr>';
     html += '<td class="rank-num rank-' + (i + 1) + '">' + (i + 1) + '</td>';
     html += '<td><span class="rank-crew-badge" style="background:' + c.color + '">' + escapeHtml(c.name) + '</span></td>';
     html += '<td>' + c.count + '명</td>';
-    html += '<td><b>' + c.avg.toFixed(1) + '</b></td>';
+    html += '<td><b>' + c.avg.toFixed(0) + '</b></td>';
     html += '<td>' + c.total + '</td>';
     html += '</tr>';
   });
   html += '</tbody></table></div>';
 
-  // 개인 레벨 TOP 20
+  // 개인 파워 TOP 20
   html += '<div class="ranking-section">';
-  html += '<div class="ranking-header">개인 레벨 TOP 20</div>';
-  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>스트리머</th><th>직업</th><th>Lv</th><th>크루</th></tr></thead><tbody>';
+  html += '<div class="ranking-header">개인 파워 TOP 20</div>';
+  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>스트리머</th><th>직업</th><th>Lv</th><th>장비</th><th>파워</th><th>크루</th></tr></thead><tbody>';
   allMembers.slice(0, 20).forEach((m, i) => {
     const profileUrl = m.id ? 'https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg' : '';
+    const equipParts = [];
+    if (m.weapon) equipParts.push('<span class="crew-equip equip-weapon">무기' + m.weapon + '</span>');
+    if (m.helmet) equipParts.push('<span class="crew-equip equip-helmet">투구' + m.helmet + '</span>');
+    if (m.armor) equipParts.push('<span class="crew-equip equip-armor">상의' + m.armor + '</span>');
+    if (m.pants) equipParts.push('<span class="crew-equip equip-pants">하의' + m.pants + '</span>');
+    if (m.boots) equipParts.push('<span class="crew-equip equip-boots">신발' + m.boots + '</span>');
     html += '<tr>';
     html += '<td class="rank-num rank-' + (i + 1) + '">' + (i + 1) + '</td>';
     html += '<td>';
@@ -3285,7 +3306,9 @@ function renderPowerRanking(crews) {
     html += '<td>';
     if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + ';font-size:9px;padding:1px 6px;">' + escapeHtml(m.job) + '</span>';
     html += '</td>';
-    html += '<td><b>' + m.level + '</b></td>';
+    html += '<td>Lv.' + m.level + '</td>';
+    html += '<td>' + (equipParts.length ? equipParts.join(' ') : '-') + '</td>';
+    html += '<td><b>' + m.power + '</b></td>';
     html += '<td><span class="rank-crew-badge" style="background:' + m.crewColor + '">' + escapeHtml(m.crewName) + '</span></td>';
     html += '</tr>';
   });
@@ -3314,7 +3337,8 @@ function renderPowerRanking(crews) {
       html += '<td>';
       if (m.id) html += '<img class="rank-profile" src="' + profileUrl + '" onerror="this.style.display=\'none\'" loading="lazy">';
       html += escapeHtml(m.name) + '</td>';
-      html += '<td><b>Lv.' + m.level + '</b></td>';
+      html += '<td>Lv.' + m.level + '</td>';
+      html += '<td><b>' + m.power + '</b></td>';
       html += '<td><span class="rank-crew-badge" style="background:' + m.crewColor + '">' + escapeHtml(m.crewName) + '</span></td>';
       html += '</tr>';
     });
