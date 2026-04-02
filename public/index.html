@@ -1273,6 +1273,227 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .cal-notice-desc { font-size: 10px !important; }
     .tab-btn { padding: 8px 16px; font-size: 13px; }
   }
+
+  /* 충동서버 탭 */
+  #crewContainer {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .crew-grid {
+    max-width: 1800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .crew-section {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .crew-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .crew-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    padding: 4px 14px;
+    border-radius: 8px;
+  }
+  .crew-count {
+    font-size: 12px;
+    color: #999;
+  }
+  .crew-live-count {
+    font-size: 12px;
+    color: #e74c3c;
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .crew-members {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+    padding: 14px;
+  }
+  .crew-member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 10px;
+    background: #f8f8ff;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .crew-member:hover {
+    background: #eef0ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .crew-member.is-live {
+    background: #fff5f5;
+    box-shadow: 0 0 0 2px #e74c3c;
+  }
+  .crew-member.is-live:hover {
+    background: #ffe8e8;
+  }
+  .crew-member-profile {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #eee;
+  }
+  .crew-member.is-live .crew-member-profile {
+    box-shadow: 0 0 0 3px #e74c3c;
+  }
+  .crew-member-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    word-break: keep-all;
+  }
+  .crew-member-name .leader-badge {
+    font-size: 9px;
+    background: #ff6b6b;
+    color: #fff;
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-left: 3px;
+    vertical-align: middle;
+  }
+  .crew-member-live {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    background: #e74c3c;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: none;
+    animation: livePulse 2s infinite;
+  }
+  .crew-member.is-live .crew-member-live {
+    display: block;
+  }
+  .crew-member-btns {
+    display: flex;
+    gap: 4px;
+  }
+  .crew-btn {
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.15s;
+    border: none;
+    cursor: pointer;
+  }
+  .crew-btn-soop {
+    background: #5B6AED;
+  }
+  .crew-btn-soop:hover {
+    background: #4a58d6;
+  }
+  .crew-btn-live {
+    background: #ccc;
+  }
+  .crew-member.is-live .crew-btn-live {
+    background: #e74c3c;
+  }
+  .crew-btn-live:hover {
+    background: #c0392b;
+  }
+  .crew-member-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .crew-member-level {
+    font-size: 10px;
+    font-weight: 700;
+    color: #5B6AED;
+    background: #eef0ff;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .crew-member-job {
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  /* 직업 색상은 JS에서 inline으로 설정 */
+  .crew-member-weapon {
+    font-size: 9px;
+    font-weight: 700;
+    color: #e67e22;
+    background: #fef3e2;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .crew-member-skill {
+    font-size: 8px;
+    color: #999;
+  }
+  .crew-avg {
+    font-size: 12px;
+    color: #5B6AED;
+    font-weight: 600;
+  }
+  .crew-member-noid {
+    opacity: 0.5;
+  }
+  .crew-member-noid .crew-member-btns {
+    display: none;
+  }
+  .crew-member-nodata {
+    opacity: 0.4;
+  }
+
+  /* 다크모드 충동서버 */
+  html.dark .crew-section { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .crew-header { border-bottom-color: #333; }
+  html.dark .crew-count { color: #666; }
+  html.dark .crew-member { background: #252525; }
+  html.dark .crew-member:hover { background: #2a2a2a; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  html.dark .crew-member.is-live { background: #2a2020; box-shadow: 0 0 0 2px #e74c3c; }
+  html.dark .crew-member.is-live:hover { background: #332020; }
+  html.dark .crew-member-profile { background: #333; }
+  html.dark .crew-member-name { color: #ddd; }
+  html.dark .crew-member-level { background: #2a2a3a; color: #7B8AFF; }
+  html.dark .crew-member-weapon { background: #3a2a1a; color: #f0a050; }
+  html.dark .crew-btn-live { background: #444; }
+
+  @media (max-width: 700px) {
+    .crew-members {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 6px;
+      padding: 10px;
+    }
+    .crew-member { padding: 10px 6px; }
+    .crew-member-profile { width: 40px; height: 40px; }
+    .crew-member-name { font-size: 11px; }
+    .crew-btn { font-size: 9px; padding: 2px 8px; }
+  }
 </style>
 </head>
 <body>
@@ -1312,6 +1533,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
   <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
+  <button class="tab-btn" data-tab="crew" onclick="switchTab('crew')">충동서버</button>
   <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
 </div>
 
@@ -1365,6 +1587,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <button onclick="changeWeek(1)">다음 주 &#9654;</button>
   </div>
   <div class="weekly-days" id="weeklyDays"></div>
+</div>
+
+<div id="crewContainer">
+  <div class="crew-grid" id="crewGrid">
+    <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
+  </div>
 </div>
 
 <div id="updatesContainer" style="display:none;">
@@ -2401,6 +2629,7 @@ function switchTab(tab) {
   document.getElementById('scrollNav').style.display = 'none';
   document.getElementById('calendarContainer').style.display = 'none';
   document.getElementById('weeklyContainer').style.display = 'none';
+  document.getElementById('crewContainer').style.display = 'none';
   document.getElementById('updatesContainer').style.display = 'none';
 
   if (tab === 'notices') {
@@ -2413,6 +2642,9 @@ function switchTab(tab) {
   } else if (tab === 'weekly') {
     document.getElementById('weeklyContainer').style.display = '';
     loadWeekly();
+  } else if (tab === 'crew') {
+    document.getElementById('crewContainer').style.display = 'block';
+    loadCrew();
   } else if (tab === 'updates') {
     document.getElementById('updatesContainer').style.display = '';
     loadUpdates();
@@ -2833,6 +3065,120 @@ async function loadUpdates() {
     }).join('');
   } catch(e) {
     container.innerHTML = '<div class="updates-empty">로드 실패</div>';
+  }
+}
+
+// ===================== 충동서버 =====================
+let crewData = null;
+let crewLiveTimer = null;
+
+async function loadCrew() {
+  const grid = document.getElementById('crewGrid');
+  if (crewData && Date.now() - (crewData._ts || 0) < 60000) {
+    renderCrew(crewData);
+    return;
+  }
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div> 불러오는 중...</div>';
+  try {
+    const resp = await fetch('/api/crew');
+    crewData = await resp.json();
+    crewData._ts = Date.now();
+    renderCrew(crewData);
+  } catch(e) {
+    grid.innerHTML = '<div class="empty-msg">크루 데이터를 불러올 수 없습니다</div>';
+  }
+}
+
+const JOB_COLORS = {
+  "전사":"#e74c3c","데스나이트":"#c0392b","버서커":"#e74c3c","워리어":"#e74c3c",
+  "마법사":"#3498db","아크메이지":"#2980b9","위자드":"#3498db",
+  "궁수":"#27ae60","영월참성":"#1e8449","레인저":"#27ae60","보우마스터":"#27ae60",
+  "도적":"#8e44ad","섀도어":"#7d3c98","어쌔신":"#8e44ad","나이트로드":"#8e44ad",
+  "사제":"#f39c12","비숍":"#e67e22","프리스트":"#f39c12",
+};
+function getJobColor(job) { return JOB_COLORS[job] || '#888'; }
+
+function renderCrew(crews) {
+  const grid = document.getElementById('crewGrid');
+  let html = '';
+  crews.forEach((crew, ci) => {
+    const levels = crew.members.map(m => m.level).filter(l => l != null);
+    const avgLevel = levels.length > 0 ? (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1) : '-';
+    html += '<div class="crew-section" data-crew="' + ci + '">';
+    html += '<div class="crew-header">';
+    html += '<span class="crew-name" style="background:' + crew.color + '">' + escapeHtml(crew.name) + '</span>';
+    html += '<span class="crew-count">' + crew.members.length + '명</span>';
+    if (levels.length > 0) html += '<span class="crew-avg">avg Lv.' + avgLevel + '</span>';
+    html += '<span class="crew-live-count" id="crewLive' + ci + '"></span>';
+    html += '</div>';
+    html += '<div class="crew-members">';
+    crew.members.forEach(m => {
+      const hasId = !!m.id;
+      const hasData = !!m.level;
+      let cls = 'crew-member';
+      if (!hasId) cls += ' crew-member-noid';
+      else if (!hasData) cls += ' crew-member-nodata';
+      html += '<div class="' + cls + '" data-bjid="' + (m.id || '') + '">';
+      if (hasId) {
+        html += '<img class="crew-member-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+      } else {
+        html += '<div class="crew-member-profile" style="display:flex;align-items:center;justify-content:center;font-size:20px;color:#bbb;background:#eee;">?</div>';
+      }
+      html += '<span class="crew-member-live">LIVE</span>';
+      html += '<div class="crew-member-name">' + escapeHtml(m.name);
+      if (m.leader) html += '<span class="leader-badge">리더</span>';
+      html += '</div>';
+      if (m.job || m.level != null) {
+        html += '<div class="crew-member-info">';
+        if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + '">' + escapeHtml(m.job) + '</span>';
+        if (m.level != null) html += '<span class="crew-member-level">Lv.' + m.level + '</span>';
+        if (m.weapon) html += '<span class="crew-member-weapon">' + m.weapon + '강</span>';
+        html += '</div>';
+      }
+      if (hasId) {
+        html += '<div class="crew-member-btns">';
+        html += '<a class="crew-btn crew-btn-soop" href="https://www.sooplive.com/' + m.id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">SOOP</a>';
+        html += '<a class="crew-btn crew-btn-live" href="https://play.sooplive.com/' + m.id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">LIVE</a>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  grid.innerHTML = html;
+  checkCrewLive();
+  if (crewLiveTimer) clearInterval(crewLiveTimer);
+  crewLiveTimer = setInterval(checkCrewLive, 30000);
+}
+
+async function checkCrewLive() {
+  const members = document.querySelectorAll('.crew-member[data-bjid]');
+  const allIds = [...new Set([...members].map(el => el.dataset.bjid).filter(Boolean))];
+  if (allIds.length === 0) return;
+
+  for (let i = 0; i < allIds.length; i += 20) {
+    const batch = allIds.slice(i, i + 20);
+    try {
+      const resp = await fetch('/api/live-check?ids=' + batch.join(','));
+      const data = await resp.json();
+      members.forEach(el => {
+        const bjid = el.dataset.bjid;
+        if (data[bjid] !== undefined) {
+          el.classList.toggle('is-live', data[bjid]);
+        }
+      });
+    } catch(e) {}
+  }
+
+  // 크루별 라이브 수 업데이트
+  if (crewData) {
+    crewData.forEach((crew, ci) => {
+      const section = document.querySelector('.crew-section[data-crew="' + ci + '"]');
+      if (!section) return;
+      const liveCount = section.querySelectorAll('.crew-member.is-live').length;
+      const el = document.getElementById('crewLive' + ci);
+      if (el) el.textContent = liveCount > 0 ? (liveCount + '명 방송중') : '';
+    });
   }
 }
 
