@@ -321,6 +321,7 @@ export const BJ_LIST = {
   candyrang00  : { name: "하랑e♥" },
   son4069      : { name: "빵지니♥" },
   dkwkal       : { name: "탱크~_~" },
+  rlaxordyd    : { name: "Bisu김택용" },
   byflash      : { name: "FlaSh.이영호" },
   rlekfu6      : { name: "박재혁;;;" },
   jk890202     : { name: "JuM.윤중2" },
