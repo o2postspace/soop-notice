@@ -2194,6 +2194,19 @@ async function loadHotNotices(offset) {
   }
 }
 
+function findCurrentTimeSlotIndex(slots, timeField) {
+  if (calDayOffset !== 0 || slots.length === 0) return 0;
+  const nowHour = new Date().getHours();
+  for (let i = 0; i < slots.length; i++) {
+    const utc = new Date(slots[i][timeField]);
+    const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+    const slotHour = t.getUTCHours();
+    if (slotHour === nowHour) return i;
+    if (slotHour > nowHour) return Math.max(0, i - 1);
+  }
+  return slots.length - 1;
+}
+
 function renderDayCalendar(data) {
   const idx = document.getElementById('calIndex');
   const content = document.getElementById('calContent');
@@ -2205,12 +2218,13 @@ function renderDayCalendar(data) {
   }
 
   // 왼쪽 인덱스
+  const initIdx = findCurrentTimeSlotIndex(data.slots, 'start');
   let idxHtml = '';
   data.slots.forEach((s, i) => {
     const utc = new Date(s.start);
     const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
-    idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
+    idxHtml += '<div class="cal-index-item' + (i === initIdx ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
       + '<div class="idx-time">' + timeStr + '</div>'
       + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
       + '<div class="idx-desc">' + escapeHtml(s.description) + '</div>'
@@ -2241,6 +2255,9 @@ function renderDayCalendar(data) {
   // 본문 lazy load
   data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
 
+  // 현재 시간 슬롯으로 자동 스크롤
+  if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
+
   // 스크롤 감지 → 인덱스 하이라이트
   content.addEventListener('scroll', onCalContentScroll);
   setTimeout(checkLiveStatus, 500);
@@ -2257,12 +2274,13 @@ function renderHotCalendar(data) {
   }
 
   // 왼쪽 인덱스 (방송 시간순)
+  const initIdx = findCurrentTimeSlotIndex(data.slots, 'broadcast_start');
   let idxHtml = '';
   data.slots.forEach((s, i) => {
     const utc = new Date(s.broadcast_start);
     const t = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
     const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0');
-    idxHtml += '<div class="cal-index-item' + (i === 0 ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
+    idxHtml += '<div class="cal-index-item' + (i === initIdx ? ' active' : '') + '" onclick="scrollToNotice(' + i + ')" data-idx="' + i + '">'
       + '<div class="idx-time">' + timeStr + ' <span class="view-count"><span class="vc-icon">👁</span><span class="vc-text">조회수</span>' + (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '</span></div>'
       + '<div class="idx-bj">' + escapeHtml(s.bj_name) + '</div>'
       + '<div class="idx-desc">' + escapeHtml(s.description || s.title_name || '') + '</div>'
@@ -2292,6 +2310,10 @@ function renderHotCalendar(data) {
   content.innerHTML = contentHtml;
 
   data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
+
+  // 현재 시간 슬롯으로 자동 스크롤
+  if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
+
   content.addEventListener('scroll', onCalContentScroll);
   setTimeout(checkLiveStatus, 500);
 }
@@ -2336,7 +2358,7 @@ function scrollToNotice(index) {
   const idxItem = document.querySelector('.cal-index-item[data-idx="' + index + '"]');
   if (idxItem) {
     idxItem.classList.add('active');
-    idxItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+    idxItem.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
   }
   setTimeout(() => { scrollLock = false; }, 300);
 }
