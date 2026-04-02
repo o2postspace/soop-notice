@@ -4,7 +4,7 @@ const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/gviz/tq?tqx=out:csv&gid=0";
 
 const CREW_ALIAS = { "버컴": "버컴퍼니", "흥신소": "홍신소" };
-const NAME_ALIAS = { "마늘빵": "습늘빵", "팸도은": "쨈도은", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요" };
+const NAME_ALIAS = { "마늘빵": "습늘빵", "팸도은": "쨈도은", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요", "용형": "일하는용형" };
 
 function parseLine(line) {
   const result = [];
