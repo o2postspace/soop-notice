@@ -1279,8 +1279,57 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     display: none;
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    flex-direction: column;
   }
+  .crew-subtabs {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .crew-subtab {
+    padding: 8px 20px;
+    border: none;
+    background: transparent;
+    color: #999;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .crew-subtab:hover { color: #5B6AED; }
+  .crew-subtab.active { color: #5B6AED; border-bottom-color: #5B6AED; }
+  .crew-tab-content { flex: 1; overflow-y: auto; padding: 16px; }
+  html.dark .crew-subtabs { background: #1e1e1e; border-bottom-color: #333; }
+  html.dark .crew-subtab { color: #666; }
+  html.dark .crew-subtab:hover, html.dark .crew-subtab.active { color: #5B6AED; }
+
+  /* 파워랭킹 */
+  .power-ranking { max-width: 1200px; margin: 0 auto; }
+  .ranking-section { background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 16px; overflow: hidden; }
+  .ranking-header { padding: 14px 18px; border-bottom: 1px solid #f0f0f0; font-size: 15px; font-weight: 700; color: #333; }
+  .ranking-table { width: 100%; border-collapse: collapse; }
+  .ranking-table th { padding: 8px 12px; font-size: 11px; color: #999; font-weight: 600; text-align: left; border-bottom: 1px solid #f0f0f0; }
+  .ranking-table td { padding: 6px 12px; font-size: 12px; color: #333; border-bottom: 1px solid #f8f8f8; }
+  .ranking-table tr:hover { background: #f8f8ff; }
+  .rank-num { font-weight: 700; color: #5B6AED; width: 30px; text-align: center; }
+  .rank-1 { color: #e67e22; font-size: 14px; }
+  .rank-2 { color: #95a5a6; font-size: 13px; }
+  .rank-3 { color: #cd6133; font-size: 13px; }
+  .rank-profile { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; background: #eee; }
+  .rank-crew-badge { font-size: 9px; color: #fff; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+  .rank-crew-section { margin-bottom: 20px; }
+  .rank-crew-title { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .rank-crew-avg { font-size: 12px; color: #999; margin-left: auto; }
+  html.dark .ranking-section { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .ranking-header { color: #ddd; border-bottom-color: #333; }
+  html.dark .ranking-table th { color: #666; border-bottom-color: #333; }
+  html.dark .ranking-table td { color: #ddd; border-bottom-color: #2a2a2a; }
+  html.dark .ranking-table tr:hover { background: #252530; }
+  html.dark .rank-crew-title { border-bottom-color: #333; }
   .crew-grid {
     max-width: 1800px;
     margin: 0 auto;
@@ -1602,8 +1651,17 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div>
 
 <div id="crewContainer">
-  <div class="crew-grid" id="crewGrid">
-    <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
+  <div class="crew-subtabs">
+    <button class="crew-subtab active" data-crewtab="status" onclick="switchCrewTab('status')">현황</button>
+    <button class="crew-subtab" data-crewtab="ranking" onclick="switchCrewTab('ranking')">파워랭킹</button>
+  </div>
+  <div class="crew-tab-content" id="crewStatusTab">
+    <div class="crew-grid" id="crewGrid">
+      <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
+    </div>
+  </div>
+  <div class="crew-tab-content" id="crewRankingTab" style="display:none;">
+    <div class="power-ranking" id="powerRanking"></div>
   </div>
 </div>
 
@@ -2621,7 +2679,7 @@ function switchTab(tab) {
     document.getElementById('weeklyContainer').style.display = '';
     loadWeekly();
   } else if (tab === 'crew') {
-    document.getElementById('crewContainer').style.display = 'block';
+    document.getElementById('crewContainer').style.display = 'flex';
     loadCrew();
   } else if (tab === 'updates') {
     document.getElementById('updatesContainer').style.display = '';
@@ -3164,6 +3222,107 @@ async function checkCrewLive() {
       if (el) el.textContent = liveCount > 0 ? (liveCount + '명 방송중') : '';
     });
   }
+}
+
+// ===================== 충동서버 서브탭 =====================
+let currentCrewTab = 'status';
+
+function switchCrewTab(tab) {
+  currentCrewTab = tab;
+  document.querySelectorAll('.crew-subtab').forEach(b => b.classList.toggle('active', b.dataset.crewtab === tab));
+  document.getElementById('crewStatusTab').style.display = tab === 'status' ? '' : 'none';
+  document.getElementById('crewRankingTab').style.display = tab === 'ranking' ? '' : 'none';
+  if (tab === 'ranking' && crewData) renderPowerRanking(crewData);
+}
+
+function renderPowerRanking(crews) {
+  const el = document.getElementById('powerRanking');
+  // 전체 멤버 레벨 랭킹
+  const allMembers = [];
+  crews.forEach(crew => {
+    crew.members.forEach(m => {
+      if (m.level != null) allMembers.push({ ...m, crewName: crew.name, crewColor: crew.color });
+    });
+  });
+  allMembers.sort((a, b) => b.level - a.level);
+
+  // 크루 평균 랭킹
+  const crewAvgs = crews.map(crew => {
+    const levels = crew.members.map(m => m.level).filter(l => l != null);
+    const avg = levels.length > 0 ? levels.reduce((a, b) => a + b, 0) / levels.length : 0;
+    const total = levels.reduce((a, b) => a + b, 0);
+    return { name: crew.name, color: crew.color, avg, total, count: levels.length };
+  }).sort((a, b) => b.avg - a.avg);
+
+  let html = '';
+
+  // 크루 평균 랭킹
+  html += '<div class="ranking-section">';
+  html += '<div class="ranking-header">크루 평균 레벨 랭킹</div>';
+  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>크루</th><th>인원</th><th>평균 Lv</th><th>총합</th></tr></thead><tbody>';
+  crewAvgs.forEach((c, i) => {
+    html += '<tr>';
+    html += '<td class="rank-num rank-' + (i + 1) + '">' + (i + 1) + '</td>';
+    html += '<td><span class="rank-crew-badge" style="background:' + c.color + '">' + escapeHtml(c.name) + '</span></td>';
+    html += '<td>' + c.count + '명</td>';
+    html += '<td><b>' + c.avg.toFixed(1) + '</b></td>';
+    html += '<td>' + c.total + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // 개인 레벨 TOP 20
+  html += '<div class="ranking-section">';
+  html += '<div class="ranking-header">개인 레벨 TOP 20</div>';
+  html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>스트리머</th><th>직업</th><th>Lv</th><th>크루</th></tr></thead><tbody>';
+  allMembers.slice(0, 20).forEach((m, i) => {
+    const profileUrl = m.id ? 'https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg' : '';
+    html += '<tr>';
+    html += '<td class="rank-num rank-' + (i + 1) + '">' + (i + 1) + '</td>';
+    html += '<td>';
+    if (m.id) html += '<img class="rank-profile" src="' + profileUrl + '" onerror="this.style.display=\'none\'" loading="lazy">';
+    html += escapeHtml(m.name) + '</td>';
+    html += '<td>';
+    if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + ';font-size:9px;padding:1px 6px;">' + escapeHtml(m.job) + '</span>';
+    html += '</td>';
+    html += '<td><b>' + m.level + '</b></td>';
+    html += '<td><span class="rank-crew-badge" style="background:' + m.crewColor + '">' + escapeHtml(m.crewName) + '</span></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // 직업별 TOP 5
+  const jobGroups = {};
+  allMembers.forEach(m => {
+    if (!m.job) return;
+    if (!jobGroups[m.job]) jobGroups[m.job] = [];
+    jobGroups[m.job].push(m);
+  });
+  const jobNames = Object.keys(jobGroups).sort((a, b) => jobGroups[b].length - jobGroups[a].length);
+
+  html += '<div class="ranking-section">';
+  html += '<div class="ranking-header">직업별 랭킹 TOP 5</div>';
+  jobNames.forEach(job => {
+    const members = jobGroups[job].slice(0, 5);
+    html += '<div class="rank-crew-title"><span class="crew-member-job" style="background:' + getJobColor(job) + ';font-size:11px;padding:2px 10px;">' + escapeHtml(job) + '</span>';
+    html += '<span style="font-size:12px;color:#999;">' + jobGroups[job].length + '명</span></div>';
+    html += '<table class="ranking-table"><tbody>';
+    members.forEach((m, i) => {
+      const profileUrl = m.id ? 'https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg' : '';
+      html += '<tr>';
+      html += '<td class="rank-num rank-' + (i + 1) + '" style="width:30px">' + (i + 1) + '</td>';
+      html += '<td>';
+      if (m.id) html += '<img class="rank-profile" src="' + profileUrl + '" onerror="this.style.display=\'none\'" loading="lazy">';
+      html += escapeHtml(m.name) + '</td>';
+      html += '<td><b>Lv.' + m.level + '</b></td>';
+      html += '<td><span class="rank-crew-badge" style="background:' + m.crewColor + '">' + escapeHtml(m.crewName) + '</span></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  });
+  html += '</div>';
+
+  el.innerHTML = html;
 }
 
 // ===================== 라이브 체크 =====================
