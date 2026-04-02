@@ -56,17 +56,13 @@ async function getCrewWithSheet() {
     };
   }
 
-  return CREW_LIST
-    .map(crew => ({
-      ...crew,
-      members: crew.members
-        .map(m => {
-          const data = map[crew.name + ":" + m.name];
-          return data ? { ...m, ...data } : null;
-        })
-        .filter(Boolean),
-    }))
-    .filter(crew => crew.members.length > 0);
+  return CREW_LIST.map(crew => ({
+    ...crew,
+    members: crew.members.map(m => {
+      const data = map[crew.name + ":" + m.name];
+      return data ? { ...m, ...data } : m;
+    }),
+  }));
 }
 
 export async function onRequestGet() {
