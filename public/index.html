@@ -2338,15 +2338,16 @@ async function copyForFmkorea() {
   btn.disabled = true;
 
   try {
-    const info = prevData[detailBjId];
-    const notice = info.notices.find(n => String(n.title_no) === String(detailTitleNo));
-    const name = info.name;
+    const notice = prevData.find(r => String(r.title_no) === String(detailTitleNo));
+    if (!notice) throw new Error('공지 데이터를 찾을 수 없습니다');
+    const bjId = notice.bj_id || detailBjId;
+    const name = notice.bj_name || '';
     const title = notice.title_name || '';
     const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
-    const reads = notice.count?.read_cnt?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
+    const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     const regDate = formatDate(notice.reg_date);
-    const postUrl = 'https://www.sooplive.com/station/' + detailBjId + '/post/' + detailTitleNo;
-    const liveUrl = 'https://play.sooplive.com/' + detailBjId;
+    const postUrl = 'https://www.sooplive.com/station/' + bjId + '/post/' + detailTitleNo;
+    const liveUrl = 'https://play.sooplive.com/' + bjId;
 
     // 본문 복제 후 이미지 data URL 변환
     const bodyEl = document.getElementById('detailBody');
@@ -2441,7 +2442,7 @@ async function copyForFmkorea() {
     }, 2000);
   } catch(e) {
     console.error('펨코 복사 오류:', e);
-    btn.innerHTML = '❌ ' + (e.message || e);
+    btn.innerHTML = '❌ 실패';
     setTimeout(() => {
       btn.innerHTML = originalText;
       btn.style.backgroundColor = '#1859E6';
