@@ -2406,8 +2406,31 @@ async function copyForFmkorea() {
       </div>
     `;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+    // 클립보드 복사 (Clipboard API 우선, 실패 시 execCommand 폴백)
+    let copied = false;
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        const blob = new Blob([html], { type: 'text/html' });
+        await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+        copied = true;
+      } catch(_) {}
+    }
+    if (!copied) {
+      const tmp = document.createElement('div');
+      tmp.contentEditable = 'true';
+      tmp.innerHTML = html;
+      tmp.style.position = 'fixed';
+      tmp.style.left = '-9999px';
+      document.body.appendChild(tmp);
+      const range = document.createRange();
+      range.selectNodeContents(tmp);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+      document.body.removeChild(tmp);
+    }
 
     btn.innerHTML = '✅ 복사 완료!';
     btn.style.backgroundColor = '#28a745';
