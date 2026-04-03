@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/fetch-notices",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/parse-hot",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
