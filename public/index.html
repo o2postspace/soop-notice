@@ -2442,7 +2442,7 @@ async function copyForFmkorea() {
     }, 2000);
   } catch(e) {
     console.error('펨코 복사 오류:', e);
-    btn.innerHTML = '❌ 실패';
+    btn.innerHTML = '❌ ' + (e.message || e);
     setTimeout(() => {
       btn.innerHTML = originalText;
       btn.style.backgroundColor = '#1859E6';
