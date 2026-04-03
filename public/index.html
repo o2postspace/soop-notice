@@ -3258,12 +3258,10 @@ function renderCrew(crews) {
         html += '<div class="crew-member-info">';
         if (m.job) html += '<span class="crew-member-job" style="background:' + getJobColor(m.job) + '">' + escapeHtml(m.job) + '</span>';
         if (m.level != null) html += '<span class="crew-member-level">Lv.' + m.level + '</span>';
-        if (m.potential) html += '<span class="crew-equip" style="color:#e84393;background:#fde8f0;font-size:7px;">' + escapeHtml(m.potential) + '</span>';
         html += '</div>';
       }
       var equips = [];
       if (m.weapon) equips.push('<span class="crew-equip equip-weapon">무기' + m.weapon + '</span>');
-      if (m.helmet) equips.push('<span class="crew-equip equip-helmet">투구' + m.helmet + '</span>');
       if (m.armor) equips.push('<span class="crew-equip equip-armor">상의' + m.armor + '</span>');
       if (m.pants) equips.push('<span class="crew-equip equip-pants">하의' + m.pants + '</span>');
       if (m.boots) equips.push('<span class="crew-equip equip-boots">신발' + m.boots + '</span>');
@@ -3331,7 +3329,6 @@ function calcPower(m) {
   const armorVal = ARMOR_STAT[m.armor || 0] || 0;
   return (m.level || 0) * 5
     + (m.weapon || 0) * 15
-    + (m.helmet || 0) * 12
     + armorVal
     + (m.pants || 0) * 8
     + (m.boots || 0) * 8
@@ -3361,7 +3358,7 @@ function renderPowerRanking(crews) {
   // 계산식
   html += '<div style="text-align:center;font-size:11px;color:#999;margin-bottom:12px;line-height:1.6;">';
   html += '<b style="color:#666;">파워 계산식</b><br>';
-  html += '레벨×5(기존3+체력2) + 무기×15 + 투구×12 + 상의(테이블) + 하의×8 + 신발×8 + 스킬(4차=20, 3차=10)<br>';
+  html += '레벨×5(기존3+체력2) + 무기×15 + 상의(테이블) + 하의×8 + 신발×8 + 스킬(4차=20, 3차=10)<br>';
   html += '<span style="font-size:10px;">상의 능력치: 0강=10, 1강=15, 2강=25, 3강=45, 4강=90, 5강=140, 6강=210, 7강=270, 8강=330, 9강=420, 10강=550</span>';
   html += '</div>';
 
@@ -3388,7 +3385,6 @@ function renderPowerRanking(crews) {
     const profileUrl = m.id ? 'https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg' : '';
     const equipParts = [];
     if (m.weapon) equipParts.push('<span class="crew-equip equip-weapon">무기' + m.weapon + '</span>');
-    if (m.helmet) equipParts.push('<span class="crew-equip equip-helmet">투구' + m.helmet + '</span>');
     if (m.armor) equipParts.push('<span class="crew-equip equip-armor">상의' + m.armor + '</span>');
     if (m.pants) equipParts.push('<span class="crew-equip equip-pants">하의' + m.pants + '</span>');
     if (m.boots) equipParts.push('<span class="crew-equip equip-boots">신발' + m.boots + '</span>');

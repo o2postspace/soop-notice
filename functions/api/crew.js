@@ -1,7 +1,7 @@
 import { CREW_LIST } from "../_shared/crew-list.js";
 
 const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/gviz/tq?tqx=out:csv&gid=296314716";
+  "https://docs.google.com/spreadsheets/d/1lOjEzCrRcZiMeuMgQkGYC4i4F8GuUxvZVzXlQKS2WaU/gviz/tq?tqx=out:csv&gid=296314716";
 
 const CREW_ALIAS = { "버컴": "버컴퍼니", "흥신소": "홍신소" };
 const NAME_ALIAS = { "마늘빵": "습늘빵", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요" };
@@ -34,7 +34,7 @@ async function getCrewWithSheet() {
   const lines = text.trim().split("\n");
 
   // 인덱스 기반 파싱
-  // 0:←, 1:길드, 2:직업, 3:스트리머, 4:스킬, 5:Lv, 6:무기, 7:잠재, 8:투구, 9:상의, 10:하의, 11:신발
+  // 0:←, 1:길드, 2:직업, 3:스트리머, 4:스킬, 5:Lv, 6:무기, 7:투구옵션, 8:방어구투구, 9:상의, 10:하의, 11:신발
   const map = {};
   for (let i = 1; i < lines.length; i++) {
     const cols = parseLine(lines[i]);
@@ -50,8 +50,6 @@ async function getCrewWithSheet() {
       skill: cols[4]?.trim() || null,
       level: toInt(cols[5]),
       weapon: toInt(cols[6]),
-      potential: cols[7]?.trim() || null,
-      helmet: toInt(cols[8]),
       armor: toInt(cols[9]),
       pants: toInt(cols[10]),
       boots: toInt(cols[11]),
