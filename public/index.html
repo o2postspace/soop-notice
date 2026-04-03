@@ -2304,6 +2304,8 @@ function openDetail(cardEl) {
   if (!notice) return;
 
   const bjId = notice.bj_id || cardEl.dataset.bjid;
+  detailBjId = bjId;
+  detailTitleNo = titleNo;
   document.getElementById('detailName').innerHTML = '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + bjId.slice(0,2) + '/' + bjId + '/' + bjId + '.jpg" alt="" style="vertical-align:middle;margin-right:6px;" onerror="this.style.display=\'none\'">' + escapeHtml(notice.bj_name);
   document.getElementById('detailLinks').innerHTML =
     '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP</a>' +
@@ -2442,7 +2444,7 @@ async function copyForFmkorea() {
     }, 2000);
   } catch(e) {
     console.error('펨코 복사 오류:', e);
-    btn.innerHTML = '❌ ' + (e.message || e);
+    btn.innerHTML = '❌ 실패';
     setTimeout(() => {
       btn.innerHTML = originalText;
       btn.style.backgroundColor = '#1859E6';
