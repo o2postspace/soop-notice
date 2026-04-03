@@ -2,6 +2,8 @@ import { CREW_LIST } from "../_shared/crew-list.js";
 
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/1lOjEzCrRcZiMeuMgQkGYC4i4F8GuUxvZVzXlQKS2WaU/gviz/tq?tqx=out:csv&gid=296314716";
+const RANKING_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1lOjEzCrRcZiMeuMgQkGYC4i4F8GuUxvZVzXlQKS2WaU/gviz/tq?tqx=out:csv&gid=722671070";
 
 const CREW_ALIAS = { "버컴": "버컴퍼니", "흥신소": "홍신소" };
 const NAME_ALIAS = { "마늘빵": "습늘빵", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요" };
@@ -28,9 +30,10 @@ function parseLine(line) {
 function toInt(v) { const n = parseInt(v, 10); return isNaN(n) ? null : n; }
 
 async function getCrewWithSheet() {
-  const resp = await fetch(SHEET_CSV_URL);
-  if (!resp.ok) throw new Error("Sheet fetch failed");
-  const text = await resp.text();
+  const [sheetResp, rankResp] = await Promise.all([fetch(SHEET_CSV_URL), fetch(RANKING_CSV_URL)]);
+  if (!sheetResp.ok) throw new Error("Sheet fetch failed");
+
+  const text = await sheetResp.text();
   const lines = text.trim().split("\n");
 
   // 인덱스 기반 파싱
@@ -56,11 +59,32 @@ async function getCrewWithSheet() {
     };
   }
 
+  // 무력 랭킹 시트: 14:순위, 15:소속, 16:직업, 17:이름, 18:점수
+  const rankMap = {};
+  if (rankResp.ok) {
+    const rankText = await rankResp.text();
+    const rankLines = rankText.trim().split("\n");
+    for (let i = 1; i < rankLines.length; i++) {
+      const cols = parseLine(rankLines[i]);
+      const crew = (cols[15] || "").trim();
+      const name = (cols[17] || "").trim();
+      const score = toInt(cols[18]);
+      if (!crew || !name || score == null) continue;
+      const crewName = CREW_ALIAS[crew] || crew;
+      const memberName = NAME_ALIAS[name] || name;
+      rankMap[crewName + ":" + memberName] = score;
+    }
+  }
+
   return CREW_LIST.map(crew => ({
     ...crew,
     members: crew.members.map(m => {
-      const data = map[crew.name + ":" + m.name];
-      return data ? { ...m, ...data } : m;
+      const key = crew.name + ":" + m.name;
+      const data = map[key];
+      const power = rankMap[key];
+      const merged = data ? { ...m, ...data } : m;
+      if (power != null) merged.power = power;
+      return merged;
     }),
   }));
 }
