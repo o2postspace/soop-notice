@@ -3365,11 +3365,11 @@ function renderPowerRanking(crews) {
   });
   html += '</tbody></table></div>';
 
-  // 개인 파워 TOP 20
+  // 개인 무력 랭킹 전체
   html += '<div class="ranking-section">';
-  html += '<div class="ranking-header">개인 무력 TOP 20</div>';
+  html += '<div class="ranking-header">개인 무력 랭킹</div>';
   html += '<table class="ranking-table"><thead><tr><th style="width:30px">#</th><th>스트리머</th><th>직업</th><th>Lv</th><th class="col-equip">장비</th><th>무력</th><th class="col-crew">크루</th></tr></thead><tbody>';
-  allMembers.slice(0, 20).forEach((m, i) => {
+  allMembers.forEach((m, i) => {
     const profileUrl = m.id ? 'https://profile.img.sooplive.co.kr/LOGO/' + m.id.slice(0,2) + '/' + m.id + '/' + m.id + '.jpg' : '';
     const equipParts = [];
     if (m.weapon) equipParts.push('<span class="crew-equip equip-weapon">무기' + m.weapon + '</span>');
