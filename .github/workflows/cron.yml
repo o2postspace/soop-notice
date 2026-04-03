@@ -11,16 +11,33 @@ jobs:
     steps:
       - name: Fetch notices
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://afreecanotice.vercel.app/api/cron/fetch-notices"
+            "https://afreecanotice.vercel.app/api/cron/fetch-notices")
+          echo "HTTP $code"
 
   parse-hot:
     runs-on: ubuntu-latest
     needs: fetch-notices
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
       - name: Parse schedules
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://afreecanotice.vercel.app/api/cron/parse-hot"
+          node -e "
+            const handler = require('./api/cron/parse-hot.js');
+            const req = { headers: { authorization: 'Bearer ' + process.env.CRON_SECRET } };
+            const res = {
+              status(code) { this._code = code; return this; },
+              json(data) { console.log('Status:', this._code, JSON.stringify(data)); process.exit(this._code >= 400 ? 1 : 0); }
+            };
+            handler(req, res).catch(e => { console.error(e); process.exit(1); });
+          "
