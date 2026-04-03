@@ -2803,7 +2803,7 @@ async function loadWeekly() {
         const views = (s.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         const desc = escapeHtml(s.title_name || s.description || '');
         html += '<div class="wk-card" onclick="openWkModal(\'' + s.bj_id + '\',\'' + escapeHtml(s.bj_name).replace(/'/g,'\\\'') + '\',' + s.title_no + ',\'' + timeStr + '\',' + (s.read_cnt||0) + ')">'
-          + '<div class="wk-card-top"><span class="wk-time">' + timeStr + '</span><span class="wk-views">👁 ' + views + '</span></div>'
+          + '<div class="wk-card-top"><span class="wk-time">' + timeStr + '</span><span class="wk-views">조회수 ' + views + '</span></div>'
           + '<div class="wk-bj">' + escapeHtml(s.bj_name) + '</div>'
           + '<div class="wk-desc">' + desc + '</div>'
           + '</div>';
@@ -2852,7 +2852,7 @@ async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
     + '<div class="wk-modal-top">'
     + '<span class="wk-time">' + timeStr + '</span>'
     + '<span class="wk-bj">' + bjName + '</span>'
-    + '<span class="wk-views">👁 ' + views + '</span>'
+    + '<span class="wk-views">조회수 ' + views + '</span>'
     + '<div class="wk-modal-links">'
     + '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank">SOOP</a>'
     + '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank">LIVE</a>'
