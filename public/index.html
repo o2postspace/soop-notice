@@ -2358,32 +2358,16 @@ async function copyForFmkorea() {
       img.removeAttribute('data-src');
     });
 
-    // 이미지 data URL 변환
-    const imgs = clone.querySelectorAll('img');
-    await Promise.all(Array.from(imgs).map(img => {
-      return new Promise(resolve => {
-        if (img.src.startsWith('data:')) return resolve();
-        fetch(img.src).then(r => r.blob()).then(blob => {
-          const reader = new FileReader();
-          reader.onloadend = () => { img.src = reader.result; resolve(); };
-          reader.readAsDataURL(blob);
-        }).catch(() => resolve());
-      });
-    }));
-
-    // 이미지 스타일 정리
+    // 이미지 스타일 정리 (data URL 변환 생략 - 클립보드 타임아웃 방지)
     clone.querySelectorAll('img').forEach(img => {
       const src = img.src;
       const alt = img.alt || '';
-      const isGif = src.startsWith('data:image/gif');
       const origW = img.style.width;
       const attrs = Array.from(img.attributes);
       attrs.forEach(a => img.removeAttribute(a.name));
       img.src = src;
       img.alt = alt;
-      if (isGif && !origW) {
-        img.style.verticalAlign = 'middle';
-      } else if (origW && origW !== '100%') {
+      if (origW && origW !== '100%') {
         img.style.width = origW;
         img.style.height = 'auto';
       } else {
