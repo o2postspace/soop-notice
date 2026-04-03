@@ -1,9 +1,9 @@
 import { CREW_LIST } from "../_shared/crew-list.js";
 
 const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1b5YDiOaeOH1579AITLlro3JnnPq4fLh5evfehikTmSI/gviz/tq?tqx=out:csv&gid=296314716";
+  "https://docs.google.com/spreadsheets/d/1r8X83O5sa1DYxwDqV3Oyosqdcx1a2n8iccco1NFyXhY/gviz/tq?tqx=out:csv&gid=296314716";
 const RANKING_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1b5YDiOaeOH1579AITLlro3JnnPq4fLh5evfehikTmSI/gviz/tq?tqx=out:csv&gid=722671070";
+  "https://docs.google.com/spreadsheets/d/1r8X83O5sa1DYxwDqV3Oyosqdcx1a2n8iccco1NFyXhY/gviz/tq?tqx=out:csv&gid=722671070";
 
 const CREW_ALIAS = { "버컴": "버컴퍼니", "흥신소": "홍신소" };
 const NAME_ALIAS = { "마늘빵": "습늘빵", "아늉": "아눙", "몽씨": "묭씨", "예묘예묘": "예요예요" };
