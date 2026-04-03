@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "api/cron/fetch-notices.js": {
-      "maxDuration": 60
-    }
-  },
   "crons": [
     {
       "path": "/api/cron/fetch-notices",
