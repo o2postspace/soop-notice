@@ -1333,7 +1333,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   @media (max-width: 700px) {
     .ranking-table th, .ranking-table td { padding: 4px 6px; font-size: 10px; }
     .ranking-table .col-equip { display: none; }
-    .ranking-table .col-crew { display: none; }
     .rank-profile { width: 22px; height: 22px; margin-right: 4px; }
   }
   .crew-grid {
@@ -3242,11 +3241,13 @@ function switchCrewTab(tab) {
   if (tab === 'ranking' && crewData) renderPowerRanking(crewData);
 }
 
+const ARMOR_STAT = [10,15,25,45,90,140,210,270,330,420,550];
 function calcPower(m) {
-  return (m.level || 0) * 3
+  const armorVal = ARMOR_STAT[m.armor || 0] || 0;
+  return (m.level || 0) * 5
     + (m.weapon || 0) * 15
     + (m.helmet || 0) * 12
-    + (m.armor || 0) * 8
+    + armorVal
     + (m.pants || 0) * 8
     + (m.boots || 0) * 8
     + (m.skill === '4차' ? 20 : m.skill === '3차' ? 10 : 0);
@@ -3275,7 +3276,8 @@ function renderPowerRanking(crews) {
   // 계산식
   html += '<div style="text-align:center;font-size:11px;color:#999;margin-bottom:12px;line-height:1.6;">';
   html += '<b style="color:#666;">파워 계산식</b><br>';
-  html += '레벨×3 + 무기×15 + 투구×12 + 상의×8 + 하의×8 + 신발×8 + 스킬(4차=20, 3차=10)';
+  html += '레벨×5(기존3+체력2) + 무기×15 + 투구×12 + 상의(테이블) + 하의×8 + 신발×8 + 스킬(4차=20, 3차=10)<br>';
+  html += '<span style="font-size:10px;">상의 능력치: 0강=10, 1강=15, 2강=25, 3강=45, 4강=90, 5강=140, 6강=210, 7강=270, 8강=330, 9강=420, 10강=550</span>';
   html += '</div>';
 
   // 크루 평균 랭킹
