@@ -1251,9 +1251,39 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .wk-modal-close:hover { background: #2a2a2e; color: #ccc; }
 
   @media (max-width: 700px) {
-    .weekly-days { flex-direction: column; }
-    .weekly-day { min-width: 0; }
+    .weekly-days {
+      flex-direction: row;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+    .weekly-day {
+      min-width: 100%;
+      flex-shrink: 0;
+      scroll-snap-align: start;
+    }
+    .weekly-day-indicator {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .weekly-day-indicator .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .weekly-day-indicator .dot.active { background: #5B6AED; }
+    html.dark .weekly-day-indicator .dot { background: #444; }
+    html.dark .weekly-day-indicator .dot.active { background: #5B6AED; }
     .wk-modal { width: 95%; padding: 18px; }
+  }
+  @media (min-width: 701px) {
+    .weekly-day-indicator { display: none; }
   }
 
   @media (max-width: 700px) {
@@ -1660,6 +1690,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <button onclick="changeWeek(0)" style="font-size:11px;background:#a29bfe;">이번 주</button>
     <button onclick="changeWeek(1)">다음 주 &#9654;</button>
   </div>
+  <div class="weekly-day-indicator" id="weeklyIndicator"></div>
   <div class="weekly-days" id="weeklyDays"></div>
 </div>
 
@@ -2777,6 +2808,34 @@ async function loadWeekly() {
     html += '</div></div>';
   });
   container.innerHTML = html;
+
+  // 모바일 인디케이터 + 오늘로 스크롤
+  const indicator = document.getElementById('weeklyIndicator');
+  const dayNames2 = ['월','화','수','목','금','토','일'];
+  let todayIdx = offsets.indexOf(0);
+  if (todayIdx < 0) todayIdx = 0;
+  indicator.innerHTML = dayNames2.map((dn, i) =>
+    '<button class="dot' + (i === todayIdx ? ' active' : '') + '" data-idx="' + i + '" title="' + dn + '"></button>'
+  ).join('');
+  indicator.querySelectorAll('.dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      const idx = Number(dot.dataset.idx);
+      const target = container.children[idx];
+      if (target) container.scrollTo({ left: target.offsetLeft - container.offsetLeft, behavior: 'smooth' });
+    });
+  });
+  // 스크롤 시 인디케이터 업데이트
+  container.addEventListener('scroll', () => {
+    const sw = container.scrollWidth / 7;
+    const cur = Math.round(container.scrollLeft / sw);
+    indicator.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === cur));
+  });
+  // 오늘로 자동 스크롤 (모바일만)
+  if (window.innerWidth <= 700 && container.children[todayIdx]) {
+    requestAnimationFrame(() => {
+      container.scrollTo({ left: container.children[todayIdx].offsetLeft - container.offsetLeft, behavior: 'instant' });
+    });
+  }
 }
 
 async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
