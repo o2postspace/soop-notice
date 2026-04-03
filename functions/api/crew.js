@@ -59,16 +59,17 @@ async function getCrewWithSheet() {
     };
   }
 
-  // 무력 랭킹 시트: 14:순위, 15:소속, 16:직업, 17:이름, 18:점수
+  // 무력 랭킹 시트: 16:순위, 17:소속, 18:직업, 19:이름, 20:점수
   const rankMap = {};
   if (rankResp.ok) {
     const rankText = await rankResp.text();
     const rankLines = rankText.trim().split("\n");
     for (let i = 1; i < rankLines.length; i++) {
       const cols = parseLine(rankLines[i]);
-      const crew = (cols[15] || "").trim();
-      const name = (cols[17] || "").trim();
-      const score = toInt(cols[18]);
+      const crew = (cols[17] || "").trim();
+      const name = (cols[19] || "").trim();
+      const scoreStr = (cols[20] || "").replace(/,/g, "").trim();
+      const score = toInt(scoreStr);
       if (!crew || !name || score == null) continue;
       const crewName = CREW_ALIAS[crew] || crew;
       const memberName = NAME_ALIAS[name] || name;
