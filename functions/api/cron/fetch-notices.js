@@ -33,6 +33,20 @@ async function fetchPostContent(bjId, titleNo) {
   }
 }
 
+async function getExistingTitleNos(supabase) {
+  const all = [];
+  for (let i = 0; ; i += 1000) {
+    const { data } = await supabase
+      .from("notices")
+      .select("title_no")
+      .range(i, i + 999);
+    if (!data || data.length === 0) break;
+    all.push(...data.map((r) => r.title_no));
+    if (data.length < 1000) break;
+  }
+  return new Set(all);
+}
+
 export async function onRequest(context) {
   // Cron 인증
   if (context.request.headers.get("Authorization") !== `Bearer ${context.env.CRON_SECRET}`) {
@@ -43,11 +57,16 @@ export async function onRequest(context) {
   }
 
   const supabase = createSupabase(context.env);
+
+  // 1) DB에 이미 있는 title_no 조회
+  const existingIds = await getExistingTitleNos(supabase);
+
   const bjIds = Object.keys(BJ_LIST);
   let totalUpserted = 0;
+  let newCount = 0;
 
-  // 10개씩 배치로 처리 (rate limit 방지)
-  const BATCH_SIZE = 10;
+  // 30개씩 배치로 처리
+  const BATCH_SIZE = 30;
   for (let i = 0; i < bjIds.length; i += BATCH_SIZE) {
     const batch = bjIds.slice(i, i + BATCH_SIZE);
 
@@ -58,19 +77,25 @@ export async function onRequest(context) {
 
         const rows = await Promise.all(
           notices.map(async (n) => {
-            const contentHtml = await fetchPostContent(bjId, n.title_no);
-            return {
+            const isNew = !existingIds.has(n.title_no);
+            const contentHtml = isNew
+              ? await fetchPostContent(bjId, n.title_no)
+              : undefined;
+            if (isNew) newCount++;
+
+            const row = {
               bj_id: bjId,
               bj_name: info.name,
               bj_tag: "",
               title_no: n.title_no,
               title_name: n.title_name || "",
-              content_html: contentHtml,
               reg_date: n.reg_date,
               read_cnt: n.count?.read_cnt || 0,
               is_pin: !!n.is_pin,
               updated_at: new Date().toISOString(),
             };
+            if (isNew) row.content_html = contentHtml;
+            return row;
           })
         );
         return rows;
@@ -79,16 +104,28 @@ export async function onRequest(context) {
 
     const allRows = results.flat();
     if (allRows.length > 0) {
-      const { error } = await supabase
-        .from("notices")
-        .upsert(allRows, { onConflict: "title_no" });
+      const newRows = allRows.filter((r) => r.content_html !== undefined);
+      const existingRows = allRows.filter((r) => r.content_html === undefined);
 
-      if (error) console.error("Upsert error:", error.message);
-      else totalUpserted += allRows.length;
+      if (newRows.length > 0) {
+        const { error } = await supabase
+          .from("notices")
+          .upsert(newRows, { onConflict: "title_no" });
+        if (error) console.error("Upsert new error:", error.message);
+        else totalUpserted += newRows.length;
+      }
+
+      if (existingRows.length > 0) {
+        const { error } = await supabase
+          .from("notices")
+          .upsert(existingRows, { onConflict: "title_no", ignoreDuplicates: false });
+        if (error) console.error("Upsert existing error:", error.message);
+        else totalUpserted += existingRows.length;
+      }
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, upserted: totalUpserted }), {
+  return new Response(JSON.stringify({ ok: true, upserted: totalUpserted, new: newCount }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
