@@ -1935,7 +1935,7 @@ let tempFav = [];
 // 다크모드
 (function initDark() {
   const saved = localStorage.getItem('soop_dark');
-  const on = saved === '1';
+  const on = saved !== '0';
   if (on) document.documentElement.classList.add('dark');
   const btn = document.getElementById('darkToggle');
   const btnM = document.getElementById('darkToggleMobile');
