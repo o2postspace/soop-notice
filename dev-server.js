@@ -145,6 +145,17 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // --- /api/sheet ---
+  if (url.pathname === "/api/sheet") {
+    try {
+      const resp = await fetch('https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/gviz/tq?tqx=out:csv&gid=296314716');
+      const text = await resp.text();
+      res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8" });
+      res.end(text);
+    } catch (e) { return jsonResp(res, 500, { error: e.message }); }
+    return;
+  }
+
   // --- /api/live-check ---
   if (url.pathname === "/api/live-check") {
     const bjIds = (url.searchParams.get("ids") || "").split(",").filter(Boolean).slice(0, 50);
