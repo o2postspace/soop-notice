@@ -1390,24 +1390,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .ranking-table .col-equip { display: none; }
     .rank-profile { width: 22px; height: 22px; margin-right: 4px; }
   }
-  .sheet-container {
-    max-width: 1800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding: 10px;
-  }
-  .sheet-guild {
-    background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden;
-  }
-  html.dark .sheet-guild { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-  .sheet-guild-header {
-    padding: 12px 18px; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px;
-  }
-  .sheet-guild-header .avg-info { font-size: 11px; font-weight: 400; opacity: 0.85; }
-  .sheet-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .sheet-table th { padding: 6px 8px; text-align: center; border-bottom: 2px solid #eee; font-weight: 600; color: #666; font-size: 11px; }
-  .sheet-table td { padding: 5px 8px; text-align: center; border-bottom: 1px solid #f0f0f0; }
-  html.dark .sheet-table th { border-bottom-color: #333; color: #888; }
-  html.dark .sheet-table td { border-bottom-color: #2a2a2a; color: #ccc; }
-  .sheet-table tr:hover td { background: rgba(91,106,237,0.05); }
-  .sheet-job { font-size: 11px; padding: 2px 6px; border-radius: 4px; color: #fff; font-weight: 500; }
   .crew-grid {
     max-width: 1800px;
     margin: 0 auto;
@@ -1676,8 +1658,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </header>
 
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
-  <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
+  <button class="tab-btn active" data-tab="notices" onclick="switchTab('notices')">공지</button>
+  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
   <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
   <button class="tab-btn" data-tab="crew" onclick="switchTab('crew')">충동서버</button>
   <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
@@ -1737,16 +1719,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 <div id="crewContainer">
   <div class="crew-subtabs">
-    <button class="crew-subtab active" data-crewtab="sheet" onclick="switchCrewTab('sheet')">시트지</button>
-    <button class="crew-subtab" data-crewtab="status" onclick="switchCrewTab('status')">현황</button>
+    <button class="crew-subtab active" data-crewtab="status" onclick="switchCrewTab('status')">현황</button>
     <button class="crew-subtab" data-crewtab="ranking" onclick="switchCrewTab('ranking')">무력랭킹</button>
   </div>
-  <div class="crew-tab-content" id="crewSheetTab">
-    <div class="sheet-container" id="sheetContainer">
-      <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
-    </div>
-  </div>
-  <div class="crew-tab-content" id="crewStatusTab" style="display:none;">
+  <div class="crew-tab-content" id="crewStatusTab">
     <div class="crew-grid" id="crewGrid">
       <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
     </div>
@@ -2760,7 +2736,7 @@ function setupAutoRefresh() {
 }
 
 // ===================== 탭 전환 =====================
-let currentTab = 'calendar';
+let currentTab = 'notices';
 
 function switchTab(tab) {
   gtag('event', 'tab_click', { tab_name: tab });
@@ -3359,137 +3335,14 @@ async function checkCrewLive() {
 }
 
 // ===================== 충동서버 서브탭 =====================
-let currentCrewTab = 'sheet';
+let currentCrewTab = 'status';
 
 function switchCrewTab(tab) {
   currentCrewTab = tab;
   document.querySelectorAll('.crew-subtab').forEach(b => b.classList.toggle('active', b.dataset.crewtab === tab));
-  document.getElementById('crewSheetTab').style.display = tab === 'sheet' ? '' : 'none';
   document.getElementById('crewStatusTab').style.display = tab === 'status' ? '' : 'none';
   document.getElementById('crewRankingTab').style.display = tab === 'ranking' ? '' : 'none';
-  if (tab === 'sheet') loadSheet();
   if (tab === 'ranking' && crewData) renderPowerRanking(crewData);
-}
-
-const SHEET_CSV_URL = '/api/sheet';
-const JOB_COLORS = {
-  '전사': '#e74c3c', '마법사': '#3498db', '사제': '#2ecc71', '도적': '#9b59b6',
-  '팔라딘': '#f39c12', '영월참성': '#e67e22', '데스나이트': '#34495e', '마영권갑': '#1abc9c'
-};
-const GUILD_COLORS = ['#5B6AED','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e'];
-
-async function loadSheet() {
-  try {
-    const resp = await fetch(SHEET_CSV_URL + '&_t=' + Date.now());
-    const text = await resp.text();
-    const rows = parseCSV(text);
-    renderSheet(rows);
-  } catch(e) {
-    document.getElementById('sheetContainer').innerHTML = '<div style="text-align:center;padding:40px;color:#999;">시트 데이터를 불러올 수 없습니다.</div>';
-  }
-}
-
-function parseCSV(text) {
-  const rows = [];
-  let current = '';
-  let inQuotes = false;
-  const lines = text.split('\n');
-  for (const line of lines) {
-    if (inQuotes) { current += '\n' + line; } else { current = line; }
-    const quoteCount = (current.match(/"/g) || []).length;
-    inQuotes = quoteCount % 2 !== 0;
-    if (!inQuotes) {
-      const cols = [];
-      let col = '';
-      let q = false;
-      for (let i = 0; i < current.length; i++) {
-        const c = current[i];
-        if (c === '"') { q = !q; }
-        else if (c === ',' && !q) { cols.push(col.trim()); col = ''; }
-        else { col += c; }
-      }
-      cols.push(col.trim());
-      rows.push(cols);
-      current = '';
-    }
-  }
-  return rows;
-}
-
-function renderSheet(rows) {
-  const guilds = [];
-  let current = null;
-  let lastGuildName = '';
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    const guildName = (r[1] || '').trim();
-    const job = (r[2] || '').trim();
-    const name = (r[3] || '').trim();
-    const grade = (r[4] || '').trim();
-    const level = (r[5] || '').trim();
-    const weapon = (r[6] || '').trim();
-    const subWeapon = (r[7] || '').trim();
-    const armor = (r[8] || '').trim();
-    const top = (r[9] || '').trim();
-    const bottom = (r[10] || '').trim();
-    const shoes = (r[11] || '').trim();
-
-    if (guildName === '평균') {
-      if (current) current.avg = { level, weapon, armor, top, bottom, shoes };
-      continue;
-    }
-    // 길드 구분: 직업/이름 없이 길드명만 있는 행 또는 새 길드명 등장
-    if (!job && !name && guildName) {
-      current = { name: guildName, members: [], avg: null };
-      guilds.push(current);
-      lastGuildName = guildName;
-      continue;
-    }
-    // 멤버 행: 길드가 아직 없으면 길드명으로 새로 생성
-    if (job && name && guildName) {
-      if (!current || current.name !== guildName) {
-        current = { name: guildName, members: [], avg: null };
-        guilds.push(current);
-        lastGuildName = guildName;
-      }
-      current.members.push({ job, name, grade, level, weapon, subWeapon, armor, top, bottom, shoes });
-    }
-  }
-
-  let html = '';
-  guilds.forEach((g, idx) => {
-    const color = GUILD_COLORS[idx % GUILD_COLORS.length];
-    const avgText = g.avg ? 'Avg Lv' + g.avg.level : '';
-    html += '<div class="sheet-guild">';
-    html += '<div class="sheet-guild-header" style="background:' + color + ';">' + escapeHtml(g.name) + ' <span style="font-size:12px;opacity:0.8;">(' + g.members.length + '명)</span> <span class="avg-info">' + avgText + '</span></div>';
-    html += '<table class="sheet-table"><thead><tr><th>직업</th><th>스트리머</th><th>Lv</th><th>무기</th><th>방어력</th><th>상의</th><th>하의</th><th>신발</th></tr></thead><tbody>';
-    g.members.forEach(m => {
-      const jc = JOB_COLORS[m.job] || '#888';
-      html += '<tr>';
-      html += '<td><span class="sheet-job" style="background:' + jc + ';">' + escapeHtml(m.job) + '</span></td>';
-      html += '<td style="font-weight:600;">' + escapeHtml(m.name) + '</td>';
-      html += '<td>' + escapeHtml(m.level) + '</td>';
-      html += '<td>' + escapeHtml(m.weapon) + '</td>';
-      html += '<td>' + escapeHtml(m.armor) + '</td>';
-      html += '<td>' + escapeHtml(m.top) + '</td>';
-      html += '<td>' + escapeHtml(m.bottom) + '</td>';
-      html += '<td>' + escapeHtml(m.shoes) + '</td>';
-      html += '</tr>';
-    });
-    if (g.avg) {
-      html += '<tr style="font-weight:700;background:rgba(91,106,237,0.06);">';
-      html += '<td colspan="2" style="text-align:right;">평균</td>';
-      html += '<td>' + escapeHtml(g.avg.level) + '</td>';
-      html += '<td>' + escapeHtml(g.avg.weapon) + '</td>';
-      html += '<td>' + escapeHtml(g.avg.armor || '-') + '</td>';
-      html += '<td>' + escapeHtml(g.avg.top) + '</td>';
-      html += '<td>' + escapeHtml(g.avg.bottom) + '</td>';
-      html += '<td>' + escapeHtml(g.avg.shoes) + '</td>';
-      html += '</tr>';
-    }
-    html += '</tbody></table></div>';
-  });
-  document.getElementById('sheetContainer').innerHTML = html;
 }
 
 function renderPowerRanking(crews) {
@@ -3631,7 +3484,6 @@ async function checkLiveStatus() {
 setInterval(checkLiveStatus, 30000);
 
 loadAll();
-setTimeout(() => switchTab(currentTab), 100);
 setupAutoRefresh();
 
 // Pull-to-refresh (모바일 맨 위에서 아래로 당기기)
