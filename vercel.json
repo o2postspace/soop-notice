@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/fetch-notices?group=popular",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/fetch-notices?group=rest",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/parse-hot",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
