@@ -2050,6 +2050,7 @@ function neutralizeEmoticonLinks(container) {
 
 // 필터
 function setFilter(f) {
+  gtag('event', 'filter_click', { filter_name: f });
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('.filter-btn[data-filter="'+f+'"]').classList.add('active');
@@ -2738,6 +2739,7 @@ function setupAutoRefresh() {
 let currentTab = 'notices';
 
 function switchTab(tab) {
+  gtag('event', 'tab_click', { tab_name: tab });
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
@@ -3505,6 +3507,14 @@ setupAutoRefresh();
     }
   }, {passive: true});
 })();
+
+// GA4 이벤트: SOOP 원본 공지 클릭, LIVE 클릭
+document.addEventListener('click', function(e) {
+  var soop = e.target.closest('.soop-link');
+  if (soop) gtag('event', 'soop_link_click', { bj_id: soop.href });
+  var live = e.target.closest('.live-link');
+  if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
+});
 </script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
