@@ -1390,18 +1390,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .ranking-table .col-equip { display: none; }
     .rank-profile { width: 22px; height: 22px; margin-right: 4px; }
   }
-  .sheet-container { max-width:1800px;margin:0 auto;display:flex;flex-direction:column;gap:20px;padding:10px; }
-  .sheet-guild { background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);overflow:hidden; }
-  html.dark .sheet-guild { background:#1e1e1e;box-shadow:0 1px 4px rgba(0,0,0,0.3); }
-  .sheet-guild-header { padding:12px 18px;font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:10px; }
-  .sheet-guild-header .avg-info { font-size:11px;font-weight:400;opacity:0.85; }
-  .sheet-table { width:100%;border-collapse:collapse;font-size:12px; }
-  .sheet-table th { padding:6px 8px;text-align:center;border-bottom:2px solid #eee;font-weight:600;color:#666;font-size:11px; }
-  .sheet-table td { padding:5px 8px;text-align:center;border-bottom:1px solid #f0f0f0; }
-  html.dark .sheet-table th { border-bottom-color:#333;color:#888; }
-  html.dark .sheet-table td { border-bottom-color:#2a2a2a;color:#ccc; }
-  .sheet-table tr:hover td { background:rgba(91,106,237,0.05); }
-  .sheet-job { font-size:11px;padding:2px 6px;border-radius:4px;color:#fff;font-weight:500; }
   .crew-grid {
     max-width: 1800px;
     margin: 0 auto;
@@ -1736,9 +1724,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <button class="crew-subtab" data-crewtab="ranking" onclick="switchCrewTab('ranking')">무력랭킹</button>
   </div>
   <div class="crew-tab-content" id="crewSheetTab" style="display:none;">
-    <div class="sheet-container" id="sheetContainer">
-      <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
-    </div>
+    <iframe src="https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/htmlembed?gid=296314716&range=B2:L116" style="width:100%;height:80vh;border:none;border-radius:14px;"></iframe>
   </div>
   <div class="crew-tab-content" id="crewStatusTab">
     <div class="crew-grid" id="crewGrid">
@@ -3361,81 +3347,7 @@ function switchCrewTab(tab) {
   document.getElementById('crewSheetTab').style.display = tab === 'sheet' ? '' : 'none';
   document.getElementById('crewStatusTab').style.display = tab === 'status' ? '' : 'none';
   document.getElementById('crewRankingTab').style.display = tab === 'ranking' ? '' : 'none';
-  if (tab === 'sheet') loadSheet();
   if (tab === 'ranking' && crewData) renderPowerRanking(crewData);
-}
-
-// ===================== 시트지 =====================
-const SHEET_GUILD_COLORS = ['#5B6AED','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e'];
-const SHEET_JOB_COLORS = {'전사':'#e74c3c','마법사':'#3498db','사제':'#2ecc71','도적':'#9b59b6','팔라딘':'#f39c12','영월참성':'#e67e22','데스나이트':'#34495e','마영권갑':'#1abc9c'};
-
-async function loadSheet() {
-  try {
-    const resp = await fetch('/api/sheet?_t=' + Date.now());
-    const text = await resp.text();
-    renderSheet(parseSheetCSV(text));
-  } catch(e) {
-    document.getElementById('sheetContainer').innerHTML = '<div style="text-align:center;padding:40px;color:#999;">시트 데이터를 불러올 수 없습니다.</div>';
-  }
-}
-
-function parseSheetCSV(text) {
-  const rows = [];
-  let cur = '', inQ = false;
-  for (const line of text.split('\n')) {
-    cur = inQ ? cur + '\n' + line : line;
-    inQ = ((cur.match(/"/g)||[]).length % 2 !== 0);
-    if (!inQ) {
-      const cols = []; let col = '', q = false;
-      for (let i = 0; i < cur.length; i++) {
-        const c = cur[i];
-        if (c === '"') q = !q;
-        else if (c === ',' && !q) { cols.push(col.trim()); col = ''; }
-        else col += c;
-      }
-      cols.push(col.trim());
-      rows.push(cols);
-      cur = '';
-    }
-  }
-  return rows;
-}
-
-function renderSheet(rows) {
-  const guilds = []; let cur = null;
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    const gn = (r[1]||'').trim(), job = (r[2]||'').trim(), name = (r[3]||'').trim();
-    const level = (r[5]||'').trim(), weapon = (r[6]||'').trim(), armor = (r[8]||'').trim();
-    const top = (r[9]||'').trim(), bottom = (r[10]||'').trim(), shoes = (r[11]||'').trim();
-    if (gn === '평균') { if (cur) cur.avg = {level,weapon,armor,top,bottom,shoes}; continue; }
-    if (!job && !name && gn) { cur = {name:gn,members:[],avg:null}; guilds.push(cur); continue; }
-    if (job && name && gn) {
-      if (!cur || cur.name !== gn) { cur = {name:gn,members:[],avg:null}; guilds.push(cur); }
-      cur.members.push({job,name,level,weapon,armor,top,bottom,shoes});
-    }
-  }
-  let html = '';
-  guilds.forEach((g, i) => {
-    const color = SHEET_GUILD_COLORS[i % SHEET_GUILD_COLORS.length];
-    html += '<div class="sheet-guild"><div class="sheet-guild-header" style="background:'+color+';">'+escapeHtml(g.name)+' <span style="font-size:12px;opacity:0.8;">('+g.members.length+'명)</span> <span class="avg-info">'+(g.avg?'Avg Lv'+g.avg.level:'')+'</span></div>';
-    html += '<table class="sheet-table"><thead><tr><th>직업</th><th>스트리머</th><th>Lv</th><th>무기</th><th>방어력</th><th>상의</th><th>하의</th><th>신발</th></tr></thead><tbody>';
-    g.members.forEach(m => {
-      const jc = SHEET_JOB_COLORS[m.job]||'#888';
-      html += '<tr><td><span class="sheet-job" style="background:'+jc+';">'+escapeHtml(m.job)+'</span></td>';
-      html += '<td style="font-weight:600;">'+escapeHtml(m.name)+'</td>';
-      html += '<td>'+escapeHtml(m.level)+'</td><td>'+escapeHtml(m.weapon)+'</td><td>'+escapeHtml(m.armor)+'</td>';
-      html += '<td>'+escapeHtml(m.top)+'</td><td>'+escapeHtml(m.bottom)+'</td><td>'+escapeHtml(m.shoes)+'</td></tr>';
-    });
-    if (g.avg) {
-      html += '<tr style="font-weight:700;background:rgba(91,106,237,0.06);"><td colspan="2" style="text-align:right;">평균</td>';
-      html += '<td>'+escapeHtml(g.avg.level)+'</td><td>'+escapeHtml(g.avg.weapon)+'</td><td>'+escapeHtml(g.avg.armor||'-')+'</td>';
-      html += '<td>'+escapeHtml(g.avg.top)+'</td><td>'+escapeHtml(g.avg.bottom)+'</td><td>'+escapeHtml(g.avg.shoes)+'</td></tr>';
-    }
-    html += '</tbody></table></div>';
-  });
-  document.getElementById('sheetContainer').innerHTML = html;
-}
 
 function renderPowerRanking(crews) {
   const el = document.getElementById('powerRanking');
