@@ -1,16 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/fetch-notices?group=popular",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/fetch-notices?group=rest",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/parse-hot",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
+{}
