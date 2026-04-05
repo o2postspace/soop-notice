@@ -1719,8 +1719,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 <div id="crewContainer">
   <div class="crew-subtabs">
+    <button class="crew-subtab" data-crewtab="sheet" onclick="switchCrewTab('sheet')">시트지</button>
     <button class="crew-subtab active" data-crewtab="status" onclick="switchCrewTab('status')">현황</button>
     <button class="crew-subtab" data-crewtab="ranking" onclick="switchCrewTab('ranking')">무력랭킹</button>
+  </div>
+  <div class="crew-tab-content" id="crewSheetTab" style="display:none;">
+    <iframe id="sheetFrame" style="width:100%;height:80vh;border:none;border-radius:14px;"></iframe>
   </div>
   <div class="crew-tab-content" id="crewStatusTab">
     <div class="crew-grid" id="crewGrid">
@@ -3340,8 +3344,10 @@ let currentCrewTab = 'status';
 function switchCrewTab(tab) {
   currentCrewTab = tab;
   document.querySelectorAll('.crew-subtab').forEach(b => b.classList.toggle('active', b.dataset.crewtab === tab));
+  document.getElementById('crewSheetTab').style.display = tab === 'sheet' ? '' : 'none';
   document.getElementById('crewStatusTab').style.display = tab === 'status' ? '' : 'none';
   document.getElementById('crewRankingTab').style.display = tab === 'ranking' ? '' : 'none';
+  if (tab === 'sheet') { var f = document.getElementById('sheetFrame'); if (!f.src) f.src = 'https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/htmlembed?gid=296314716&range=B2:L116'; }
   if (tab === 'ranking' && crewData) renderPowerRanking(crewData);
 }
 
