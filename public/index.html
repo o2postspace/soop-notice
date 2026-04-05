@@ -3483,7 +3483,7 @@ async function checkLiveStatus() {
 // 30초마다 라이브 체크
 setInterval(checkLiveStatus, 30000);
 
-loadAll();
+loadAll().then(() => switchTab(currentTab));
 setupAutoRefresh();
 
 // Pull-to-refresh (모바일 맨 위에서 아래로 당기기)
