@@ -1343,6 +1343,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     border-bottom: 1px solid #e0e0e0;
     padding: 0 16px;
     flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .crew-subtab {
     padding: 8px 20px;
@@ -1354,6 +1356,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .crew-subtab:hover { color: #5B6AED; }
   .crew-subtab.active { color: #5B6AED; border-bottom-color: #5B6AED; }
