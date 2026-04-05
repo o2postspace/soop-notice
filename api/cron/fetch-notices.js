@@ -1,5 +1,5 @@
 const { supabase } = require("../../lib/supabase");
-const { BJ_LIST } = require("../../lib/bj-list");
+const { BJ_LIST, POPULAR_BJ_IDS } = require("../../lib/bj-list");
 
 const API_URL = "https://chapi.sooplive.co.kr/api/{bj_id}/home";
 const POST_API_URL = "https://api-channel.sooplive.co.kr/v1.1/channel/{bj_id}/post/{title_no}";
@@ -56,7 +56,15 @@ module.exports = async function handler(req, res) {
   // 1) DB에 이미 있는 title_no 조회
   const existingIds = await getExistingTitleNos();
 
-  const bjIds = Object.keys(BJ_LIST);
+  // group 파라미터로 인기 BJ / 나머지 분리
+  const group = req.query.group;
+  const allBjIds = Object.keys(BJ_LIST);
+  const popularSet = new Set(POPULAR_BJ_IDS);
+  const bjIds = group === "popular"
+    ? allBjIds.filter((id) => popularSet.has(id))
+    : group === "rest"
+    ? allBjIds.filter((id) => !popularSet.has(id))
+    : allBjIds;
   let totalUpserted = 0;
   let newCount = 0;
 
