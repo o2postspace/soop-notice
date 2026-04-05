@@ -1723,6 +1723,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <button class="crew-subtab active" data-crewtab="power" onclick="switchCrewTab('power')">무력랭킹</button>
     <button class="crew-subtab" data-crewtab="sheet" onclick="switchCrewTab('sheet')">시트지</button>
     <button class="crew-subtab" data-crewtab="war" onclick="switchCrewTab('war')">전쟁이력</button>
+    <button class="crew-subtab" data-crewtab="status" onclick="switchCrewTab('status')">현황</button>
+    <button class="crew-subtab" data-crewtab="ranking" onclick="switchCrewTab('ranking')">무력랭킹(자체)</button>
   </div>
   <div class="crew-tab-content" id="crewSheetTab" style="display:none;">
     <iframe id="sheetFrame" src="https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/htmlembed?gid=296314716&range=B2:L116" loading="lazy" style="width:100%;height:80vh;border:none;border-radius:14px;"></iframe>
@@ -1734,7 +1736,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <iframe id="powerFrame" src="https://docs.google.com/spreadsheets/d/1v3MgOlW6UGvoYMGbOvWTTrp6TQ5Z5VywIXBDZYQRKA0/htmlembed?gid=722671070" loading="lazy" style="width:100%;height:80vh;border:none;border-radius:14px;"></iframe>
   </div>
   <div class="crew-tab-content" id="crewStatusTab" style="display:none;">
-    <div class="crew-grid" id="crewGrid"></div>
+    <div class="crew-grid" id="crewGrid">
+      <div class="loading"><div class="spinner"></div> 불러오는 중...</div>
+    </div>
   </div>
   <div class="crew-tab-content" id="crewRankingTab" style="display:none;">
     <div class="power-ranking" id="powerRanking"></div>
