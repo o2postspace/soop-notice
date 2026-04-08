@@ -3,7 +3,7 @@
 # 사용법: deploy.sh [repo_name]
 
 REPO_NAME=${1:-soop-notice}
-DEPLOY_DIR="/home/deploy"
+DEPLOY_DIR="/home/msbaek/deploy"
 
 case "$REPO_NAME" in
   soop-notice|afreecanotice)
