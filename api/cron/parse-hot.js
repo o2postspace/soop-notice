@@ -182,8 +182,20 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 
-  // 키워드 프리필터 → Gemini 호출 대상만 추출 (이미 있어도 upsert로 업데이트)
+  // 이미 파싱된 title_no 조회 → 스킵
+  const allTitleNos = (notices || []).map(n => n.title_no);
+  let parsedSet = new Set();
+  if (allTitleNos.length > 0) {
+    const { data: existing } = await supabase
+      .from("schedules")
+      .select("title_no")
+      .in("title_no", allTitleNos);
+    if (existing) parsedSet = new Set(existing.map(e => e.title_no));
+  }
+
+  // 키워드 프리필터 + 이미 파싱된 공지 스킵
   const toParse = (notices || []).filter(n => {
+    if (parsedSet.has(n.title_no)) return false;
     const plainText = stripHtml(n.content_html);
     if (!plainText || plainText.length < 5) return false;
     return hasScheduleKeyword(n.title_name, plainText);
@@ -260,5 +272,5 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  res.status(200).json({ ok: true, parsed: totalParsed, checked: notices.length, filtered: toParse.length });
+  res.status(200).json({ ok: true, parsed: totalParsed, checked: notices.length, filtered: toParse.length, skipped: parsedSet.size });
 };
