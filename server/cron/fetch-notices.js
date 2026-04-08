@@ -34,6 +34,7 @@ async function fetchPostContent(bjId, titleNo) {
 }
 
 async function getExistingTitleNos() {
+  // title_no만 가져오므로 메모리 부담 적음
   const rows = await query("SELECT title_no FROM notices");
   return new Set(rows.map(r => r.title_no));
 }
@@ -53,7 +54,9 @@ async function run(group) {
 
     let totalUpserted = 0;
     let newCount = 0;
-    const BATCH_SIZE = 30;
+
+    // rest는 배치 크기 줄여서 메모리 절약
+    const BATCH_SIZE = group === "rest" ? 10 : 30;
 
     for (let i = 0; i < bjIds.length; i += BATCH_SIZE) {
       const batch = bjIds.slice(i, i + BATCH_SIZE);
@@ -63,31 +66,32 @@ async function run(group) {
           const info = BJ_LIST[bjId];
           const notices = await fetchNoticesFromAPI(bjId);
 
-          const rows = await Promise.all(
-            notices.map(async (n) => {
-              const isNew = !existingIds.has(n.title_no);
-              const contentHtml = isNew ? await fetchPostContent(bjId, n.title_no) : undefined;
-              if (isNew) newCount++;
+          // 새 공지는 순차 처리 (동시에 본문 다운로드 X → 메모리 절약)
+          const rows = [];
+          for (const n of notices) {
+            const isNew = !existingIds.has(n.title_no);
+            const contentHtml = isNew ? await fetchPostContent(bjId, n.title_no) : undefined;
+            if (isNew) newCount++;
 
-              const row = {
-                bj_id: bjId,
-                bj_name: info.name,
-                bj_tag: "",
-                title_no: n.title_no,
-                title_name: n.title_name || "",
-                reg_date: n.reg_date,
-                read_cnt: n.count?.read_cnt || 0,
-                is_pin: !!n.is_pin,
-                updated_at: new Date().toISOString(),
-              };
-              if (isNew) row.content_html = contentHtml;
-              return row;
-            })
-          );
+            const row = {
+              bj_id: bjId,
+              bj_name: info.name,
+              bj_tag: "",
+              title_no: n.title_no,
+              title_name: n.title_name || "",
+              reg_date: n.reg_date,
+              read_cnt: n.count?.read_cnt || 0,
+              is_pin: !!n.is_pin,
+              updated_at: new Date().toISOString(),
+            };
+            if (isNew) row.content_html = contentHtml;
+            rows.push(row);
+          }
           return rows;
         })
       );
 
+      // 배치마다 바로 DB 저장 (메모리에 누적 X)
       const allRows = results.flat();
       if (allRows.length > 0) {
         await upsertNotices(allRows);
