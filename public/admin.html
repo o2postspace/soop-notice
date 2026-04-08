@@ -87,6 +87,7 @@
 </div>
 
 <script>
+const API_BASE = "https://api.soopnotice.com";
 let adminKey = '';
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -104,7 +105,7 @@ function showPanel(name) {
 async function login() {
   adminKey = document.getElementById('keyInput').value;
   try {
-    const resp = await fetch('/api/feedback?key=' + encodeURIComponent(adminKey));
+    const resp = await fetch(API_BASE + '/api/feedback?key=' + encodeURIComponent(adminKey));
     if (!resp.ok) { alert('비밀키가 틀립니다'); return; }
     const data = await resp.json();
     document.getElementById('loginBox').style.display = 'none';
@@ -124,7 +125,7 @@ function renderFeedback(data) {
 }
 
 async function loadSchedules() {
-  const resp = await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-schedules');
+  const resp = await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-schedules');
   const data = await resp.json();
   if (!data.length) {
     document.getElementById('scheduleList').innerHTML = '<div class="empty">일정이 없습니다</div>';
@@ -139,12 +140,12 @@ async function loadSchedules() {
 
 async function delSchedule(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-schedule&id=' + id);
+  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-schedule&id=' + id);
   loadSchedules();
 }
 
 async function loadUpdateList() {
-  const resp = await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-updates');
+  const resp = await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-updates');
   const data = await resp.json();
   if (!data.length) {
     document.getElementById('updateList').innerHTML = '<div class="empty">작성된 업데이트가 없습니다</div>';
@@ -160,7 +161,7 @@ async function addUpdate() {
   const title = document.getElementById('updateTitle').value.trim();
   const content = document.getElementById('updateContent').value.trim();
   if (!title || !content) { alert('제목과 내용을 입력하세요'); return; }
-  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-update&title=' + encodeURIComponent(title) + '&content=' + encodeURIComponent(content) + '&category=' + encodeURIComponent(category));
+  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-update&title=' + encodeURIComponent(title) + '&content=' + encodeURIComponent(content) + '&category=' + encodeURIComponent(category));
   document.getElementById('updateTitle').value = '';
   document.getElementById('updateContent').value = '';
   loadUpdateList();
@@ -168,7 +169,7 @@ async function addUpdate() {
 
 async function delUpdate(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-update&id=' + id);
+  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-update&id=' + id);
   loadUpdateList();
 }
 
@@ -179,7 +180,7 @@ async function addSchedule() {
   const desc = document.getElementById('addDesc').value.trim();
   if (!bj || !date || !time) { alert('스트리머 이름, 날짜, 시간을 입력하세요'); return; }
   const start = date + 'T' + time + ':00+09:00';
-  await fetch('/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-schedule&bj_name=' + encodeURIComponent(bj) + '&broadcast_start=' + encodeURIComponent(start) + '&description=' + encodeURIComponent(desc));
+  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-schedule&bj_name=' + encodeURIComponent(bj) + '&broadcast_start=' + encodeURIComponent(start) + '&description=' + encodeURIComponent(desc));
   document.getElementById('addBj').value = '';
   document.getElementById('addDesc').value = '';
   loadSchedules();

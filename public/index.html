@@ -1818,6 +1818,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div>
 
 <script>
+const API_BASE = "https://api.soopnotice.com";
 let BJ_LIST = {};
 const BJ_ORDER = [
   {id:"y1026",name:"철구형2↑"},{id:"devil0108",name:"감스트"},{id:"lshooooo",name:"이상호"},
@@ -2705,7 +2706,7 @@ async function loadAll() {
 
   try {
     // 본문 없이 전체 목록 한번에 (~40KB, CDN 캐시)
-    const resp = await fetch("/api/notices");
+    const resp = await fetch(API_BASE + "/api/notices");
     const data = await resp.json();
 
     // 프론트엔드에서 HTML 정화 + 이미지 최적화
@@ -2820,7 +2821,7 @@ async function loadWeekly() {
 
   // 7일 병렬 로드
   const weekData = await Promise.all(offsets.map(off =>
-    fetch('/api/hot-notices?day_offset=' + off).then(r => r.json()).catch(() => ({ slots: [] }))
+    fetch(API_BASE + '/api/hot-notices?day_offset=' + off).then(r => r.json()).catch(() => ({ slots: [] }))
   ));
 
   let html = '';
@@ -2905,7 +2906,7 @@ async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
   document.body.appendChild(overlay);
 
   try {
-    const resp = await fetch('/api/notice-content?title_no=' + titleNo);
+    const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
     const data = await resp.json();
     overlay.querySelector('.wk-modal-body').innerHTML =
       optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
@@ -2944,7 +2945,7 @@ async function loadSchedules(offset) {
   content.innerHTML = '';
 
   try {
-    const resp = await fetch('/api/schedules?day_offset=' + offset);
+    const resp = await fetch(API_BASE + '/api/schedules?day_offset=' + offset);
     const data = await resp.json();
     document.getElementById('calDateLabel').textContent = data.date + ' (' + data.day_name + ')';
     calSlots = data.slots;
@@ -2961,7 +2962,7 @@ async function loadHotNotices(offset) {
   content.innerHTML = '';
 
   try {
-    const resp = await fetch('/api/hot-notices?day_offset=' + offset);
+    const resp = await fetch(API_BASE + '/api/hot-notices?day_offset=' + offset);
     const data = await resp.json();
     document.getElementById('calDateLabel').textContent = data.date + ' (' + data.day_name + ')';
     renderHotCalendar(data);
@@ -3103,7 +3104,7 @@ async function loadNoticeBody(titleNo, index) {
   const bodyEl = document.getElementById('cal-body-' + index);
   if (!bodyEl) return;
   try {
-    const resp = await fetch('/api/notice-content?title_no=' + titleNo);
+    const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
     const data = await resp.json();
     bodyEl.innerHTML = optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
     neutralizeEmoticonLinks(bodyEl);
@@ -3184,7 +3185,7 @@ async function sendFeedback() {
   const body = document.getElementById('fbBody').value.trim();
   if (!subject || !body) { showToast('제목과 내용을 입력해주세요'); return; }
   try {
-    const resp = await fetch('/api/feedback', {
+    const resp = await fetch(API_BASE + '/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subject, body }),
@@ -3205,7 +3206,7 @@ async function loadUpdates() {
   const container = document.getElementById('updatesList');
   container.innerHTML = '<div class="updates-empty">불러오는 중...</div>';
   try {
-    const resp = await fetch('/api/updates');
+    const resp = await fetch(API_BASE + '/api/updates');
     const data = await resp.json();
     if (!data.length) {
       container.innerHTML = '<div class="updates-empty">업데이트 소식이 없습니다</div>';
@@ -3238,7 +3239,7 @@ async function loadCrew() {
   }
   grid.innerHTML = '<div class="loading"><div class="spinner"></div> 불러오는 중...</div>';
   try {
-    const resp = await fetch('/api/crew');
+    const resp = await fetch(API_BASE + '/api/crew');
     crewData = await resp.json();
     crewData._ts = Date.now();
     renderCrew(crewData);
@@ -3323,7 +3324,7 @@ async function checkCrewLive() {
   for (let i = 0; i < allIds.length; i += 20) {
     const batch = allIds.slice(i, i + 20);
     try {
-      const resp = await fetch('/api/live-check?ids=' + batch.join(','));
+      const resp = await fetch(API_BASE + '/api/live-check?ids=' + batch.join(','));
       const data = await resp.json();
       members.forEach(el => {
         const bjid = el.dataset.bjid;
@@ -3483,14 +3484,14 @@ async function checkLiveStatus() {
   // 인기 BJ 먼저 빠르게
   if (popular.length > 0) {
     try {
-      const resp = await fetch('/api/live-check?ids=' + popular.join(','));
+      const resp = await fetch(API_BASE + '/api/live-check?ids=' + popular.join(','));
       applyResults(await resp.json());
     } catch(e) {}
   }
   // 나머지 백그라운드
   if (others.length > 0) {
     try {
-      const resp = await fetch('/api/live-check?ids=' + others.join(','));
+      const resp = await fetch(API_BASE + '/api/live-check?ids=' + others.join(','));
       applyResults(await resp.json());
     } catch(e) {}
   }
