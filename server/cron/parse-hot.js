@@ -208,7 +208,20 @@ async function run() {
         process.env.GEMINI_API_KEY
       );
       await new Promise(r => setTimeout(r, 500));
-      if (schedules.length === 0) continue;
+
+      // 빈 결과도 기록하여 재시도 방지
+      if (schedules.length === 0) {
+        await upsertSchedule({
+          bj_id: notice.bj_id,
+          bj_name: notice.bj_name,
+          title_no: notice.title_no,
+          broadcast_start: (noticeDate + "T00:00:00+09:00"),
+          description: "",
+          raw_text: "파싱결과없음",
+          parsed_at: new Date().toISOString(),
+        });
+        continue;
+      }
 
       for (const s of schedules) {
         if (!s.date || !s.start_time) continue;
