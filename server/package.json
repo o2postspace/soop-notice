@@ -1,0 +1,17 @@
+{
+  "name": "soop-notice-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "migrate": "node scripts/migrate-data.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "mysql2": "^3.9.0",
+    "node-cron": "^3.0.3"
+  }
+}
