@@ -224,8 +224,23 @@ async function run() {
         continue;
       }
 
-      for (const s of schedules) {
-        if (!s.date || !s.start_time) continue;
+      // 유효한 스케줄이 하나도 없으면 작성시간으로 폴백
+      const validSchedules = schedules.filter(s => s.date && s.start_time);
+      if (validSchedules.length === 0) {
+        await upsertSchedule({
+          bj_id: notice.bj_id,
+          bj_name: notice.bj_name,
+          title_no: notice.title_no,
+          broadcast_start: notice.reg_date || (noticeDate + "T00:00:00+09:00"),
+          description: schedules[0]?.description || notice.title_name || "",
+          raw_text: "시간미정",
+          parsed_at: new Date().toISOString(),
+        });
+        totalParsed++;
+        continue;
+      }
+
+      for (const s of validSchedules) {
         const startStr = `${s.date}T${s.start_time}:00+09:00`;
         const endStr = s.end_time ? `${s.date}T${s.end_time}:00+09:00` : null;
 
