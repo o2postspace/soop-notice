@@ -209,34 +209,18 @@ async function run() {
       );
       await new Promise(r => setTimeout(r, 500));
 
-      // 빈 결과 → 공지 작성 시간을 방송 시간으로 사용
-      if (schedules.length === 0) {
-        await upsertSchedule({
-          bj_id: notice.bj_id,
-          bj_name: notice.bj_name,
-          title_no: notice.title_no,
-          broadcast_start: notice.reg_date || (noticeDate + "T00:00:00+09:00"),
-          description: notice.title_name || "",
-          raw_text: "시간미정",
-          parsed_at: new Date().toISOString(),
-        });
-        totalParsed++;
-        continue;
-      }
-
-      // 유효한 스케줄이 하나도 없으면 작성시간으로 폴백
+      // 빈 결과 또는 시간 추출 실패 → 파싱결과없음으로 기록 (캘린더에 안 보임, 재시도 방지)
       const validSchedules = schedules.filter(s => s.date && s.start_time);
       if (validSchedules.length === 0) {
         await upsertSchedule({
           bj_id: notice.bj_id,
           bj_name: notice.bj_name,
           title_no: notice.title_no,
-          broadcast_start: notice.reg_date || (noticeDate + "T00:00:00+09:00"),
-          description: schedules[0]?.description || notice.title_name || "",
-          raw_text: "시간미정",
+          broadcast_start: noticeDate + "T00:00:00+09:00",
+          description: "",
+          raw_text: "파싱결과없음",
           parsed_at: new Date().toISOString(),
         });
-        totalParsed++;
         continue;
       }
 
