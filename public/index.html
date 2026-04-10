@@ -1668,11 +1668,12 @@ let tempFav = [];
   btnM.addEventListener('click', toggle);
 })();
 
-// DB에 KST가 +00:00으로 저장되어 있으므로 UTC 기준으로 계산
+// API가 UTC(Z 접미사) 또는 KST(+00:00 오프셋)로 반환
 function parseKST(dateStr) {
-  // +00:00을 제거하고 KST로 해석
+  // Z 접미사가 있으면 이미 올바른 UTC → 그대로 파싱
+  if (dateStr.endsWith('Z')) return new Date(dateStr);
+  // +00:00 등 오프셋이 있으면 제거하고 KST로 해석
   const cleaned = dateStr.replace(/[+-]\d{2}:\d{2}$/, '').replace('T', ' ');
-  // "YYYY-MM-DD HH:MM:SS"를 KST로 파싱
   return new Date(cleaned + '+09:00');
 }
 
