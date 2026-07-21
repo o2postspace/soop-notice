@@ -11,7 +11,6 @@ app.use(express.json());
 
 // API 라우트
 app.use("/api/notices", require("./routes/notices"));
-app.use("/api/notice-content", require("./routes/notice-content"));
 app.use("/api/schedules", require("./routes/schedules"));
 app.use("/api/hot-notices", require("./routes/hot-notices"));
 app.use("/api/updates", require("./routes/updates"));

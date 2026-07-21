@@ -1,0 +1,18 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+/ads.txt
+  Cache-Control: public, max-age=3600
+
+/info.css
+  Cache-Control: public, max-age=86400
+
+/logo.webp
+  Cache-Control: public, max-age=2592000
+
+/logo-dark.webp
+  Cache-Control: public, max-age=2592000

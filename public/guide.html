@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>숲공지 이용 안내와 편집 기준</title>
+  <meta name="description" content="숲공지의 캘린더, 인기 공지, 주간 보기, 본진 설정 사용법과 방송 일정 추출 기준 및 한계를 설명합니다.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="google-adsense-account" content="ca-pub-9843361612343210">
+  <link rel="canonical" href="https://soopnotice.com/guide.html">
+  <link rel="icon" href="/logo.png" type="image/png">
+  <link rel="stylesheet" href="/info.css">
+</head>
+<body>
+  <header class="info-header">
+    <div class="info-header-inner">
+      <a class="brand" href="/"><img src="/logo.webp" width="158" height="80" alt="숲공지"><span>이용 안내</span></a>
+      <nav class="info-nav" aria-label="주요 메뉴">
+        <a href="/guide.html" aria-current="page">이용 안내</a>
+        <a href="/about.html">사이트 소개</a>
+        <a href="/privacy.html">개인정보</a>
+        <a class="home-link" href="/">캘린더로 돌아가기</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="info-main">
+    <section class="hero">
+      <p class="eyebrow">SOOPNOTICE GUIDE</p>
+      <h1>공지를 찾는 시간보다<br>방송을 보는 시간을 더 길게</h1>
+      <p class="lead">숲공지는 여러 스트리머의 공개 공지를 방송 예정 시각 중심으로 다시 정리합니다. 이 페이지에서는 화면별 사용법뿐 아니라 어떤 공지가 캘린더에 들어오는지, 자동 추출 결과를 어디까지 믿어야 하는지 투명하게 설명합니다.</p>
+      <p class="updated">최종 수정: 2026년 7월 22일</p>
+    </section>
+
+    <nav class="toc" aria-label="페이지 목차">
+      <strong>목차</strong>
+      <ol>
+        <li><a href="#quick-start">빠른 사용법</a></li>
+        <li><a href="#screens">화면별 기능</a></li>
+        <li><a href="#method">편집·선별 기준</a></li>
+        <li><a href="#limits">자동 추출의 한계</a></li>
+        <li><a href="#faq">자주 묻는 질문</a></li>
+      </ol>
+    </nav>
+
+    <section class="content-section" id="quick-start">
+      <h2>처음 방문했다면 이렇게 보세요</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <h3>오늘 방송 흐름 확인</h3>
+          <p>첫 화면의 캘린더에서 방송 예정 시각 순으로 일정을 확인합니다. 왼쪽 목록에서 스트리머를 고르면 해당 일정으로 바로 이동합니다.</p>
+        </article>
+        <article class="feature-card">
+          <h3>한 주 일정 훑기</h3>
+          <p>주간 탭은 월요일부터 일요일까지 HOT 공지를 날짜별로 묶습니다. 모바일에서는 좌우로 밀어 날짜를 바꿀 수 있습니다.</p>
+        </article>
+        <article class="feature-card">
+          <h3>관심 스트리머만 보기</h3>
+          <p>공지 탭의 본진 설정에서 스트리머를 저장한 뒤 본진 필터를 선택합니다. 선택 정보는 계정이 아니라 현재 브라우저에만 저장됩니다.</p>
+        </article>
+        <article class="feature-card">
+          <h3>최종 확인은 원문에서</h3>
+          <p>일정의 SOOP 버튼을 누르면 원본 공지로 이동합니다. 시간 변경, 휴방, 지연처럼 중요한 변동은 원문을 기준으로 판단하세요.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" id="screens">
+      <h2>화면별 기능</h2>
+      <h3>캘린더</h3>
+      <p>조회수 3,000 이상인 최근 공지 중 방송 시작 날짜와 시각을 확인할 수 있는 항목을 시간순으로 배치합니다. 일반적인 자정 기준 대신 오전 6시부터 다음 날 오전 5시 59분까지를 하루로 봅니다. 심야 방송이 전날 일정과 자연스럽게 이어지도록 만든 기준입니다.</p>
+
+      <h3>공지</h3>
+      <p>수집된 공개 공지를 최신순으로 탐색하는 화면입니다. 인기 필터는 조회수 1,000 이상, 전체 필터는 등록된 스트리머의 최근 공지를 보여줍니다. 제목과 스트리머 이름으로 검색할 수 있으며 각 항목은 SOOP 원문으로 연결됩니다.</p>
+
+      <h3>주간</h3>
+      <p>일간 캘린더와 같은 조회수 3,000 기준을 사용해 한 주의 방송 예정 일정을 비교합니다. 공지가 여러 일정을 언급하더라도 작성자의 실제 방송 시작 시각으로 판단되는 일정 하나를 우선합니다. 합방 상대의 일정은 중복 표시를 줄이기 위해 별도로 정리될 수 있습니다.</p>
+
+      <h3>업데이트</h3>
+      <p>기능 추가, 오류 수정, 사용자 건의 반영처럼 사이트 동작에 영향을 주는 변경을 기록합니다. 기준이 바뀌면 업데이트 내역과 이 안내 페이지를 함께 수정합니다.</p>
+    </section>
+
+    <section class="content-section" id="method">
+      <h2>데이터 편집과 선별 기준</h2>
+      <p>숲공지는 공개 공지를 그대로 대체하려는 서비스가 아닙니다. 여러 채널에 흩어진 사실 정보를 수집한 뒤 날짜·시각·조회수·작성자 기준을 통일하고, 방송 일정 탐색에 필요한 구조로 바꾸는 것이 목적입니다.</p>
+      <table class="criteria-table">
+        <tbody>
+          <tr><th>데이터 출처</th><td>SOOP 스트리머 채널에 공개된 공지 정보입니다. 각 일정과 공지는 원본 페이지로 연결됩니다.</td></tr>
+          <tr><th>갱신 주기</th><td>주요 채널은 약 5분 간격, 나머지 등록 채널은 약 30분 간격으로 새 공지를 확인합니다. 브라우저 화면은 기본 1분 간격으로 새 데이터를 불러옵니다.</td></tr>
+          <tr><th>인기 공지</th><td>공지 화면에서 조회수 1,000 이상인 항목을 빠르게 보는 편의 필터입니다.</td></tr>
+          <tr><th>HOT 캘린더</th><td>최근 공지 중 조회수 3,000 이상이며, 방송 날짜와 시작 시각을 식별할 수 있는 항목을 사용합니다.</td></tr>
+          <tr><th>하루 경계</th><td>한국시간 오전 6시부터 다음 날 오전 5시 59분까지를 같은 방송일로 묶습니다.</td></tr>
+          <tr><th>일정 추출</th><td>공지 제목과 내용을 분석해 작성자 본인의 실제 방송 시작 시각 한 건을 우선합니다. 단순 행사 시작, 합방 상대 시작, 게임 출시 시각은 방송 시작과 구분합니다.</td></tr>
+          <tr><th>중복 정리</th><td>같은 공지에서 반복된 시간이나 합방으로 파생된 중복 일정을 합쳐 캘린더가 과밀해지지 않도록 합니다.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">조회수는 공지가 수집된 시점의 값이며 계속 변할 수 있습니다. 기준을 넘긴 직후에는 다음 수집 주기까지 캘린더 반영이 늦어질 수 있습니다.</p>
+    </section>
+
+    <section class="content-section" id="limits">
+      <h2>자동 추출 결과를 읽을 때 주의할 점</h2>
+      <p>방송 공지는 자연어로 작성되고 “오늘”, “이따”, “저녁쯤”처럼 상대적인 표현이 많습니다. 숲공지는 공지 작성 시각과 한국시간을 함께 고려하지만 다음 상황에서는 틀릴 수 있습니다.</p>
+      <ul>
+        <li>방송 시작 시각이 명시되지 않고 대략적인 표현만 있는 경우</li>
+        <li>공지 작성 후 스트리머가 시간을 변경하거나 휴방으로 전환한 경우</li>
+        <li>합방, 대회, 콘텐츠 시작 시각과 개인 방송 시작 시각이 함께 적힌 경우</li>
+        <li>이미지 안에만 시간이 있고 글에는 단서가 거의 없는 경우</li>
+        <li>자정을 넘는 일정에서 날짜 표현이 생략된 경우</li>
+      </ul>
+      <p class="note warning"><strong>중요:</strong> 캘린더는 빠른 탐색을 위한 보조 정보입니다. 시청 예약이나 참여 신청처럼 정확한 시간이 필요한 경우 반드시 연결된 SOOP 원문과 스트리머의 최신 안내를 확인하세요.</p>
+      <div class="contact-box">
+        <p>잘못된 시간, 중복 일정, 누락된 공지를 발견했다면 제목 번호나 원문 주소와 함께 알려주세요.</p>
+        <a href="mailto:soopnotice@gmail.com">오류 제보</a>
+      </div>
+    </section>
+
+    <section class="content-section" id="faq">
+      <h2>자주 묻는 질문</h2>
+      <h3>조회수 3,000이 넘는데 캘린더에 왜 없나요?</h3>
+      <p>방송 시작 날짜와 시각을 식별할 수 없거나 수집 주기가 아직 돌아오지 않았을 수 있습니다. 단순 행사 안내나 다른 사람의 방송 시각만 언급한 공지는 작성자의 일정으로 등록하지 않습니다.</p>
+
+      <h3>본진 설정이 다른 기기에도 동기화되나요?</h3>
+      <p>아닙니다. 회원가입을 받지 않으며 본진 목록과 다크모드 설정은 현재 브라우저의 localStorage에만 저장됩니다. 브라우저 데이터를 삭제하면 함께 초기화됩니다.</p>
+
+      <h3>숲공지는 SOOP 공식 서비스인가요?</h3>
+      <p>아닙니다. SOOP(주)와 제휴하거나 운영 지원을 받지 않는 비공식 개인 팬 서비스입니다. 로고, 채널명, 공지의 권리는 각 권리자에게 있습니다.</p>
+
+      <h3>공지 내용의 수정이나 삭제를 요청할 수 있나요?</h3>
+      <p>가능합니다. 원문 작성자 또는 권리자가 원문 주소와 요청 사유를 이메일로 보내면 확인 후 링크·표시 정보의 수정 또는 삭제를 검토합니다. 자세한 절차는 <a href="/about.html#correction">사이트 소개의 정정 정책</a>을 확인하세요.</p>
+    </section>
+  </main>
+
+  <footer class="info-footer">
+    <div class="info-footer-inner">
+      <span>© 2026 숲공지 · SOOP(주)와 관련 없는 비공식 팬 서비스</span>
+      <nav aria-label="정책 링크">
+        <a href="/">홈</a><a href="/about.html">사이트 소개</a><a href="/privacy.html">개인정보처리방침</a><a href="/terms.html">이용약관</a><a href="mailto:soopnotice@gmail.com">문의</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

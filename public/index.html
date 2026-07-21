@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>숲공지 - SOOP 스트리머 공지사항 대시보드 | soopnotice</title>
 <link rel="icon" href="/logo.png" type="image/png">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="google-adsense-account" content="ca-pub-9843361612343210">
+<meta name="theme-color" content="#5B6AED">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-9J4PTFHT9S"></script>
 <script>
@@ -12,6 +15,7 @@
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-9J4PTFHT9S');
+  gtag('config', 'G-X41YVCDSB4');
 </script>
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -27,14 +31,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-WWFQ9ZH7');</script>
 <!-- End Google Tag Manager (2) -->
-<!-- Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-X41YVCDSB4"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-X41YVCDSB4');
-</script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9843361612343210" crossorigin="anonymous"></script>
 <meta name="description" content="숲공지(soopnotice) - SOOP(숲) 스트리머들의 공지사항을 한 곳에서 모아보는 대시보드. 실시간 방송 일정, 캘린더, 인기 공지를 확인하세요.">
 <meta name="keywords" content="숲공지, soopnotice, SOOP, 숲, 아프리카TV, 스트리머, 공지사항, 방송일정, 캘린더">
@@ -43,10 +39,26 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://soopnotice.com">
 <meta property="og:site_name" content="숲공지">
+<meta property="og:image" content="https://soopnotice.com/logo.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="숲공지 - SOOP 스트리머 공지사항 대시보드">
 <meta name="twitter:description" content="SOOP 스트리머들의 공지사항을 한 곳에서. 실시간 방송 일정과 캘린더.">
+<meta name="twitter:image" content="https://soopnotice.com/logo.png">
 <link rel="canonical" href="https://soopnotice.com">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "숲공지",
+  "url": "https://soopnotice.com/",
+  "description": "SOOP 스트리머 공지를 방송 일정, 인기 공지, 일간·주간 캘린더로 다시 정리하는 비공식 팬 서비스",
+  "applicationCategory": "EntertainmentApplication",
+  "operatingSystem": "Any",
+  "isAccessibleForFree": true,
+  "inLanguage": "ko-KR",
+  "featureList": ["방송 일정 추출", "일간·주간 캘린더", "인기 공지 필터", "스트리머 즐겨찾기", "원문 바로가기"]
+}
+</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -130,7 +142,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark, html.dark body { background: #121212; color: #e0e0e0; }
   html.dark header { background: #1e1e1e; border-bottom-color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
   html.dark header h1 { color: #e0e0e0; }
-  html.dark header h1 img { content: url('/logo-dark.png'); }
+  html.dark header h1 img { content: url('/logo-dark.webp'); }
   html.dark #lastUpdate { color: #777; }
   html.dark .auto-refresh { color: #777; }
   html.dark .auto-refresh select { background: #2a2a2a; color: #ccc; border-color: #444; }
@@ -150,10 +162,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .card-header { border-bottom-color: #333; }
   html.dark .card-title { color: #e0e0e0; }
   html.dark .card-meta { color: #666; }
-  html.dark .card-body { color: #b0b0b0; }
-  html.dark .card-body img { background: #2a2a2a; }
-  html.dark .card-expand-btn { background: #252525; color: #5B6AED; border-top-color: #333; }
-  html.dark .card-expand-btn:hover { background: #303030; }
   html.dark .card-tag { background: #2a2a2a; border-color: #444; color: #a29bfe; }
   html.dark .live-link { background: #444; }
   html.dark .live-link.is-live { background: #e74c3c; }
@@ -171,6 +179,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .tab-btn { color: #666; }
   html.dark .tab-btn:hover { color: #5B6AED; }
   html.dark .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
+  html.dark .tab-link { color: #888; }
+  html.dark .tab-link:hover { color: #a29bfe; }
+  html.dark .service-summary { background: #181818; border-bottom-color: #333; color: #aaa; }
+  html.dark .service-summary strong { color: #ddd; }
+  html.dark .service-summary a { color: #a29bfe; }
+  html.dark .site-overview, html.dark .site-footer { background: #171717; color: #aaa; border-color: #333; }
+  html.dark .site-overview h2, html.dark .site-overview h3 { color: #e0e0e0; }
+  html.dark .site-overview-card { background: #1e1e1e; border-color: #333; }
+  html.dark .site-footer a { color: #bbb; }
   /* 다크모드 모달 */
   html.dark .modal-bg { background: rgba(0,0,0,0.7); }
   html.dark .modal { background: #1e1e1e; border-color: #333; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
@@ -212,6 +229,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .cal-notice-bj { color: #e0e0e0; }
   html.dark .cal-notice-desc { color: #666; }
   html.dark .cal-notice-body { color: #b0b0b0; }
+  html.dark .card-source-note, html.dark .source-panel { background: #252525; border-color: #3a3a3a; color: #aaa; }
+  html.dark .source-panel strong { color: #ddd; }
   html.dark .cal-slot { background: #2a2a2a; color: #ccc; }
   html.dark .cal-slot .bj { color: #5B6AED; }
   html.dark .cal-slot .desc { color: #888; }
@@ -441,64 +460,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     display: flex; gap: 10px;
     margin-bottom: 8px;
   }
-  /* 공지 본문 영역 - 접힘 (화면 1/4 기준 동적) */
-  .card-body {
-    font-size: 13px;
-    line-height: 1.7;
-    color: #444;
-    overflow: hidden;
-    word-break: break-word;
-    max-height: var(--card-body-max, 150px);
-    position: relative;
-    transition: max-height 0.3s ease;
-  }
-  .card-body.expanded {
-    max-height: none;
-  }
-  .card-body:not(.expanded)::after {
-    display: none;
-  }
-  .card-expand-btn {
-    display: none;
-    width: 100%;
-    padding: 6px 0;
-    border: none;
-    background: #f8f8ff;
-    color: #5B6AED;
+  .card-source-note {
+    margin-top: 12px;
+    padding: 9px 11px;
+    border: 1px solid #ececf2;
+    border-radius: 8px;
+    background: #f8f8fc;
+    color: #777;
     font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    border-top: 1px solid #f0f0f0;
-    transition: background 0.15s;
+    line-height: 1.5;
   }
-  .card-expand-btn:hover { background: #eef0ff; }
-  .card-expand-btn.visible { display: block; }
-  .card-body img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
-    margin: 6px 0;
-    display: block;
-    background: #f0f0f0;
-    min-height: 30px;
-    content-visibility: auto;
-  }
-  .card-body img[style*="width:100%"],
-  .card-body img[style*="width: 100%"] {
-    max-height: 250px;
-    object-fit: cover;
-  }
-  .card-body img:last-child {
-    margin-bottom: 0;
-  }
-  .card-body br + br { display: none; }
-  .card-body a { color: #5B6AED; }
-  .card-body iframe, .card-body video {
-    max-width: 100%;
-    border-radius: 6px;
-    margin: 6px 0;
-  }
-
   @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } }
 
@@ -712,6 +683,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .scroll-nav .nav-first { left: 4px; }
     .modal-body { flex-direction: column; }
     .modal-right { width: auto; border-left: none; border-top: 1px solid #eee; padding-left: 0; padding-top: 12px; max-height: 120px; }
+    .service-summary { justify-content: flex-start; padding: 6px 10px; overflow-x: auto; text-align: left; }
+    .site-overview { padding: 36px 18px; }
+    .site-overview h2 { font-size: 22px; }
+    .site-overview-grid { grid-template-columns: 1fr; }
+    .site-footer-inner { align-items: flex-start; flex-direction: column; }
   }
 
   /* 공지 상세보기 모달 */
@@ -767,6 +743,26 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     color: #333;
     word-break: break-word;
   }
+  .source-panel {
+    padding: 20px;
+    border: 1px solid #e4e5ee;
+    border-radius: 10px;
+    background: #f8f8fc;
+    color: #555b67;
+    line-height: 1.75;
+  }
+  .source-panel strong { display: block; margin-bottom: 6px; color: #333; }
+  .source-panel a {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 8px 13px;
+    border-radius: 7px;
+    background: #5B6AED;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+  }
   .detail-body img {
     max-width: 100%;
     height: auto;
@@ -818,6 +814,59 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
   .tab-btn:hover { color: #5B6AED; }
   .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
+  .tab-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 14px;
+    color: #777;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .tab-link:hover { color: #5B6AED; }
+  .service-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 7px 16px;
+    border-bottom: 1px solid #e8e8ec;
+    background: #f8f8fc;
+    color: #666;
+    font-size: 11px;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .service-summary strong { color: #333; }
+  .service-summary a { color: #5B6AED; font-weight: 700; white-space: nowrap; }
+
+  .site-overview {
+    padding: 56px 24px;
+    border-top: 1px solid #e5e5e5;
+    background: #fff;
+  }
+  .site-overview-inner { max-width: 1040px; margin: 0 auto; }
+  .site-overview h2 { margin-bottom: 12px; color: #222; font-size: 26px; }
+  .site-overview-lead { max-width: 760px; color: #555; font-size: 15px; line-height: 1.8; }
+  .site-overview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 26px; }
+  .site-overview-card { padding: 20px; border: 1px solid #e8e8ec; border-radius: 12px; background: #fafafe; }
+  .site-overview-card h3 { margin-bottom: 8px; color: #333; font-size: 15px; }
+  .site-overview-card p { color: #666; font-size: 13px; line-height: 1.7; }
+  .site-overview-note { margin-top: 22px; color: #777; font-size: 12px; line-height: 1.7; }
+  .site-overview-note a { color: #5B6AED; }
+  .site-footer {
+    padding: 22px 24px 28px;
+    border-top: 1px solid #e5e5e5;
+    background: #f7f7f9;
+    color: #777;
+    font-size: 12px;
+  }
+  .site-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1040px; margin: 0 auto; }
+  .site-footer nav { display: flex; flex-wrap: wrap; gap: 14px; }
+  .site-footer a { color: #555; text-decoration: none; }
+  .site-footer a:hover { color: #5B6AED; text-decoration: underline; }
 
   /* 캘린더 */
   #calendarContainer {
@@ -1344,7 +1393,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <div class="app-wrap">
 
 <header>
-  <h1 style="display:flex;align-items:center;gap:6px;"><img src="/logo.png" alt="숲공지">
+  <h1 style="display:flex;align-items:center;gap:6px;"><img src="/logo.webp" width="158" height="80" alt="숲공지">
     <span class="info-tooltip" style="cursor:pointer;position:relative;top:6px;">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="11" stroke="#888" stroke-width="1.5"/><text x="12" y="17" text-anchor="middle" fill="#888" font-size="14" font-weight="bold" font-family="serif" font-style="italic">i</text></svg>
       <span class="info-tooltip-text">본 사이트는 SOOP(주)와 관련이 없는 개인이 운영하는 비공식 팬 서비스입니다.</span>
@@ -1353,7 +1402,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="header-right">
     <div class="auto-refresh">
       다크모드
-      <button class="dark-toggle" id="darkToggle"></button>
+      <button class="dark-toggle" id="darkToggle" type="button" aria-label="다크모드 전환" aria-pressed="false"></button>
     </div>
     <div class="auto-refresh">
       자동갱신
@@ -1370,12 +1419,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
 </header>
 
-<div class="tab-bar">
-  <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
-  <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
-  <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
-  <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
-  <button class="dark-toggle mobile-dark-toggle" id="darkToggleMobile"></button>
+<div class="tab-bar" role="tablist" aria-label="숲공지 화면">
+  <button class="tab-btn active" role="tab" aria-selected="true" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-tab="notices" onclick="switchTab('notices')">공지</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
+  <a class="tab-link" href="/guide.html">이용 안내</a>
+  <button class="dark-toggle mobile-dark-toggle" id="darkToggleMobile" type="button" aria-label="다크모드 전환" aria-pressed="false"></button>
+</div>
+
+<div class="service-summary" role="note">
+  <span><strong>숲공지 편집 기준</strong> 공개 공지에서 방송 시각을 추출해 캘린더로 재구성하며, HOT 일정은 조회수 3,000 이상 공지만 표시합니다.</span>
+  <a href="/guide.html#method">기준과 한계 보기</a>
 </div>
 
 <div class="filter-bar" id="filterBar">
@@ -1387,8 +1442,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
   <div class="search-box">
-    <input id="searchInput" type="text" placeholder="검색 (제목, 내용, 스트리머)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
-    <button class="search-clear" onclick="document.getElementById('searchInput').value='';onSearch();">X</button>
+    <input id="searchInput" type="search" aria-label="공지 제목 또는 스트리머 검색" placeholder="검색 (제목, 스트리머)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
+    <button class="search-clear" type="button" aria-label="검색어 지우기" onclick="document.getElementById('searchInput').value='';onSearch();">X</button>
   </div>
 </div>
 
@@ -1436,6 +1491,41 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 </div><!-- app-wrap -->
 
+<section class="site-overview" id="site-overview" aria-labelledby="site-overview-title">
+  <div class="site-overview-inner">
+    <h2 id="site-overview-title">흩어진 방송 공지를 일정으로 다시 정리합니다</h2>
+    <p class="site-overview-lead">숲공지는 여러 SOOP 스트리머의 공개 공지를 모아 제목만 나열하는 데 그치지 않고, 방송 시작 시각과 날짜를 추출해 일간·주간 캘린더로 재구성하는 비공식 팬 서비스입니다. 사용자는 원문을 하나씩 찾아다니지 않고 오늘 방송 흐름을 먼저 파악한 뒤 원본 공지에서 세부 내용을 확인할 수 있습니다.</p>
+    <div class="site-overview-grid">
+      <article class="site-overview-card">
+        <h3>시간 중심 재구성</h3>
+        <p>공지 작성 순서가 아니라 실제 방송 예정 시각 순서로 정리합니다. 하루 구분은 심야 방송 이용 패턴을 고려해 오전 6시를 기준으로 합니다.</p>
+      </article>
+      <article class="site-overview-card">
+        <h3>명확한 선별 기준</h3>
+        <p>일간·주간 HOT 캘린더는 조회수 3,000 이상인 최근 공지를 대상으로 합니다. 일반 공지의 인기 필터는 조회수 1,000 이상을 사용합니다.</p>
+      </article>
+      <article class="site-overview-card">
+        <h3>원문 우선과 오류 정정</h3>
+        <p>각 항목에서 SOOP 원문으로 이동할 수 있습니다. 자동 추출 특성상 시간이 달라질 수 있으므로 중요한 일정은 원문을 우선하며, 오류는 건의 기능으로 제보받습니다.</p>
+      </article>
+    </div>
+    <p class="site-overview-note">숲공지는 SOOP(주)와 관련이 없는 개인 운영 서비스입니다. 자세한 데이터 처리 방식은 <a href="/guide.html#method">편집 기준</a>, 운영 주체와 정정 요청은 <a href="/about.html">사이트 소개</a>에서 확인할 수 있습니다.</p>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <span>© 2026 숲공지 · 비공식 팬 서비스</span>
+    <nav aria-label="사이트 정책 및 안내">
+      <a href="/about.html">사이트 소개</a>
+      <a href="/guide.html">이용 안내</a>
+      <a href="/privacy.html">개인정보처리방침</a>
+      <a href="/terms.html">이용약관</a>
+      <a href="mailto:soopnotice@gmail.com">문의</a>
+    </nav>
+  </div>
+</footer>
+
 <div class="toast" id="toast"></div>
 
 <!-- 쇼츠 스타일 페이지 네비게이션 -->
@@ -1447,16 +1537,16 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div>
 
 <!-- 본진 설정 모달 -->
-<div class="modal-bg" id="modalBg">
+<div class="modal-bg" id="modalBg" role="dialog" aria-modal="true" aria-labelledby="favoriteTitle">
   <div class="modal">
     <div class="modal-top">
-      <h3>본진 스트리머 설정</h3>
-      <button class="modal-close" onclick="closeModal()">X</button>
+      <h3 id="favoriteTitle">본진 스트리머 설정</h3>
+      <button class="modal-close" type="button" aria-label="본진 설정 닫기" onclick="closeModal()">X</button>
     </div>
     <div class="modal-body">
       <div class="modal-left">
         <div class="modal-search">
-          <input type="text" id="modalSearchInput" placeholder="스트리머 이름 검색..." oninput="filterModalList()">
+          <input type="search" id="modalSearchInput" aria-label="본진 스트리머 검색" placeholder="스트리머 이름 검색..." oninput="filterModalList()">
         </div>
         <div id="modalList"></div>
       </div>
@@ -1472,23 +1562,23 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div>
 
 <!-- 건의사항 모달 -->
-<div class="modal-bg" id="feedbackBg">
+<div class="modal-bg" id="feedbackBg" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
   <div class="modal" style="max-width:400px;">
     <div class="modal-top">
-      <h3>건의 / 문의</h3>
-      <button class="modal-close" onclick="closeFeedback()">X</button>
+      <h3 id="feedbackTitle">건의 / 문의</h3>
+      <button class="modal-close" type="button" aria-label="건의 창 닫기" onclick="closeFeedback()">X</button>
     </div>
-    <input id="fbSubject" type="text" placeholder="제목" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:8px;">
-    <textarea id="fbBody" placeholder="내용을 입력하세요" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-height:120px;resize:vertical;margin-bottom:12px;"></textarea>
+    <input id="fbSubject" type="text" aria-label="건의 제목" placeholder="제목" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:8px;">
+    <textarea id="fbBody" aria-label="건의 내용" placeholder="내용을 입력하세요" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-height:120px;resize:vertical;margin-bottom:12px;"></textarea>
     <button onclick="sendFeedback()" style="width:100%;padding:10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;background:#5B6AED;color:#fff;">보내기</button>
     <p style="font-size:11px;color:#999;text-align:center;margin-top:10px;">문의/건의사항은 <a href="mailto:soopnotice@gmail.com" style="color:#5B6AED;">soopnotice@gmail.com</a> 으로도 보내실 수 있습니다.</p>
   </div>
 </div>
 
 <!-- 공지 상세보기 모달 -->
-<div class="detail-bg" id="detailBg">
+<div class="detail-bg" id="detailBg" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
   <div class="detail-modal" style="position:relative;">
-    <button class="detail-close" onclick="closeDetail()">X</button>
+    <button class="detail-close" type="button" aria-label="공지 상세 닫기" onclick="closeDetail()">X</button>
     <div class="detail-header">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div class="detail-name" id="detailName"></div>
@@ -1498,9 +1588,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="detail-meta" id="detailMeta"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
-    <div class="detail-footer" style="padding:12px 20px 16px; border-top:1px solid #eee; text-align:center;">
-      <button id="detailCopyBtn" onclick="copyForFmkorea()" style="padding:10px 24px; background:#1859E6; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">📋 펨코 복사</button>
-    </div>
   </div>
 </div>
 
@@ -1658,10 +1745,14 @@ let tempFav = [];
   const btn = document.getElementById('darkToggle');
   const btnM = document.getElementById('darkToggleMobile');
   if (on) { btn.classList.add('on'); btnM.classList.add('on'); }
+  btn.setAttribute('aria-pressed', String(on));
+  btnM.setAttribute('aria-pressed', String(on));
   function toggle() {
     const isOn = document.documentElement.classList.toggle('dark');
     btn.classList.toggle('on', isOn);
     btnM.classList.toggle('on', isOn);
+    btn.setAttribute('aria-pressed', String(isOn));
+    btnM.setAttribute('aria-pressed', String(isOn));
     localStorage.setItem('soop_dark', isOn ? '1' : '0');
   }
   btn.addEventListener('click', toggle);
@@ -1710,42 +1801,6 @@ function isNew(dateStr) {
 
 function escapeHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-function sanitizeHtml(html) {
-  if (!html) return "";
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "")
-    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
-    .replace(/src\s*=\s*["']data:(?!image\/)[^"']*["']/gi, 'src=""')
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<(object|embed|form|input|button|textarea|select)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<(object|embed|form|input|button|textarea|select)[^>]*\/?>/gi, "")
-    .replace(/expression\s*\([^)]*\)/gi, "")
-    .replace(/style\s*=\s*["'][^"']*url\s*\([^)]*\)[^"']*["']/gi, "");
-}
-
-function optimizeImages(html) {
-  if (!html) return "";
-  return html
-    .replace(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/gi, function(match, url) {
-      var proxy = 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=400&output=webp&q=75';
-      return 'src="' + proxy + '" data-full="' + url + '"';
-    })
-    .replace(/<img(?![^>]*loading)/gi, '<img loading="lazy"');
-}
-
-// 이모티콘 링크 무력화 (SOOP 이모티콘 구매페이지 이동 방지)
-function neutralizeEmoticonLinks(container) {
-  container.querySelectorAll('a').forEach(a => {
-    const href = a.getAttribute('href') || '';
-    if (href.includes('ogqmarket.sooplive.com')) {
-      a.removeAttribute('href');
-      a.style.pointerEvents = 'none';
-      a.style.cursor = 'default';
-    }
-  });
 }
 
 // 필터
@@ -1851,24 +1906,13 @@ function saveFav() {
   }, 400);
 }
 
-// 이미지가 많거나 큰 본문인지 판별
-function isLargeContent(html) {
-  if (!html) return false;
-  const imgCount = (html.match(/<img[\s>]/gi) || []).length;
-  if (imgCount >= 2) return true;
-  // 큰 이미지가 포함된 경우 (width 속성이 크거나 style에 큰 값)
-  if (imgCount >= 1 && html.length > 500) return true;
-  return false;
-}
-
 // 카드 HTML 생성
 function buildCardHtml(item) {
   const n = item.notice;
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
   const reads = (n.read_cnt || n.count?.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const bodyHtml = n.contentHtml || n.content_html || '';
-  return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
+  return '<article class="card" tabindex="0" aria-label="' + escapeHtml((n.title_name || '') + ' 공지 요약') + '" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + item.bjId.slice(0,2) + '/' + item.bjId + '/' + item.bjId + '.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
@@ -1882,10 +1926,9 @@ function buildCardHtml(item) {
     + '<span>' + timeAgo(n.reg_date) + '</span>'
     + '<span>조회 ' + reads + '</span>'
     + '</div>'
-    + (bodyHtml ? '<div class="card-body">' + bodyHtml + '</div>'
-      + '<button class="card-expand-btn" onclick="toggleExpand(event, this)">더보기</button>' : '')
+    + '<div class="card-source-note">공지 전체 내용과 최신 변경 사항은 SOOP 원문에서 확인합니다.</div>'
     + '</div>'
-    + '</div>';
+    + '</article>';
 }
 
 let currentPage = 0;
@@ -1911,25 +1954,11 @@ function getFilteredNotices(data) {
     list = list.filter(x => {
       const n = x.notice;
       const title = (n.title_name || '').toLowerCase();
-      const body = (n.content_html || n.contentHtml || '').replace(/<[^>]+>/g, ' ').toLowerCase();
       const bj = (x.name || '').toLowerCase();
-      return title.includes(query) || body.includes(query) || bj.includes(query);
+      return title.includes(query) || bj.includes(query);
     });
   }
   return list;
-}
-
-// 카드 높이 추정 (본문 없으면 짧음, 있으면 슬롯 꽉 참)
-function estimateCardH(item, slotH) {
-  const body = item.notice.contentHtml || '';
-  if (!body) return 90; // 헤더+제목+메타만
-  if (body.length < 100 && !body.includes('<img')) return 140;
-  return slotH; // 긴 본문/이미지 → 슬롯 최대
-}
-
-// 카드가 span2인지 판별
-function isCardSpan2(item) {
-  return isLargeContent(item.notice.contentHtml || '');
 }
 
 // 4열 × 1행 고정 패킹 (가로 우선 배치)
@@ -1961,6 +1990,14 @@ function packIntoPages(notices) {
   return pages;
 }
 
+function buildNoticePageHtml(pageNumber) {
+  let html = '<div class="page active" data-page="' + pageNumber + '"><div class="page-inner">';
+  for (const idx of packedPages[pageNumber] || []) {
+    html += buildCardHtml(filteredNotices[idx]);
+  }
+  return html + '</div></div>';
+}
+
 // 페이지 단위로 렌더링
 function renderPages(data) {
   filteredNotices = getFilteredNotices(data);
@@ -1974,45 +2011,15 @@ function renderPages(data) {
     return;
   }
 
-  // 화면 높이 기준 본문 최대 높이
-  const scroller = document.getElementById('scroller');
-  const bodyMax = Math.max(60, scroller.clientHeight - 170);
-  document.documentElement.style.setProperty('--card-body-max', bodyMax + 'px');
-
   packedPages = packIntoPages(filteredNotices);
   totalPages = packedPages.length;
   currentPage = Math.min(currentPage, totalPages - 1);
-
-  let html = '';
-  for (let p = 0; p < totalPages; p++) {
-    html += '<div class="page" data-page="' + p + '"><div class="page-inner">';
-    for (const idx of packedPages[p]) {
-      html += buildCardHtml(filteredNotices[idx]);
-    }
-    html += '</div></div>';
-  }
-  container.innerHTML = html;
-  container.querySelectorAll('.card-body').forEach(b => neutralizeEmoticonLinks(b));
-
-  // 긴 본문에만 "더보기" 버튼 표시
-  container.querySelectorAll('.card-body').forEach(body => {
-    if (body.scrollHeight > body.clientHeight + 10) {
-      const btn = body.nextElementSibling;
-      if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
-    }
-  });
+  container.innerHTML = buildNoticePageHtml(currentPage);
 
   showCurrentPage();
   if (currentTab === 'notices') {
     document.getElementById('scrollNav').style.display = 'flex';
   }
-}
-
-function toggleExpand(e, btn) {
-  e.stopPropagation();
-  const body = btn.previousElementSibling;
-  const expanded = body.classList.toggle('expanded');
-  btn.textContent = expanded ? '접기' : '더보기';
 }
 
 let detailBjId = '', detailTitleNo = '';
@@ -2024,11 +2031,12 @@ function openDetail(cardEl) {
   if (!notice) return;
 
   const bjId = notice.bj_id || cardEl.dataset.bjid;
+  const postUrl = 'https://www.sooplive.com/station/' + encodeURIComponent(bjId) + '/post/' + encodeURIComponent(titleNo);
   detailBjId = bjId;
   detailTitleNo = titleNo;
-  document.getElementById('detailName').innerHTML = '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + bjId.slice(0,2) + '/' + bjId + '/' + bjId + '.jpg" alt="" style="vertical-align:middle;margin-right:6px;" onerror="this.style.display=\'none\'">' + escapeHtml(notice.bj_name);
+  document.getElementById('detailName').innerHTML = '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + bjId.slice(0,2) + '/' + bjId + '/' + bjId + '.jpg" alt="" style="vertical-align:middle;margin-right:6px;" onerror="this.style.display=\'none\'">' + escapeHtml(notice.bj_name || '');
   document.getElementById('detailLinks').innerHTML =
-    '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP</a>' +
+    '<a class="soop-link" href="' + postUrl + '" target="_blank" rel="noopener" title="SOOP에서 보기">SOOP</a>' +
     '<a class="live-link" data-bjid="' + bjId + '" href="https://play.sooplive.com/' + bjId + '" target="_blank" rel="noopener" title="생방송 보러가기">LIVE</a>';
   const pin = notice.is_pin ? '<span class="pin">PIN</span>' : '';
   document.getElementById('detailTitle').innerHTML = pin + escapeHtml(notice.title_name || '');
@@ -2036,11 +2044,9 @@ function openDetail(cardEl) {
   document.getElementById('detailMeta').innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
 
   const bodyEl = document.getElementById('detailBody');
-  let html = notice.content_html || '<p style="color:#999">본문 없음</p>';
-  // 모달에서는 원본 이미지로 복원
-  html = html.replace(/src="https:\/\/wsrv\.nl\/[^"]*"(\s*data-full="([^"]+)")/gi, 'src="$2" loading="lazy"');
-  bodyEl.innerHTML = html;
-  neutralizeEmoticonLinks(bodyEl);
+  bodyEl.innerHTML = '<div class="source-panel"><strong>원문을 우선합니다</strong>'
+    + '숲공지는 공지 전체를 재게시하지 않고 일정 탐색에 필요한 제목, 작성 시각, 조회수와 방송 일정만 정리합니다. 전체 내용과 최신 변경 사항은 작성자의 SOOP 공지에서 확인하세요.'
+    + '<br><a href="' + postUrl + '" target="_blank" rel="noopener">SOOP 원문에서 전체 내용 보기</a></div>';
   bodyEl.scrollTop = 0;
 
   // 카드의 라이브 상태를 모달에도 반영
@@ -2053,126 +2059,6 @@ function openDetail(cardEl) {
   document.getElementById('detailBg').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
-async function copyForFmkorea() {
-  const btn = document.getElementById('detailCopyBtn');
-  const originalText = btn.innerHTML;
-  btn.innerHTML = '⏳ 처리 중...';
-  btn.disabled = true;
-
-  try {
-    const notice = prevData.find(r => String(r.title_no) === String(detailTitleNo));
-    if (!notice) throw new Error('공지 데이터를 찾을 수 없습니다');
-    const bjId = notice.bj_id || detailBjId;
-    const name = notice.bj_name || '';
-    const title = notice.title_name || '';
-    const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
-    const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const regDate = formatDate(notice.reg_date);
-    const postUrl = 'https://www.sooplive.com/station/' + bjId + '/post/' + detailTitleNo;
-    const liveUrl = 'https://play.sooplive.com/' + bjId;
-
-    // 본문 복제 후 이미지 data URL 변환
-    const bodyEl = document.getElementById('detailBody');
-    const clone = bodyEl.cloneNode(true);
-
-    // lazy load 이미지 원본 src 복원
-    clone.querySelectorAll('img[data-src]').forEach(img => {
-      img.src = img.dataset.src;
-      img.removeAttribute('data-src');
-    });
-
-    // 이미지 스타일 정리 (data URL 변환 생략 - 클립보드 타임아웃 방지)
-    clone.querySelectorAll('img').forEach(img => {
-      const src = img.src;
-      const alt = img.alt || '';
-      const origW = img.style.width;
-      const attrs = Array.from(img.attributes);
-      attrs.forEach(a => img.removeAttribute(a.name));
-      img.src = src;
-      img.alt = alt;
-      if (origW && origW !== '100%') {
-        img.style.width = origW;
-        img.style.height = 'auto';
-      } else {
-        img.style.width = '100%';
-        img.style.height = 'auto';
-        img.style.maxWidth = '100%';
-      }
-    });
-
-    const bodyHtml = clone.innerHTML;
-
-    // 펨코용 HTML 구성
-    const html = `
-      <div style="margin-bottom:20px;">
-        <h2 style="font-size:24px;font-weight:bold;margin:0;line-height:1.2;">
-          ${pin}<span style="vertical-align:middle;">${escapeHtml(title)}</span>
-        </h2>
-      </div>
-      <table style="border:none;border-collapse:collapse;width:100%;max-width:600px;">
-        <tbody><tr>
-          <td style="vertical-align:middle;">
-            <div style="font-size:16px;font-weight:bold;">${escapeHtml(name)}</div>
-            <div style="font-size:12px;color:#888;">
-              <span>${regDate}</span>
-              <span style="margin:0 4px;">·</span>
-              <span>조회수 ${reads}</span>
-            </div>
-          </td>
-        </tr></tbody>
-      </table>
-      <div style="border-top:1px solid #eee;margin:20px 0;"></div>
-      <div style="font-size:14px;line-height:1.6;">${bodyHtml}</div>
-      <div style="margin-top:24px;padding:20px 0;border-top:2px solid #eee;border-bottom:2px solid #eee;text-align:center;">
-        <a href="${postUrl}" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#6c757d;border:1px solid #6c757d;border-radius:4px;">공지사항 바로가기</a>
-        <a href="${liveUrl}" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#1859E6;border:1px solid #1859E6;border-radius:4px;">생방송 바로가기</a>
-      </div>
-    `;
-
-    // 클립보드 복사 (Clipboard API 우선, 실패 시 execCommand 폴백)
-    let copied = false;
-    if (navigator.clipboard && window.ClipboardItem) {
-      try {
-        const blob = new Blob([html], { type: 'text/html' });
-        await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
-        copied = true;
-      } catch(_) {}
-    }
-    if (!copied) {
-      const tmp = document.createElement('div');
-      tmp.contentEditable = 'true';
-      tmp.innerHTML = html;
-      tmp.style.position = 'fixed';
-      tmp.style.left = '-9999px';
-      document.body.appendChild(tmp);
-      const range = document.createRange();
-      range.selectNodeContents(tmp);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand('copy');
-      sel.removeAllRanges();
-      document.body.removeChild(tmp);
-    }
-
-    btn.innerHTML = '✅ 복사 완료!';
-    btn.style.backgroundColor = '#28a745';
-    setTimeout(() => {
-      btn.innerHTML = originalText;
-      btn.style.backgroundColor = '#1859E6';
-      btn.disabled = false;
-    }, 2000);
-  } catch(e) {
-    console.error('펨코 복사 오류:', e);
-    btn.innerHTML = '❌ 실패';
-    setTimeout(() => {
-      btn.innerHTML = originalText;
-      btn.style.backgroundColor = '#1859E6';
-      btn.disabled = false;
-    }, 2000);
-  }
-}
-
 function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
   document.body.style.overflow = '';
@@ -2193,11 +2079,17 @@ document.getElementById('detailBody').addEventListener('click', function(e) {
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
-  if (card && !e.target.closest('.card-expand-btn') && !e.target.closest('a')) {
+  if (card && !e.target.closest('a')) {
     if (!document.getElementById('detailBg').classList.contains('show')) {
       openDetail(card);
     }
   }
+});
+document.addEventListener('keydown', (e) => {
+  const card = e.target.closest?.('.card');
+  if (!card || e.target.closest('a') || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  openDetail(card);
 });
 document.addEventListener('keydown', (e) => {
   if (!document.getElementById('detailBg').classList.contains('show')) return;
@@ -2237,36 +2129,14 @@ function goPage(dir) {
   const next = currentPage + dir;
   if (next < 0 || next >= totalPages) return;
   currentPage = next;
-
-  // 해당 페이지가 DOM에 없으면 추가
-  const existing = document.querySelector('#container .page[data-page="' + next + '"]');
-  if (!existing) {
-    const scroller = document.getElementById('scroller');
-    const pageH = scroller.clientHeight;
-    const bodyMax = Math.max(60, pageH - 40 - 130);
-    let html = '<div class="page" data-page="' + next + '"><div class="page-inner">';
-    for (const idx of packedPages[next]) {
-      html += buildCardHtml(filteredNotices[idx]);
-    }
-    html += '</div></div>';
-    document.getElementById('container').insertAdjacentHTML('beforeend', html);
-
-    const newPage = document.querySelector('#container .page[data-page="' + next + '"]');
-    newPage.querySelectorAll('.card-body').forEach(body => {
-      if (body.scrollHeight > body.clientHeight + 10) {
-        const btn = body.nextElementSibling;
-        if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
-      }
-    });
-  }
-
+  document.getElementById('container').innerHTML = buildNoticePageHtml(currentPage);
   showCurrentPage();
 }
 
 function showCurrentPage() {
   const pages = document.querySelectorAll('#container .page');
-  pages.forEach((p, i) => {
-    p.classList.toggle('active', i === currentPage);
+  pages.forEach(p => {
+    p.classList.toggle('active', Number(p.dataset.page) === currentPage);
   });
   updateNav();
 }
@@ -2397,13 +2267,6 @@ async function loadAll() {
     const resp = await fetch(API_BASE + "/api/notices");
     const data = await resp.json();
 
-    // 프론트엔드에서 HTML 정화 + 이미지 최적화
-    for (const row of data) {
-      if (row.content_html) {
-        row.content_html = optimizeImages(sanitizeHtml(row.content_html));
-      }
-    }
-
     const isFirstLoad = prevData.length === 0;
     // 데이터 변경 여부 확인 (첫 공지 title_no 비교)
     const changed = isFirstLoad || data.length !== prevData.length ||
@@ -2441,7 +2304,11 @@ let currentTab = 'calendar';
 function switchTab(tab) {
   gtag('event', 'tab_click', { tab_name: tab });
   currentTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    const active = b.dataset.tab === tab;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-selected', String(active));
+  });
 
   document.getElementById('filterBar').style.display = 'none';
   document.getElementById('scroller').style.display = 'none';
@@ -2585,19 +2452,9 @@ async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
     + '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank">LIVE</a>'
     + '</div>'
     + '</div>'
-    + '<div class="wk-modal-body"><div style="text-align:center;padding:30px;color:#999;">로딩 중...</div></div>'
+    + '<div class="wk-modal-body"><div class="source-panel"><strong>숲공지의 일정 추출 결과입니다</strong>전체 공지와 시간 변경 여부는 상단의 SOOP 버튼을 눌러 원문에서 확인하세요.</div></div>'
     + '</div>';
   document.body.appendChild(overlay);
-
-  try {
-    const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
-    const data = await resp.json();
-    overlay.querySelector('.wk-modal-body').innerHTML =
-      optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
-    neutralizeEmoticonLinks(overlay.querySelector('.wk-modal-body'));
-  } catch {
-    overlay.querySelector('.wk-modal-body').innerHTML = '<p style="color:#f66;">로드 실패</p>';
-  }
 }
 
 // ===================== 캘린더 (하루 뷰) =====================
@@ -2713,13 +2570,11 @@ function renderDayCalendar(data) {
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
-      + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
+      + '<div class="cal-notice-body"><div class="source-panel"><strong>정리된 방송 일정</strong>' + escapeHtml(s.description || '방송 예정')
+      + '<br><a href="https://www.sooplive.com/station/' + encodeURIComponent(s.bj_id) + '/post/' + encodeURIComponent(s.title_no) + '" target="_blank" rel="noopener">SOOP 원문 확인</a></div></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
-
-  // 본문 lazy load
-  data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
 
   // 현재 시간 슬롯으로 자동 스크롤
   if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
@@ -2735,7 +2590,7 @@ function renderHotCalendar(data) {
 
   if (!data.slots || data.slots.length === 0) {
     idx.innerHTML = '<div class="cal-empty-day">HOT 공지 없음</div>';
-    content.innerHTML = '<div class="cal-empty-day">조회수 1000 이상 방송 일정이 없습니다</div>';
+    content.innerHTML = '<div class="cal-empty-day">조회수 3000 이상 방송 일정이 없습니다</div>';
     return;
   }
 
@@ -2770,31 +2625,17 @@ function renderHotCalendar(data) {
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:20px;font-weight:700;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
-      + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
+      + '<div class="cal-notice-body"><div class="source-panel"><strong>HOT 공지에서 추출한 방송 일정</strong>' + escapeHtml(s.description || s.title_name || '방송 예정')
+      + '<br><a href="https://www.sooplive.com/station/' + encodeURIComponent(s.bj_id) + '/post/' + encodeURIComponent(s.title_no) + '" target="_blank" rel="noopener">SOOP 원문 확인</a></div></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
-
-  data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
 
   // 현재 시간 슬롯으로 자동 스크롤
   if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
 
   content.addEventListener('scroll', onCalContentScroll);
   setTimeout(checkLiveStatus, 500);
-}
-
-async function loadNoticeBody(titleNo, index) {
-  const bodyEl = document.getElementById('cal-body-' + index);
-  if (!bodyEl) return;
-  try {
-    const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
-    const data = await resp.json();
-    bodyEl.innerHTML = optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
-    neutralizeEmoticonLinks(bodyEl);
-  } catch(e) {
-    bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
-  }
 }
 
 let scrollLock = false;
