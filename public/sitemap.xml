@@ -7,25 +7,25 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://soopnotice.com/guide.html</loc>
+    <loc>https://soopnotice.com/guide</loc>
     <lastmod>2026-07-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://soopnotice.com/about.html</loc>
+    <loc>https://soopnotice.com/about</loc>
     <lastmod>2026-07-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://soopnotice.com/privacy.html</loc>
+    <loc>https://soopnotice.com/privacy</loc>
     <lastmod>2026-07-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://soopnotice.com/terms.html</loc>
+    <loc>https://soopnotice.com/terms</loc>
     <lastmod>2026-07-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
