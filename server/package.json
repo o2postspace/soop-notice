@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
-    "migrate": "node scripts/migrate-data.js"
+    "migrate": "node scripts/migrate-data.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -1,8 +1,18 @@
 const { query, select, upsertSchedule, toMySQLDate, inPlaceholders } = require("../db");
 const { POPULAR_BJ_IDS, BJ_LIST } = require("../lib/bj-list");
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const ALERT_EMAIL = "kck106@naver.com";
+const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 30000;
+const GEMINI_REQUEST_INTERVAL_MS = Number(process.env.GEMINI_REQUEST_INTERVAL_MS) || 7000;
+const PARSE_BATCH_SIZE = Number(process.env.PARSE_BATCH_SIZE) || 180;
+const GEMINI_BATCH_SIZE = Number(process.env.GEMINI_BATCH_SIZE) || 12;
+const GEMINI_BATCH_MAX_IMAGES = Number(process.env.GEMINI_BATCH_MAX_IMAGES) || 7;
+const GEMINI_MAX_IMAGE_BYTES = Number(process.env.GEMINI_MAX_IMAGE_BYTES) || 4000000;
+const GEMINI_BATCH_MAX_IMAGE_BYTES = Number(process.env.GEMINI_BATCH_MAX_IMAGE_BYTES) || 10000000;
+const GEMINI_NOTICE_TEXT_LIMIT = Number(process.env.GEMINI_NOTICE_TEXT_LIMIT) || 2000;
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 async function sendAlert(subject, body) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -11,6 +21,7 @@ async function sendAlert(subject, body) {
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
       body: JSON.stringify({
         from: "SOOP Notice <onboarding@resend.dev>",
         to: ALERT_EMAIL,
@@ -58,11 +69,17 @@ async function fetchImageAsBase64(url) {
     const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!resp.ok) return null;
     const contentType = resp.headers.get("content-type") || "image/jpeg";
+    const contentLength = Number(resp.headers.get("content-length"));
+    if (contentLength > GEMINI_MAX_IMAGE_BYTES) return null;
     const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength > GEMINI_MAX_IMAGE_BYTES) return null;
     return {
-      inlineData: {
-        mimeType: contentType.split(";")[0],
-        data: Buffer.from(buffer).toString("base64"),
+      byteLength: buffer.byteLength,
+      part: {
+        inlineData: {
+          mimeType: contentType.split(";")[0],
+          data: Buffer.from(buffer).toString("base64"),
+        },
       },
     };
   } catch { return null; }
@@ -73,49 +90,75 @@ function hasScheduleKeyword(title, text) {
   return SCHEDULE_KEYWORDS.some(kw => combined.includes(kw));
 }
 
-async function parseWithGemini(noticeText, images, today, apiKey) {
-  if (!apiKey) return [];
+function toKSTDateTime(isoStr, fallbackDate, fallbackTime = "00:00") {
+  const date = new Date(isoStr);
+  if (Number.isNaN(date.getTime())) {
+    return { date: fallbackDate, time: fallbackTime };
+  }
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+  return {
+    date: kst.toISOString().slice(0, 10),
+    time: kst.toISOString().slice(11, 16),
+  };
+}
 
-  const prompt = `SOOP BJ의 공지사항에서 "방송 시작 시간"을 추출해. 공지를 올린 시간이 아니라 실제 방송 시작 시간이야.
-텍스트와 이미지 모두 확인해서 일정을 추출해.
-오늘: ${today}
+function parseGeminiPayload(data) {
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini response has no content");
+  const schedules = JSON.parse(text);
+  if (!Array.isArray(schedules)) throw new Error("Gemini response is not an array");
+  return schedules;
+}
 
-인기BJ 목록: ${POPULAR_NAMES.join(', ')}
+function selectBroadcastSchedules(schedules) {
+  if (!Array.isArray(schedules)) return [];
+  return schedules.filter(schedule => {
+    if (!schedule || typeof schedule !== "object") return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(schedule.date || "")) return false;
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(schedule.start_time || "")) return false;
+    return !Number.isNaN(new Date(`${schedule.date}T${schedule.start_time}:00+09:00`).getTime());
+  }).slice(0, 1);
+}
 
-${noticeText}
+const SCHEDULE_SCHEMA = {
+  type: "object",
+  properties: {
+    date: { type: "string", description: "YYYY-MM-DD" },
+    start_time: { type: "string", description: "HH:MM in KST" },
+    end_time: { type: "string", description: "HH:MM in KST; omit when unknown" },
+    description: { type: "string" },
+    mentioned_bjs: { type: "array", items: { type: "string" } },
+  },
+  required: ["date", "start_time", "description", "mentioned_bjs"],
+};
+const SCHEDULE_ARRAY_SCHEMA = { type: "array", items: SCHEDULE_SCHEMA };
+const BATCH_RESPONSE_SCHEMA = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      title_no: { type: "string" },
+      schedules: SCHEDULE_ARRAY_SCHEMA,
+    },
+    required: ["title_no", "schedules"],
+  },
+};
 
-규칙:
-- date는 반드시 "방송하는 날짜"로 판단:
-  - "오늘", "오방공", "금일" → 작성일
-  - "내일" → 작성일+1일 (단, 작성시간이 00:00~05:59 새벽이면 "내일"은 당일 낮을 의미하므로 작성일 그대로)
-  - "월요일"~"일요일" → 해당 요일의 실제 날짜로 변환
-- 시간은 반드시 "방송 시작 시간"만 추출 (공지 작성 시간 아님!)
-- 본문에 시간이 명시되지 않지만 "시작합니다", "갑니다", "킵니다", "지금", "바로" 등 즉시 시작 표현이 있으면 → start_time은 [작성시간]을 사용
-- 시간 정보가 전혀 없고 즉시 시작도 아니면 start_time: null
-- 상식적으로 시간 판단:
-  - BJ는 보통 낮~밤(12시~24시)에 방송함
-  - 숫자만 있으면 오후로: "6시"→18:00, "7시"→19:00, "5시"→17:00, "1시"→13:00
-  - "자고 6시에 온다" → 자고 일어나서 저녁에 = 18:00
-  - "오전", "아침" 명시된 경우만 AM
-  - "새벽" 명시된 경우만 AM
-- 합방 상대가 인기BJ 목록에 있으면 mentioned_bjs에 이름 추가
-- "좌표" = 해당 BJ 방송으로 가라는 뜻 → 합방
-- "제방" = 제 방송, 그 BJ의 방 → 합방 장소
-- description: 방송 내용 요약 (10~20자)
-- "쉽니다", "휴방", "오프" → 빈 배열 []
-- 방송 일정이 아닌 글(일상, 홍보, 경기결과, 모집) → 빈 배열 []
-
-JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"요약","mentioned_bjs":["이름"]}]`;
-
-  const parts = [{ text: prompt }, ...images];
+async function requestGemini(parts, apiKey, parseResponse = parseGeminiPayload, responseSchema = null) {
+  if (!apiKey) {
+    return { ok: false, reason: "GEMINI_API_KEY missing" };
+  }
 
   try {
     const resp = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
       body: JSON.stringify({
         contents: [{ parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
+        generationConfig: responseSchema
+          ? { temperature: 0.1, responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: responseSchema } } }
+          : { responseMimeType: "application/json", temperature: 0.1 },
       }),
     });
     if (!resp.ok) {
@@ -124,23 +167,86 @@ JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","end_time":null,"description":"
       } else {
         await sendAlert("[SOOP] Gemini API 에러", `Gemini API ${resp.status} 에러\n시간: ${new Date().toISOString()}`);
       }
-      return [];
+      const retryAfter = resp.headers.get("retry-after");
+      let apiMessage = "";
+      try {
+        const errorBody = await resp.json();
+        apiMessage = (errorBody.error?.message || "").split("\n")[0].slice(0, 240);
+      } catch {}
+      return {
+        ok: false,
+        reason: `Gemini ${GEMINI_MODEL} HTTP ${resp.status}${retryAfter ? ` (retry-after: ${retryAfter})` : ""}${apiMessage ? `: ${apiMessage}` : ""}`,
+      };
     }
     const data = await resp.json();
-    return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "[]");
+    return { ok: true, value: parseResponse(data) };
   } catch (e) {
     await sendAlert("[SOOP] parse-hot 에러", `파싱 중 에러\n시간: ${new Date().toISOString()}\n에러: ${e.message}`);
-    return [];
+    return { ok: false, reason: e.message };
+  }
+}
+
+async function parseWithGemini(noticeText, images, today, apiKey) {
+  const prompt = `SOOP BJ 공지에서 실제 방송 시작 시간만 추출해.
+오늘: ${today}
+인기BJ 목록: ${POPULAR_NAMES.join(', ')}
+${noticeText}
+공지 1개당 방송 시작 일정은 최대 1개만 반환하고 합방·연습·대회 시각보다 방송을 켜는 시각을 우선해.
+시간 정보가 없거나 휴방·일상·홍보 글이면 빈 배열을 반환해.
+JSON: [{"date":"YYYY-MM-DD","start_time":"HH:MM","description":"요약","mentioned_bjs":["이름"]}]`;
+  const result = await requestGemini([{ text: prompt }, ...images], apiKey, parseGeminiPayload, SCHEDULE_ARRAY_SCHEMA);
+  return result.ok
+    ? { ok: true, schedules: result.value }
+    : { ok: false, schedules: [], reason: result.reason };
+}
+
+async function parseBatchWithGemini(items, today, apiKey) {
+  const expectedIds = new Set(items.map(item => String(item.notice.title_no)));
+  const parts = [{ text: `SOOP BJ 공지 여러 개에서 각각의 실제 방송 시작 시간만 추출해.
+오늘: ${today}
+인기BJ 목록: ${POPULAR_NAMES.join(', ')}
+
+규칙:
+- 공지별로 독립 분석하고 반드시 입력 title_no를 그대로 반환
+- 공지 1개당 실제 방송 시작 일정은 최대 1개
+- 합방·연습·대회·콘텐츠 시작 시각보다 방송을 켜는 시각을 우선
+- "방송 켭니다", "만나요", "오겠습니다", "뵙겠습니다" 같은 시청자 대상 방송 시작 표현을 우선
+- "오늘"은 작성일, "내일"은 작성일 다음 날. 단 작성시간 00:00~05:59의 "내일"은 작성일 당일 낮
+- 숫자만 있는 시각은 오후로 해석하되 오전·아침·새벽이 명시되면 AM
+- 휴방·일상·홍보·경기결과·모집 글이나 시간 정보가 없는 글은 schedules: []
+- 출력에는 모든 입력 title_no를 한 번씩 포함
+
+JSON: [{"title_no":"입력값","schedules":[{"date":"YYYY-MM-DD","start_time":"HH:MM","description":"요약","mentioned_bjs":["이름"]}]}]` }];
+
+  for (const item of items) {
+    parts.push({ text: `[NOTICE title_no=${item.notice.title_no}]\n[작성일: ${item.noticeDate}] [작성시간: ${item.noticeTime} KST] [BJ: ${item.notice.bj_name}] [제목: ${item.notice.title_name}]\n${item.plainText.slice(0, GEMINI_NOTICE_TEXT_LIMIT)}` });
+    parts.push(...item.imageParts);
+    parts.push({ text: `[END NOTICE title_no=${item.notice.title_no}]` });
+  }
+
+  const result = await requestGemini(parts, apiKey, parseGeminiPayload, BATCH_RESPONSE_SCHEMA);
+  if (!result.ok) return { ok: false, results: new Map(), reason: result.reason };
+
+  try {
+    const results = new Map();
+    for (const row of result.value) {
+      if (!row || typeof row !== "object") throw new Error("Invalid row in Gemini response");
+      const id = String(row.title_no);
+      if (!expectedIds.has(id)) throw new Error(`Unexpected title_no in Gemini response: ${id}`);
+      if (results.has(id)) throw new Error(`Duplicate title_no in Gemini response: ${id}`);
+      if (!Array.isArray(row.schedules)) throw new Error(`Missing schedules array for title_no: ${id}`);
+      results.set(id, row.schedules);
+    }
+    return { ok: true, results };
+  } catch (error) {
+    return { ok: false, results: new Map(), reason: error.message };
   }
 }
 
 async function run() {
   const startTime = Date.now();
   try {
-    const today = new Date().toLocaleDateString("ko-KR", {
-      timeZone: "Asia/Seoul",
-      year: "numeric", month: "2-digit", day: "2-digit",
-    }).replace(/\. /g, "-").replace(".", "");
+    const today = toKSTDateTime(new Date().toISOString()).date;
 
     const threeDaysAgo = toMySQLDate(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
 
@@ -165,113 +271,150 @@ async function run() {
       }
     }
 
-    // 조회수 1000+ 공지 (3일간)
+    // 조회수 3000+이면서 아직 파싱되지 않은 공지 (3일간)
     const notices = await select(
-      `SELECT bj_id, bj_name, title_no, title_name, content_html, reg_date, read_cnt
-       FROM notices WHERE reg_date >= ? AND read_cnt >= 1000
-       ORDER BY reg_date DESC LIMIT 300`,
+      `SELECT n.bj_id, n.bj_name, n.title_no, n.title_name, n.content_html, n.reg_date, n.read_cnt
+       FROM notices n
+       LEFT JOIN (
+         SELECT DISTINCT title_no FROM schedules
+         WHERE raw_text NOT LIKE '합방(%'
+       ) s ON s.title_no = n.title_no
+       WHERE n.reg_date >= ? AND n.read_cnt >= 3000 AND s.title_no IS NULL
+       ORDER BY n.reg_date DESC LIMIT 300`,
       [threeDaysAgo]
     );
 
-    // 이미 파싱된 title_no 스킵
-    const allTitleNos = notices.map(n => n.title_no);
-    let parsedSet = new Set();
-    if (allTitleNos.length > 0) {
-      const existing = await query(
-        `SELECT DISTINCT title_no FROM schedules WHERE title_no IN (${inPlaceholders(allTitleNos)})`,
-        allTitleNos
-      );
-      parsedSet = new Set(existing.map(e => e.title_no));
-    }
-
-    const toParse = notices.filter(n => {
-      if (parsedSet.has(n.title_no)) return false;
+    const candidates = notices.filter(n => {
       const plainText = stripHtml(n.content_html);
-      if (!plainText || plainText.length < 5) return false;
+      if (!`${n.title_name || ""} ${plainText}`.trim()) return false;
       return hasScheduleKeyword(n.title_name, plainText);
     });
+    const toParse = candidates.slice(0, PARSE_BATCH_SIZE);
 
     let totalParsed = 0;
+    let processed = 0;
+    let deferred = 0;
+    let failedReason = null;
 
-    for (const notice of toParse) {
-      const plainText = stripHtml(notice.content_html);
-      const noticeDate = notice.reg_date ? notice.reg_date.slice(0, 10) : today;
-      const noticeTime = notice.reg_date ? notice.reg_date.slice(11, 16) : "00:00";
+    const prepared = toParse.map(notice => {
+      const noticeDateTime = toKSTDateTime(notice.reg_date, today);
+      return {
+        notice,
+        noticeDate: noticeDateTime.date,
+        noticeTime: noticeDateTime.time,
+        plainText: stripHtml(notice.content_html),
+        imageUrls: extractImageUrls(notice.content_html),
+        imageParts: [],
+        imageIncluded: false,
+        imageOmittedByCap: false,
+      };
+    });
 
-      const imageUrls = extractImageUrls(notice.content_html);
-      const imageParts = (await Promise.all(imageUrls.map(fetchImageAsBase64))).filter(Boolean);
+    for (let batchStart = 0; batchStart < prepared.length; batchStart += GEMINI_BATCH_SIZE) {
+      const batch = prepared.slice(batchStart, batchStart + GEMINI_BATCH_SIZE);
+      const imageItems = batch.filter(item => item.imageUrls.length > 0);
+      const images = await Promise.all(imageItems.map(item => fetchImageAsBase64(item.imageUrls[0])));
+      let batchImageBytes = 0;
+      let batchImageCount = 0;
+      imageItems.forEach((item, index) => {
+        const image = images[index];
+        if (image && batchImageCount < GEMINI_BATCH_MAX_IMAGES && batchImageBytes + image.byteLength <= GEMINI_BATCH_MAX_IMAGE_BYTES) {
+          item.imageParts = [image.part];
+          item.imageIncluded = true;
+          batchImageBytes += image.byteLength;
+          batchImageCount++;
+        } else if (image) {
+          item.imageOmittedByCap = true;
+        }
+      });
 
-      const schedules = await parseWithGemini(
-        `[작성일: ${noticeDate}] [작성시간: ${noticeTime} KST] [BJ: ${notice.bj_name}] [제목: ${notice.title_name}] ${plainText}`,
-        imageParts,
-        today,
-        process.env.GEMINI_API_KEY
-      );
-      await new Promise(r => setTimeout(r, 500));
-
-      // 빈 결과 또는 시간 추출 실패 → 파싱결과없음으로 기록 (캘린더에 안 보임, 재시도 방지)
-      const validSchedules = schedules.filter(s => s.date && s.start_time);
-      if (validSchedules.length === 0) {
-        await upsertSchedule({
-          bj_id: notice.bj_id,
-          bj_name: notice.bj_name,
-          title_no: notice.title_no,
-          broadcast_start: noticeDate + "T00:00:00+09:00",
-          description: "",
-          raw_text: "파싱결과없음",
-          parsed_at: new Date().toISOString(),
-        });
-        continue;
+      const result = await parseBatchWithGemini(batch, today, process.env.GEMINI_API_KEY);
+      if (!result.ok) {
+        failedReason = result.reason;
+        console.error(`[parse-hot] API failure; batch paused without marking ${batch.length} notices: ${result.reason}`);
+        break;
       }
 
-      for (const s of validSchedules) {
-        const startStr = `${s.date}T${s.start_time}:00+09:00`;
-        const endStr = s.end_time ? `${s.date}T${s.end_time}:00+09:00` : null;
-
-        await upsertSchedule({
-          bj_id: notice.bj_id,
-          bj_name: notice.bj_name,
-          title_no: notice.title_no,
-          broadcast_start: startStr,
-          broadcast_end: endStr,
-          description: s.description || notice.title_name || "",
-          raw_text: `${notice.title_name}: ${s.start_time}~${s.end_time || "?"}`,
-          parsed_at: new Date().toISOString(),
-        });
-        totalParsed++;
-
-        // 언급된 인기 BJ도 캘린더에 추가
-        for (const bjName of (s.mentioned_bjs || [])) {
-          const bjEntry = Object.entries(BJ_LIST).find(([, v]) => v.name === bjName);
-          if (!bjEntry) continue;
-          if (bjEntry[0] === notice.bj_id) continue;
-
-          const ownNotice = await query(
-            "SELECT title_no FROM notices WHERE bj_id = ? AND reg_date >= ? ORDER BY reg_date DESC LIMIT 1",
-            [bjEntry[0], threeDaysAgo]
-          );
-          const collabTitleNo = ownNotice[0]?.title_no || null;
-          if (!collabTitleNo) continue;
-
-          try {
-            await upsertSchedule({
-              bj_id: bjEntry[0],
-              bj_name: bjName,
-              title_no: collabTitleNo,
-              broadcast_start: startStr,
-              broadcast_end: endStr,
-              description: `${notice.bj_name} 합방: ${s.description || ""}`,
-              raw_text: `합방(${notice.bj_name}): ${s.start_time}~${s.end_time || "?"}`,
-              parsed_at: new Date().toISOString(),
-            });
-            totalParsed++;
-          } catch {}
+      for (const item of batch) {
+        const resultId = String(item.notice.title_no);
+        if (!result.results.has(resultId)) {
+          deferred++;
+          continue;
         }
+
+        const schedules = result.results.get(resultId);
+        const validSchedules = selectBroadcastSchedules(schedules);
+        if (validSchedules.length === 0 && item.imageOmittedByCap) {
+          deferred++;
+          continue;
+        }
+
+        processed++;
+        if (validSchedules.length === 0) {
+          await upsertSchedule({
+            bj_id: item.notice.bj_id,
+            bj_name: item.notice.bj_name,
+            title_no: item.notice.title_no,
+            broadcast_start: item.noticeDate + "T00:00:00+09:00",
+            description: "",
+            raw_text: "파싱결과없음",
+            parsed_at: new Date().toISOString(),
+          });
+          continue;
+        }
+
+        for (const schedule of validSchedules) {
+          const startStr = `${schedule.date}T${schedule.start_time}:00+09:00`;
+          const endStr = schedule.end_time ? `${schedule.date}T${schedule.end_time}:00+09:00` : null;
+
+          await upsertSchedule({
+            bj_id: item.notice.bj_id,
+            bj_name: item.notice.bj_name,
+            title_no: item.notice.title_no,
+            broadcast_start: startStr,
+            broadcast_end: endStr,
+            description: schedule.description || item.notice.title_name || "",
+            raw_text: `${item.notice.title_name}: ${schedule.start_time}~${schedule.end_time || "?"}`,
+            parsed_at: new Date().toISOString(),
+          });
+          totalParsed++;
+
+          for (const bjName of (schedule.mentioned_bjs || [])) {
+            const bjEntry = Object.entries(BJ_LIST).find(([, value]) => value.name === bjName);
+            if (!bjEntry || bjEntry[0] === item.notice.bj_id) continue;
+
+            const ownNotice = await query(
+              "SELECT title_no FROM notices WHERE bj_id = ? AND reg_date >= ? ORDER BY reg_date DESC LIMIT 1",
+              [bjEntry[0], threeDaysAgo]
+            );
+            const collabTitleNo = ownNotice[0]?.title_no || null;
+            if (!collabTitleNo) continue;
+
+            try {
+              await upsertSchedule({
+                bj_id: bjEntry[0],
+                bj_name: bjName,
+                title_no: collabTitleNo,
+                broadcast_start: startStr,
+                broadcast_end: endStr,
+                description: `${item.notice.bj_name} 합방: ${schedule.description || ""}`,
+                raw_text: `합방(${item.notice.bj_name}): ${schedule.start_time}~${schedule.end_time || "?"}`,
+                parsed_at: new Date().toISOString(),
+              });
+              totalParsed++;
+            } catch {}
+          }
+        }
+      }
+
+      if (batchStart + GEMINI_BATCH_SIZE < prepared.length) {
+        await new Promise(resolve => setTimeout(resolve, GEMINI_REQUEST_INTERVAL_MS));
       }
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[parse-hot] ${totalParsed} parsed, ${notices.length} checked, ${toParse.length} filtered, ${parsedSet.size} skipped (${elapsed}s)`);
+    const failure = failedReason ? `, paused=${failedReason}` : "";
+    console.log(`[parse-hot] ${totalParsed} parsed, ${notices.length} checked, ${processed}/${candidates.length} processed, ${deferred} deferred${failure} (${elapsed}s)`);
   } catch (e) {
     console.error("[parse-hot] error:", e.message);
     await sendAlert("[SOOP] parse-hot 에러", `에러: ${e.message}\n시간: ${new Date().toISOString()}`);
@@ -279,3 +422,8 @@ async function run() {
 }
 
 module.exports = run;
+module.exports.parseBatchWithGemini = parseBatchWithGemini;
+module.exports.parseWithGemini = parseWithGemini;
+module.exports.parseGeminiPayload = parseGeminiPayload;
+module.exports.selectBroadcastSchedules = selectBroadcastSchedules;
+module.exports.toKSTDateTime = toKSTDateTime;

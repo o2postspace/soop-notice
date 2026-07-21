@@ -2,17 +2,62 @@ const cron = require("node-cron");
 const fetchNotices = require("./fetch-notices");
 const parseHot = require("./parse-hot");
 
-function start() {
-  // 인기 BJ: 5분마다
-  cron.schedule("*/5 * * * *", () => fetchNotices("popular"));
+function createRunner({
+  fetchNoticesFn = fetchNotices,
+  parseHotFn = parseHot,
+  logger = console,
+} = {}) {
+  const fetchRuns = new Map();
+  let parseRun = null;
 
-  // 나머지 BJ: 30분마다
-  cron.schedule("*/30 * * * *", () => fetchNotices("rest"));
+  function runFetch(mode) {
+    if (fetchRuns.has(mode)) return fetchRuns.get(mode);
 
-  // Gemini 파싱: 5분마다
-  cron.schedule("*/5 * * * *", () => parseHot());
+    const task = Promise.resolve()
+      .then(() => fetchNoticesFn(mode))
+      .catch((error) => {
+        logger.error(`[cron] fetch-notices:${mode} failed:`, error.message);
+      })
+      .finally(() => fetchRuns.delete(mode));
+    fetchRuns.set(mode, task);
+    return task;
+  }
 
-  console.log("[cron] scheduled: fetch-notices(popular/5m, rest/30m), parse-hot(5m)");
+  function runParse() {
+    if (parseRun) return parseRun;
+
+    parseRun = Promise.resolve()
+      .then(() => parseHotFn())
+      .catch((error) => {
+        logger.error("[cron] parse-hot failed:", error.message);
+      })
+      .finally(() => { parseRun = null; });
+    return parseRun;
+  }
+
+  async function runCycle({ includeRest = false } = {}) {
+    const fetchTasks = [runFetch("popular")];
+    if (includeRest) fetchTasks.push(runFetch("rest"));
+    await Promise.all(fetchTasks);
+    await runParse();
+  }
+
+  return { runCycle };
 }
 
-module.exports = { start };
+function start() {
+  const runner = createRunner();
+
+  // 수집이 끝난 뒤 파싱한다. 이전 파싱이 진행 중이면 같은 Promise를 공유해 중복 실행하지 않는다.
+  cron.schedule("*/5 * * * *", () => {
+    const includeRest = new Date().getMinutes() % 30 === 0;
+    void runner.runCycle({ includeRest });
+  });
+
+  // 재기동 직후에도 전체 공지를 먼저 갱신하고 캘린더를 백필한다.
+  void runner.runCycle({ includeRest: true });
+
+  console.log("[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, bootstrap enabled");
+}
+
+module.exports = { start, createRunner };

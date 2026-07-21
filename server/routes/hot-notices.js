@@ -29,7 +29,7 @@ router.get("/", async (req, res) => {
         n.title_name, n.read_cnt, n.reg_date
       FROM schedules s INNER JOIN notices n ON s.title_no = n.title_no
       WHERE s.broadcast_start >= ? AND s.broadcast_start <= ?
-      AND s.raw_text != '파싱결과없음' AND n.read_cnt >= 1000
+      AND s.raw_text != '파싱결과없음' AND n.read_cnt >= 3000
       ORDER BY s.broadcast_start ASC`;
     const rows = await select(sql, [dayStartUTC, dayEndUTC]);
 
