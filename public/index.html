@@ -31,7 +31,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-WWFQ9ZH7');</script>
 <!-- End Google Tag Manager (2) -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9843361612343210" crossorigin="anonymous"></script>
 <meta name="description" content="숲공지(soopnotice) - SOOP(숲) 스트리머들의 공지사항을 한 곳에서 모아보는 대시보드. 실시간 방송 일정, 캘린더, 인기 공지를 확인하세요.">
 <meta name="keywords" content="숲공지, soopnotice, SOOP, 숲, 아프리카TV, 스트리머, 공지사항, 방송일정, 캘린더">
 <meta property="og:title" content="숲공지 - SOOP 스트리머 공지사항 대시보드">
@@ -56,7 +55,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   "operatingSystem": "Any",
   "isAccessibleForFree": true,
   "inLanguage": "ko-KR",
-  "featureList": ["방송 일정 추출", "일간·주간 캘린더", "인기 공지 필터", "스트리머 즐겨찾기", "원문 바로가기"]
+  "featureList": ["방송 일정 추출", "일간·주간 캘린더", "인기 공지 필터", "스트리머 즐겨찾기", "공지 본문 읽기", "원문 바로가기"]
 }
 </script>
 <style>
@@ -229,8 +228,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .cal-notice-bj { color: #e0e0e0; }
   html.dark .cal-notice-desc { color: #666; }
   html.dark .cal-notice-body { color: #b0b0b0; }
-  html.dark .card-source-note, html.dark .source-panel { background: #252525; border-color: #3a3a3a; color: #aaa; }
+  html.dark .card-source-note, html.dark .source-panel, html.dark .notice-body-placeholder { background: #252525; border-color: #3a3a3a; color: #aaa; }
   html.dark .source-panel strong { color: #ddd; }
+  html.dark .notice-body-btn { background: #30303a; color: #b6baff; border-color: #4a4a5a; }
   html.dark .cal-slot { background: #2a2a2a; color: #ccc; }
   html.dark .cal-slot .bj { color: #5B6AED; }
   html.dark .cal-slot .desc { color: #888; }
@@ -470,6 +470,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     font-size: 11px;
     line-height: 1.5;
   }
+  .card-source-note strong { color: #5B6AED; }
   @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } }
 
@@ -763,6 +764,33 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     font-weight: 700;
     text-decoration: none;
   }
+  .notice-body-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 120px;
+    padding: 20px;
+    border: 1px solid #e4e5ee;
+    border-radius: 10px;
+    background: #f8f8fc;
+    color: #777;
+    text-align: center;
+  }
+  .notice-body-btn {
+    padding: 9px 16px;
+    border: 1px solid #d8dafa;
+    border-radius: 8px;
+    background: #fff;
+    color: #5B6AED;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .notice-body-btn:hover { background: #eef0ff; }
+  .notice-body-loading { padding: 30px; color: #999; text-align: center; }
   .detail-body img {
     max-width: 100%;
     height: auto;
@@ -1494,7 +1522,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <section class="site-overview" id="site-overview" aria-labelledby="site-overview-title">
   <div class="site-overview-inner">
     <h2 id="site-overview-title">흩어진 방송 공지를 일정으로 다시 정리합니다</h2>
-    <p class="site-overview-lead">숲공지는 여러 SOOP 스트리머의 공개 공지를 모아 제목만 나열하는 데 그치지 않고, 방송 시작 시각과 날짜를 추출해 일간·주간 캘린더로 재구성하는 비공식 팬 서비스입니다. 사용자는 원문을 하나씩 찾아다니지 않고 오늘 방송 흐름을 먼저 파악한 뒤 원본 공지에서 세부 내용을 확인할 수 있습니다.</p>
+    <p class="site-overview-lead">숲공지는 여러 SOOP 스트리머의 공개 공지를 모아 제목만 나열하는 데 그치지 않고, 방송 시작 시각과 날짜를 추출해 일간·주간 캘린더로 재구성하는 비공식 팬 서비스입니다. 사용자는 오늘 방송 흐름을 먼저 파악하고 필요한 공지 본문을 사이트 안에서 확인한 뒤 원본으로 이동할 수 있습니다.</p>
     <div class="site-overview-grid">
       <article class="site-overview-card">
         <h3>시간 중심 재구성</h3>
@@ -1800,7 +1828,120 @@ function isNew(dateStr) {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  return String(s ?? '').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+const noticeContentCache = new Map();
+
+function sanitizeNoticeHtml(html) {
+  if (!html) return '';
+  const template = document.createElement('template');
+  template.innerHTML = String(html);
+  template.content.querySelectorAll('script,style,iframe,object,embed,form,input,button,textarea,select,option,base,meta,link,svg,math,canvas').forEach(el => el.remove());
+  template.content.querySelectorAll('*').forEach(el => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim();
+      const compactValue = value.replace(/[\u0000-\u0020]/g, '').toLowerCase();
+      const isUrlAttribute = ['href', 'src', 'poster', 'xlink:href', 'action', 'formaction'].includes(name);
+      const unsafeDataUrl = compactValue.startsWith('data:') &&
+        !(el.tagName === 'IMG' && name === 'src' && /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(compactValue));
+
+      if (name.startsWith('on') || ['srcdoc', 'id', 'name', 'autoplay'].includes(name)) {
+        el.removeAttribute(attr.name);
+      } else if (isUrlAttribute && (/^(?:javascript|vbscript):/i.test(compactValue) || unsafeDataUrl)) {
+        el.removeAttribute(attr.name);
+      } else if (name === 'style' && /(?:expression|url\s*\(|@import|position\s*:|z-index\s*:|behavior\s*:|-moz-binding)/i.test(value)) {
+        el.removeAttribute(attr.name);
+      }
+    }
+
+    if (el.tagName === 'A') {
+      el.setAttribute('rel', 'noopener noreferrer');
+    } else if (el.tagName === 'IMG') {
+      el.setAttribute('loading', 'lazy');
+      el.setAttribute('decoding', 'async');
+      el.setAttribute('referrerpolicy', 'no-referrer');
+    }
+  });
+  return template.innerHTML;
+}
+
+function neutralizeEmoticonLinks(container) {
+  container.querySelectorAll('a').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    if (href.includes('ogqmarket.sooplive.com')) {
+      a.removeAttribute('href');
+      a.style.pointerEvents = 'none';
+      a.style.cursor = 'default';
+    }
+  });
+}
+
+async function fetchNoticeContent(titleNo) {
+  const key = String(titleNo);
+  if (!/^\d+$/.test(key)) throw new Error('잘못된 공지 번호입니다');
+  if (noticeContentCache.has(key)) return noticeContentCache.get(key);
+
+  const request = fetch(API_BASE + '/api/notice-content?title_no=' + encodeURIComponent(key))
+    .then(async resp => {
+      if (!resp.ok) throw new Error('본문 API ' + resp.status);
+      const data = await resp.json();
+      return sanitizeNoticeHtml(data.content_html || '');
+    });
+
+  if (noticeContentCache.size >= 100) {
+    noticeContentCache.delete(noticeContentCache.keys().next().value);
+  }
+  noticeContentCache.set(key, request);
+  try {
+    return await request;
+  } catch (error) {
+    noticeContentCache.delete(key);
+    throw error;
+  }
+}
+
+function showNoticeBodyPrompt(target, titleNo, message) {
+  if (!target) return;
+  const key = String(titleNo);
+  target.dataset.noticeTitleNo = key;
+  target.dataset.noticeState = 'idle';
+  target.replaceChildren();
+
+  const panel = document.createElement('div');
+  panel.className = 'notice-body-placeholder';
+  const text = document.createElement('span');
+  text.textContent = message || '필요할 때만 본문을 불러와 서버 사용량을 줄입니다.';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'notice-body-btn';
+  button.textContent = '공지 본문 보기';
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    renderNoticeContent(target, key);
+  });
+  panel.append(text, button);
+  target.append(panel);
+}
+
+async function renderNoticeContent(target, titleNo) {
+  if (!target) return;
+  const key = String(titleNo);
+  target.dataset.noticeTitleNo = key;
+  target.dataset.noticeState = 'loading';
+  target.innerHTML = '<div class="notice-body-loading">공지 본문을 불러오는 중...</div>';
+
+  try {
+    const html = await fetchNoticeContent(key);
+    if (!target.isConnected || target.dataset.noticeTitleNo !== key) return;
+    target.innerHTML = html || '<p style="color:#999">본문이 없습니다.</p>';
+    target.dataset.noticeState = 'loaded';
+    neutralizeEmoticonLinks(target);
+  } catch (error) {
+    if (!target.isConnected || target.dataset.noticeTitleNo !== key) return;
+    showNoticeBodyPrompt(target, key, '본문을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+  }
 }
 
 // 필터
@@ -1912,7 +2053,7 @@ function buildCardHtml(item) {
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
   const reads = (n.read_cnt || n.count?.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return '<article class="card" tabindex="0" aria-label="' + escapeHtml((n.title_name || '') + ' 공지 요약') + '" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
+  return '<article class="card" tabindex="0" aria-label="' + escapeHtml((n.title_name || '') + ' 공지 본문 보기') + '" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + item.bjId.slice(0,2) + '/' + item.bjId + '/' + item.bjId + '.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
     + '<span class="card-name">' + escapeHtml(item.name) + '</span>'
@@ -1926,7 +2067,7 @@ function buildCardHtml(item) {
     + '<span>' + timeAgo(n.reg_date) + '</span>'
     + '<span>조회 ' + reads + '</span>'
     + '</div>'
-    + '<div class="card-source-note">공지 전체 내용과 최신 변경 사항은 SOOP 원문에서 확인합니다.</div>'
+    + '<div class="card-source-note"><strong>본문 보기</strong> 카드를 누르면 공지 내용을 사이트 안에서 확인할 수 있습니다.</div>'
     + '</div>'
     + '</article>';
 }
@@ -2044,10 +2185,8 @@ function openDetail(cardEl) {
   document.getElementById('detailMeta').innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
 
   const bodyEl = document.getElementById('detailBody');
-  bodyEl.innerHTML = '<div class="source-panel"><strong>원문을 우선합니다</strong>'
-    + '숲공지는 공지 전체를 재게시하지 않고 일정 탐색에 필요한 제목, 작성 시각, 조회수와 방송 일정만 정리합니다. 전체 내용과 최신 변경 사항은 작성자의 SOOP 공지에서 확인하세요.'
-    + '<br><a href="' + postUrl + '" target="_blank" rel="noopener">SOOP 원문에서 전체 내용 보기</a></div>';
   bodyEl.scrollTop = 0;
+  renderNoticeContent(bodyEl, titleNo);
 
   // 카드의 라이브 상태를 모달에도 반영
   const cardLive = cardEl.querySelector('.live-link.is-live');
@@ -2438,23 +2577,26 @@ async function loadWeekly() {
 
 async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
   const views = readCnt.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const safeBjId = encodeURIComponent(bjId);
+  const safeTitleNo = encodeURIComponent(titleNo);
   const overlay = document.createElement('div');
   overlay.className = 'wk-modal-overlay';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   overlay.innerHTML = '<div class="wk-modal">'
     + '<button class="wk-modal-close" onclick="this.closest(\'.wk-modal-overlay\').remove()">&times;</button>'
     + '<div class="wk-modal-top">'
-    + '<span class="wk-time">' + timeStr + '</span>'
-    + '<span class="wk-bj">' + bjName + '</span>'
+    + '<span class="wk-time">' + escapeHtml(timeStr) + '</span>'
+    + '<span class="wk-bj">' + escapeHtml(bjName) + '</span>'
     + '<span class="wk-views"><span class="vc-icon">👁</span><span class="vc-text">조회수</span> ' + views + '</span>'
     + '<div class="wk-modal-links">'
-    + '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank">SOOP</a>'
-    + '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank">LIVE</a>'
+    + '<a class="soop-link" href="https://www.sooplive.com/station/' + safeBjId + '/post/' + safeTitleNo + '" target="_blank" rel="noopener">SOOP</a>'
+    + '<a class="live-link" href="https://play.sooplive.com/' + safeBjId + '" target="_blank" rel="noopener">LIVE</a>'
     + '</div>'
     + '</div>'
-    + '<div class="wk-modal-body"><div class="source-panel"><strong>숲공지의 일정 추출 결과입니다</strong>전체 공지와 시간 변경 여부는 상단의 SOOP 버튼을 눌러 원문에서 확인하세요.</div></div>'
+    + '<div class="wk-modal-body"><div class="notice-body-loading">공지 본문을 불러오는 중...</div></div>'
     + '</div>';
   document.body.appendChild(overlay);
+  renderNoticeContent(overlay.querySelector('.wk-modal-body'), titleNo);
 }
 
 // ===================== 캘린더 (하루 뷰) =====================
@@ -2570,11 +2712,13 @@ function renderDayCalendar(data) {
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
-      + '<div class="cal-notice-body"><div class="source-panel"><strong>정리된 방송 일정</strong>' + escapeHtml(s.description || '방송 예정')
-      + '<br><a href="https://www.sooplive.com/station/' + encodeURIComponent(s.bj_id) + '/post/' + encodeURIComponent(s.title_no) + '" target="_blank" rel="noopener">SOOP 원문 확인</a></div></div>'
+      + '<div class="cal-notice-body" id="cal-body-' + i + '"></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
+
+  data.slots.forEach((s, i) => showNoticeBodyPrompt(document.getElementById('cal-body-' + i), s.title_no));
+  renderNoticeContent(document.getElementById('cal-body-' + initIdx), data.slots[initIdx].title_no);
 
   // 현재 시간 슬롯으로 자동 스크롤
   if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
@@ -2625,11 +2769,13 @@ function renderHotCalendar(data) {
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:20px;font-weight:700;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
-      + '<div class="cal-notice-body"><div class="source-panel"><strong>HOT 공지에서 추출한 방송 일정</strong>' + escapeHtml(s.description || s.title_name || '방송 예정')
-      + '<br><a href="https://www.sooplive.com/station/' + encodeURIComponent(s.bj_id) + '/post/' + encodeURIComponent(s.title_no) + '" target="_blank" rel="noopener">SOOP 원문 확인</a></div></div>'
+      + '<div class="cal-notice-body" id="cal-body-' + i + '"></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
+
+  data.slots.forEach((s, i) => showNoticeBodyPrompt(document.getElementById('cal-body-' + i), s.title_no));
+  renderNoticeContent(document.getElementById('cal-body-' + initIdx), data.slots[initIdx].title_no);
 
   // 현재 시간 슬롯으로 자동 스크롤
   if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
@@ -2658,6 +2804,10 @@ function scrollToNotice(index) {
   const el = document.getElementById('cal-notice-' + index);
   if (el && container) {
     container.scrollTop = el.offsetTop - container.offsetTop;
+    const body = el.querySelector('.cal-notice-body');
+    if (body?.dataset.noticeState === 'idle') {
+      renderNoticeContent(body, body.dataset.noticeTitleNo);
+    }
   }
 
   // 인덱스 하이라이트
