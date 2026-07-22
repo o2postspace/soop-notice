@@ -64,7 +64,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     font-family: 'Segoe UI', -apple-system, 'Malgun Gothic', sans-serif;
     background: #f5f5f5;
     color: #222;
-    min-height: 100%;
+    height: 100%;
+    overflow: hidden;
   }
   header {
     background: #fff;
@@ -161,6 +162,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .card-header { border-bottom-color: #333; }
   html.dark .card-title { color: #e0e0e0; }
   html.dark .card-meta { color: #666; }
+  html.dark .card-body { color: #b0b0b0; }
+  html.dark .card-body img { background: #2a2a2a; }
+  html.dark .card-expand-btn { background: #252525; color: #5B6AED; border-top-color: #333; }
+  html.dark .card-expand-btn:hover { background: #303030; }
   html.dark .card-tag { background: #2a2a2a; border-color: #444; color: #a29bfe; }
   html.dark .live-link { background: #444; }
   html.dark .live-link.is-live { background: #e74c3c; }
@@ -178,15 +183,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .tab-btn { color: #666; }
   html.dark .tab-btn:hover { color: #5B6AED; }
   html.dark .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
-  html.dark .tab-link { color: #888; }
-  html.dark .tab-link:hover { color: #a29bfe; }
-  html.dark .service-summary { background: #181818; border-bottom-color: #333; color: #aaa; }
-  html.dark .service-summary strong { color: #ddd; }
-  html.dark .service-summary a { color: #a29bfe; }
-  html.dark .site-overview, html.dark .site-footer { background: #171717; color: #aaa; border-color: #333; }
-  html.dark .site-overview h2, html.dark .site-overview h3 { color: #e0e0e0; }
-  html.dark .site-overview-card { background: #1e1e1e; border-color: #333; }
-  html.dark .site-footer a { color: #bbb; }
   /* 다크모드 모달 */
   html.dark .modal-bg { background: rgba(0,0,0,0.7); }
   html.dark .modal { background: #1e1e1e; border-color: #333; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
@@ -228,7 +224,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .cal-notice-bj { color: #e0e0e0; }
   html.dark .cal-notice-desc { color: #666; }
   html.dark .cal-notice-body { color: #b0b0b0; }
-  html.dark .card-source-note, html.dark .source-panel, html.dark .notice-body-placeholder { background: #252525; border-color: #3a3a3a; color: #aaa; }
+  html.dark .source-panel, html.dark .notice-body-placeholder { background: #252525; border-color: #3a3a3a; color: #aaa; }
   html.dark .source-panel strong { color: #ddd; }
   html.dark .notice-body-btn { background: #30303a; color: #b6baff; border-color: #4a4a5a; }
   html.dark .cal-slot { background: #2a2a2a; color: #ccc; }
@@ -460,17 +456,54 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     display: flex; gap: 10px;
     margin-bottom: 8px;
   }
-  .card-source-note {
-    margin-top: 12px;
-    padding: 9px 11px;
-    border: 1px solid #ececf2;
-    border-radius: 8px;
-    background: #f8f8fc;
-    color: #777;
-    font-size: 11px;
-    line-height: 1.5;
+  /* 현재 페이지의 공지 본문만 불러와 기존 카드형 화면을 유지한다. */
+  .card-body {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #444;
+    overflow: hidden;
+    word-break: break-word;
+    max-height: var(--card-body-max, 150px);
+    position: relative;
+    transition: max-height 0.3s ease;
   }
-  .card-source-note strong { color: #5B6AED; }
+  .card-body.expanded { max-height: none; }
+  .card-body:not(.expanded)::after { display: none; }
+  .card-expand-btn {
+    display: none;
+    width: 100%;
+    padding: 6px 0;
+    border: none;
+    border-top: 1px solid #f0f0f0;
+    background: #f8f8ff;
+    color: #5B6AED;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .card-expand-btn:hover { background: #eef0ff; }
+  .card-expand-btn.visible { display: block; }
+  .card-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 6px 0;
+    display: block;
+    background: #f0f0f0;
+    min-height: 30px;
+    content-visibility: auto;
+  }
+  .card-body img[style*="width:100%"],
+  .card-body img[style*="width: 100%"] {
+    max-height: 250px;
+    object-fit: cover;
+  }
+  .card-body img:last-child { margin-bottom: 0; }
+  .card-body br + br { display: none; }
+  .card-body a { color: #5B6AED; }
+  .card-body iframe, .card-body video { max-width: 100%; border-radius: 6px; margin: 6px 0; }
+  .card-body .notice-body-loading { padding: 18px 0; }
   @media (max-width: 1200px) { .page-inner { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 700px) { .page-inner { grid-template-columns: 1fr; } }
 
@@ -684,11 +717,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .scroll-nav .nav-first { left: 4px; }
     .modal-body { flex-direction: column; }
     .modal-right { width: auto; border-left: none; border-top: 1px solid #eee; padding-left: 0; padding-top: 12px; max-height: 120px; }
-    .service-summary { justify-content: flex-start; padding: 6px 10px; overflow-x: auto; text-align: left; }
-    .site-overview { padding: 36px 18px; }
-    .site-overview h2 { font-size: 22px; }
-    .site-overview-grid { grid-template-columns: 1fr; }
-    .site-footer-inner { align-items: flex-start; flex-direction: column; }
   }
 
   /* 공지 상세보기 모달 */
@@ -842,60 +870,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
   .tab-btn:hover { color: #5B6AED; }
   .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
-  .tab-link {
-    display: inline-flex;
-    align-items: center;
-    padding: 10px 14px;
-    color: #777;
-    font-size: 12px;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .tab-link:hover { color: #5B6AED; }
-  .service-summary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    flex-shrink: 0;
-    padding: 7px 16px;
-    border-bottom: 1px solid #e8e8ec;
-    background: #f8f8fc;
-    color: #666;
-    font-size: 11px;
-    line-height: 1.5;
-    text-align: center;
-  }
-  .service-summary strong { color: #333; }
-  .service-summary a { color: #5B6AED; font-weight: 700; white-space: nowrap; }
-
-  .site-overview {
-    padding: 56px 24px;
-    border-top: 1px solid #e5e5e5;
-    background: #fff;
-  }
-  .site-overview-inner { max-width: 1040px; margin: 0 auto; }
-  .site-overview h2 { margin-bottom: 12px; color: #222; font-size: 26px; }
-  .site-overview-lead { max-width: 760px; color: #555; font-size: 15px; line-height: 1.8; }
-  .site-overview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 26px; }
-  .site-overview-card { padding: 20px; border: 1px solid #e8e8ec; border-radius: 12px; background: #fafafe; }
-  .site-overview-card h3 { margin-bottom: 8px; color: #333; font-size: 15px; }
-  .site-overview-card p { color: #666; font-size: 13px; line-height: 1.7; }
-  .site-overview-note { margin-top: 22px; color: #777; font-size: 12px; line-height: 1.7; }
-  .site-overview-note a { color: #5B6AED; }
-  .site-footer {
-    padding: 22px 24px 28px;
-    border-top: 1px solid #e5e5e5;
-    background: #f7f7f9;
-    color: #777;
-    font-size: 12px;
-  }
-  .site-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1040px; margin: 0 auto; }
-  .site-footer nav { display: flex; flex-wrap: wrap; gap: 14px; }
-  .site-footer a { color: #555; text-decoration: none; }
-  .site-footer a:hover { color: #5B6AED; text-decoration: underline; }
-
   /* 캘린더 */
   #calendarContainer {
     flex: 1;
@@ -1452,13 +1426,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <button class="tab-btn" role="tab" aria-selected="false" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" role="tab" aria-selected="false" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
   <button class="tab-btn" role="tab" aria-selected="false" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
-  <a class="tab-link" href="/guide">이용 안내</a>
   <button class="dark-toggle mobile-dark-toggle" id="darkToggleMobile" type="button" aria-label="다크모드 전환" aria-pressed="false"></button>
-</div>
-
-<div class="service-summary" role="note">
-  <span><strong>숲공지 편집 기준</strong> 공개 공지에서 방송 시각을 추출해 캘린더로 재구성하며, HOT 일정은 조회수 3,000 이상 공지만 표시합니다.</span>
-  <a href="/guide#method">기준과 한계 보기</a>
 </div>
 
 <div class="filter-bar" id="filterBar">
@@ -1518,41 +1486,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div>
 
 </div><!-- app-wrap -->
-
-<section class="site-overview" id="site-overview" aria-labelledby="site-overview-title">
-  <div class="site-overview-inner">
-    <h2 id="site-overview-title">흩어진 방송 공지를 일정으로 다시 정리합니다</h2>
-    <p class="site-overview-lead">숲공지는 여러 SOOP 스트리머의 공개 공지를 모아 제목만 나열하는 데 그치지 않고, 방송 시작 시각과 날짜를 추출해 일간·주간 캘린더로 재구성하는 비공식 팬 서비스입니다. 사용자는 오늘 방송 흐름을 먼저 파악하고 필요한 공지 본문을 사이트 안에서 확인한 뒤 원본으로 이동할 수 있습니다.</p>
-    <div class="site-overview-grid">
-      <article class="site-overview-card">
-        <h3>시간 중심 재구성</h3>
-        <p>공지 작성 순서가 아니라 실제 방송 예정 시각 순서로 정리합니다. 하루 구분은 심야 방송 이용 패턴을 고려해 오전 6시를 기준으로 합니다.</p>
-      </article>
-      <article class="site-overview-card">
-        <h3>명확한 선별 기준</h3>
-        <p>일간·주간 HOT 캘린더는 조회수 3,000 이상인 최근 공지를 대상으로 합니다. 일반 공지의 인기 필터는 조회수 1,000 이상을 사용합니다.</p>
-      </article>
-      <article class="site-overview-card">
-        <h3>원문 우선과 오류 정정</h3>
-        <p>각 항목에서 SOOP 원문으로 이동할 수 있습니다. 자동 추출 특성상 시간이 달라질 수 있으므로 중요한 일정은 원문을 우선하며, 오류는 건의 기능으로 제보받습니다.</p>
-      </article>
-    </div>
-    <p class="site-overview-note">숲공지는 SOOP(주)와 관련이 없는 개인 운영 서비스입니다. 자세한 데이터 처리 방식은 <a href="/guide#method">편집 기준</a>, 운영 주체와 정정 요청은 <a href="/about">사이트 소개</a>에서 확인할 수 있습니다.</p>
-  </div>
-</section>
-
-<footer class="site-footer">
-  <div class="site-footer-inner">
-    <span>© 2026 숲공지 · 비공식 팬 서비스</span>
-    <nav aria-label="사이트 정책 및 안내">
-      <a href="/about">사이트 소개</a>
-      <a href="/guide">이용 안내</a>
-      <a href="/privacy">개인정보처리방침</a>
-      <a href="/terms">이용약관</a>
-      <a href="mailto:soopnotice@gmail.com">문의</a>
-    </nav>
-  </div>
-</footer>
 
 <div class="toast" id="toast"></div>
 
@@ -1616,6 +1549,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="detail-meta" id="detailMeta"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
+    <div class="detail-footer" style="padding:12px 20px 16px;border-top:1px solid #eee;text-align:center;">
+      <button id="detailCopyBtn" type="button" onclick="copyForFmkorea()" style="padding:10px 24px;background:#1859E6;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;">펨코 복사</button>
+    </div>
   </div>
 </div>
 
@@ -2067,7 +2003,8 @@ function buildCardHtml(item) {
     + '<span>' + timeAgo(n.reg_date) + '</span>'
     + '<span>조회 ' + reads + '</span>'
     + '</div>'
-    + '<div class="card-source-note"><strong>본문 보기</strong> 카드를 누르면 공지 내용을 사이트 안에서 확인할 수 있습니다.</div>'
+    + '<div class="card-body" data-notice-title-no="' + n.title_no + '"><div class="notice-body-loading">본문을 불러오는 중...</div></div>'
+    + '<button class="card-expand-btn" type="button" onclick="toggleExpand(event, this)">더보기</button>'
     + '</div>'
     + '</article>';
 }
@@ -2139,8 +2076,36 @@ function buildNoticePageHtml(pageNumber) {
   return html + '</div></div>';
 }
 
+function updateCardExpandButton(body) {
+  if (!body?.isConnected) return;
+  const button = body.nextElementSibling;
+  if (!button?.classList.contains('card-expand-btn')) return;
+  button.classList.toggle('visible', body.classList.contains('expanded') || body.scrollHeight > body.clientHeight + 10);
+}
+
+async function hydrateCardBody(card) {
+  const body = card.querySelector('.card-body');
+  if (!body) return;
+  const titleNo = body.dataset.noticeTitleNo;
+  await renderNoticeContent(body, titleNo);
+  if (!body.isConnected || body.dataset.noticeState !== 'loaded') return;
+  requestAnimationFrame(() => updateCardExpandButton(body));
+  body.querySelectorAll('img').forEach(img => {
+    if (!img.complete) img.addEventListener('load', () => updateCardExpandButton(body), { once: true });
+  });
+}
+
+function renderCurrentNoticePage() {
+  if (totalPages <= 0 || !packedPages[currentPage]) return;
+  const container = document.getElementById('container');
+  container.innerHTML = buildNoticePageHtml(currentPage);
+  container.querySelectorAll('.card').forEach(card => hydrateCardBody(card));
+  showCurrentPage();
+  setTimeout(checkLiveStatus, 100);
+}
+
 // 페이지 단위로 렌더링
-function renderPages(data) {
+function renderPages(data, anchorTitleNo) {
   filteredNotices = getFilteredNotices(data);
   const container = document.getElementById('container');
 
@@ -2154,13 +2119,30 @@ function renderPages(data) {
 
   packedPages = packIntoPages(filteredNotices);
   totalPages = packedPages.length;
-  currentPage = Math.min(currentPage, totalPages - 1);
-  container.innerHTML = buildNoticePageHtml(currentPage);
+  if (anchorTitleNo != null) {
+    const anchorIndex = filteredNotices.findIndex(item => String(item.notice.title_no) === String(anchorTitleNo));
+    const anchorPage = packedPages.findIndex(page => page.includes(anchorIndex));
+    currentPage = anchorPage >= 0 ? anchorPage : Math.min(currentPage, totalPages - 1);
+  } else {
+    currentPage = Math.min(currentPage, totalPages - 1);
+  }
 
-  showCurrentPage();
+  const scroller = document.getElementById('scroller');
+  const bodyMax = Math.max(60, scroller.clientHeight - 170);
+  document.documentElement.style.setProperty('--card-body-max', bodyMax + 'px');
+
+  renderCurrentNoticePage();
   if (currentTab === 'notices') {
     document.getElementById('scrollNav').style.display = 'flex';
   }
+}
+
+function toggleExpand(event, button) {
+  event.stopPropagation();
+  const body = button.previousElementSibling;
+  const expanded = body.classList.toggle('expanded');
+  button.textContent = expanded ? '접기' : '더보기';
+  button.classList.add('visible');
 }
 
 let detailBjId = '', detailTitleNo = '';
@@ -2198,6 +2180,103 @@ function openDetail(cardEl) {
   document.getElementById('detailBg').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
+
+async function copyForFmkorea() {
+  const button = document.getElementById('detailCopyBtn');
+  const originalText = button.textContent;
+  const titleNo = detailTitleNo;
+  button.textContent = '처리 중...';
+  button.disabled = true;
+
+  try {
+    const notice = prevData.find(r => String(r.title_no) === String(titleNo));
+    if (!notice) throw new Error('공지 데이터를 찾을 수 없습니다');
+
+    const body = document.getElementById('detailBody');
+    if (body.dataset.noticeState !== 'loaded') {
+      await renderNoticeContent(body, titleNo);
+    }
+    if (body.dataset.noticeState !== 'loaded' || body.dataset.noticeTitleNo !== String(titleNo)) {
+      throw new Error('본문을 불러오지 못했습니다');
+    }
+
+    const bjId = notice.bj_id || detailBjId;
+    const title = notice.title_name || '';
+    const name = notice.bj_name || '';
+    const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
+    const postUrl = 'https://www.sooplive.com/station/' + encodeURIComponent(bjId) + '/post/' + encodeURIComponent(titleNo);
+    const liveUrl = 'https://play.sooplive.com/' + encodeURIComponent(bjId);
+    const clone = body.cloneNode(true);
+
+    clone.querySelectorAll('img').forEach(img => {
+      const src = img.currentSrc || img.src;
+      const alt = img.alt || '';
+      const originalWidth = img.style.width;
+      Array.from(img.attributes).forEach(attr => img.removeAttribute(attr.name));
+      img.src = src;
+      img.alt = alt;
+      img.style.width = originalWidth && originalWidth !== '100%' ? originalWidth : '100%';
+      img.style.height = 'auto';
+      img.style.maxWidth = '100%';
+    });
+
+    const html = '<div style="margin-bottom:20px;"><h2 style="font-size:24px;font-weight:bold;margin:0;line-height:1.2;">'
+      + pin + '<span style="vertical-align:middle;">' + escapeHtml(title) + '</span></h2></div>'
+      + '<table style="border:none;border-collapse:collapse;width:100%;max-width:600px;"><tbody><tr><td style="vertical-align:middle;">'
+      + '<div style="font-size:16px;font-weight:bold;">' + escapeHtml(name) + '</div>'
+      + '<div style="font-size:12px;color:#888;">' + formatDate(notice.reg_date) + ' · 조회수 ' + reads + '</div>'
+      + '</td></tr></tbody></table><div style="border-top:1px solid #eee;margin:20px 0;"></div>'
+      + '<div style="font-size:14px;line-height:1.6;">' + clone.innerHTML + '</div>'
+      + '<div style="margin-top:24px;padding:20px 0;border-top:2px solid #eee;border-bottom:2px solid #eee;text-align:center;">'
+      + '<a href="' + postUrl + '" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#6c757d;border-radius:4px;">공지사항 바로가기</a>'
+      + '<a href="' + liveUrl + '" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#1859E6;border-radius:4px;">생방송 바로가기</a>'
+      + '</div>';
+
+    let copied = false;
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        const plain = clone.textContent || '';
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' }),
+        })]);
+        copied = true;
+      } catch (_) {}
+    }
+    if (!copied) {
+      const temporary = document.createElement('div');
+      temporary.contentEditable = 'true';
+      temporary.innerHTML = html;
+      temporary.style.position = 'fixed';
+      temporary.style.left = '-9999px';
+      document.body.appendChild(temporary);
+      const range = document.createRange();
+      range.selectNodeContents(temporary);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      copied = document.execCommand('copy');
+      selection.removeAllRanges();
+      temporary.remove();
+    }
+    if (!copied) throw new Error('클립보드 복사에 실패했습니다');
+
+    button.textContent = '복사 완료';
+    button.style.backgroundColor = '#28a745';
+  } catch (error) {
+    console.error('펨코 복사 오류:', error);
+    button.textContent = '복사 실패';
+    button.style.backgroundColor = '#c0392b';
+  } finally {
+    setTimeout(() => {
+      button.textContent = originalText;
+      button.style.backgroundColor = '#1859E6';
+      button.disabled = false;
+    }, 2000);
+  }
+}
+
 function closeDetail() {
   document.getElementById('detailBg').classList.remove('show');
   document.body.style.overflow = '';
@@ -2218,7 +2297,7 @@ document.getElementById('detailBody').addEventListener('click', function(e) {
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
-  if (card && !e.target.closest('a')) {
+  if (card && !e.target.closest('a') && !e.target.closest('.card-expand-btn')) {
     if (!document.getElementById('detailBg').classList.contains('show')) {
       openDetail(card);
     }
@@ -2226,7 +2305,7 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   const card = e.target.closest?.('.card');
-  if (!card || e.target.closest('a') || (e.key !== 'Enter' && e.key !== ' ')) return;
+  if (!card || e.target.closest('a') || e.target.closest('.card-expand-btn') || (e.key !== 'Enter' && e.key !== ' ')) return;
   e.preventDefault();
   openDetail(card);
 });
@@ -2253,8 +2332,9 @@ function onSearch() {
 }
 
 function goToTop() {
+  if (totalPages <= 0) return;
   currentPage = 0;
-  showCurrentPage();
+  renderCurrentNoticePage();
   const activePage = document.querySelector('#container .page.active');
   if (activePage) activePage.scrollTop = 0;
 }
@@ -2268,8 +2348,7 @@ function goPage(dir) {
   const next = currentPage + dir;
   if (next < 0 || next >= totalPages) return;
   currentPage = next;
-  document.getElementById('container').innerHTML = buildNoticePageHtml(currentPage);
-  showCurrentPage();
+  renderCurrentNoticePage();
 }
 
 function showCurrentPage() {
@@ -2311,6 +2390,7 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
+  if (currentTab !== 'notices' || totalPages <= 0) return;
 
   if (e.key === 'ArrowRight' || e.key === 'j' || e.key === 'PageDown') {
     e.preventDefault();
@@ -2321,11 +2401,11 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'Home') {
     e.preventDefault();
     currentPage = 0;
-    showCurrentPage();
+    renderCurrentNoticePage();
   } else if (e.key === 'End') {
     e.preventDefault();
     currentPage = totalPages - 1;
-    showCurrentPage();
+    renderCurrentNoticePage();
   }
 });
 
@@ -2336,12 +2416,13 @@ window.addEventListener('keydown', (e) => {
     if (currentTab !== 'notices') return;
     if (document.getElementById('modalBg').classList.contains('show')) return;
     if (document.getElementById('detailBg').classList.contains('show')) return;
+    e.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
     if (e.deltaY > 0) goPage(1);
     else if (e.deltaY < 0) goPage(-1);
     setTimeout(function() { wheelLock = false; }, 400);
-  }, { passive: true });
+  }, { passive: false });
 })();
 
 // 터치 좌우 스와이프로 페이지/캘린더 전환 (모바일)
@@ -2374,11 +2455,18 @@ window.addEventListener('keydown', (e) => {
   }, { passive: true });
 })();
 
-// 리사이즈 시 페이지 재구성
+function getCurrentNoticeAnchor() {
+  const firstIndex = packedPages[currentPage]?.[0];
+  return firstIndex == null ? null : filteredNotices[firstIndex]?.notice?.title_no;
+}
+
+// 화면 폭이 바뀌어 카드 수가 달라져도 현재 보고 있던 첫 공지를 유지한다.
+let resizeTimer = null;
 window.addEventListener('resize', () => {
-  if (Object.keys(prevData).length > 0) {
-    renderPages(prevData);
-  }
+  if (currentTab !== 'notices' || prevData.length === 0) return;
+  const anchorTitleNo = getCurrentNoticeAnchor();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => renderPages(prevData, anchorTitleNo), 120);
 });
 
 // API 응답에서 BJ_LIST를 동적으로 구축
@@ -2412,7 +2500,7 @@ async function loadAll() {
       (data[0]?.title_no !== prevData[0]?.title_no);
     prevData = data;
     if (isFirstLoad) currentPage = 0;
-    if (changed) renderPages(data);
+    if (changed && currentTab === 'notices') renderPages(data);
 
     document.getElementById("lastUpdate").textContent =
       new Date().toLocaleTimeString("ko-KR");
@@ -2798,6 +2886,22 @@ function calNavPrev() {
   if (prevIdx >= 0 && document.querySelector('.cal-index-item[data-idx="' + prevIdx + '"]')) scrollToNotice(prevIdx);
 }
 
+function keepCalendarIndexVisible(item, behavior) {
+  const index = document.getElementById('calIndex');
+  if (!item || !index) return;
+  const indexRect = index.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  let left = 0;
+  let top = 0;
+
+  if (itemRect.left < indexRect.left) left = itemRect.left - indexRect.left;
+  else if (itemRect.right > indexRect.right) left = itemRect.right - indexRect.right;
+  if (itemRect.top < indexRect.top) top = itemRect.top - indexRect.top;
+  else if (itemRect.bottom > indexRect.bottom) top = itemRect.bottom - indexRect.bottom;
+
+  if (left || top) index.scrollBy({ left, top, behavior: behavior || 'auto' });
+}
+
 function scrollToNotice(index) {
   scrollLock = true;
   const container = document.getElementById('calContent');
@@ -2815,7 +2919,7 @@ function scrollToNotice(index) {
   const idxItem = document.querySelector('.cal-index-item[data-idx="' + index + '"]');
   if (idxItem) {
     idxItem.classList.add('active');
-    idxItem.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
+    keepCalendarIndexVisible(idxItem, 'auto');
   }
   setTimeout(() => { scrollLock = false; }, 300);
 }
@@ -2840,8 +2944,12 @@ function onCalContentScroll() {
   document.querySelectorAll('.cal-index-item').forEach((item, i) => {
     item.classList.toggle('active', i === activeIdx);
   });
+  const activeBody = notices[activeIdx]?.querySelector('.cal-notice-body');
+  if (activeBody?.dataset.noticeState === 'idle') {
+    renderNoticeContent(activeBody, activeBody.dataset.noticeTitleNo);
+  }
   const activeItem = document.querySelector('.cal-index-item[data-idx="' + activeIdx + '"]');
-  if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  keepCalendarIndexVisible(activeItem, 'smooth');
 }
 
 // ===================== 건의사항 =====================
