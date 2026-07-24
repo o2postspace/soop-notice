@@ -2071,6 +2071,7 @@ function openDetail(cardEl) {
 
   document.getElementById('detailBg').classList.add('show');
   document.body.style.overflow = 'hidden';
+  scheduleLiveStatusCheck();
 }
 async function copyForFmkorea() {
   const btn = document.getElementById('detailCopyBtn');
@@ -2288,6 +2289,7 @@ function showCurrentPage() {
     p.classList.toggle('active', i === currentPage);
   });
   updateNav();
+  if (currentTab === 'notices') scheduleLiveStatusCheck();
 }
 
 function updateNav() {
@@ -2586,6 +2588,7 @@ async function loadWeekly() {
       container.scrollTo({ left: container.children[todayIdx].offsetLeft - container.offsetLeft, behavior: 'instant' });
     });
   }
+  scheduleLiveStatusCheck();
 }
 
 async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
@@ -2601,12 +2604,13 @@ async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
     + '<span class="wk-views"><span class="vc-icon">👁</span><span class="vc-text">조회수</span> ' + views + '</span>'
     + '<div class="wk-modal-links">'
     + '<a class="soop-link" href="https://www.sooplive.com/station/' + bjId + '/post/' + titleNo + '" target="_blank">SOOP</a>'
-    + '<a class="live-link" href="https://play.sooplive.com/' + bjId + '" target="_blank">LIVE</a>'
+    + '<a class="live-link" data-bjid="' + bjId + '" href="https://play.sooplive.com/' + bjId + '" target="_blank">LIVE</a>'
     + '</div>'
     + '</div>'
     + '<div class="wk-modal-body"><div style="text-align:center;padding:30px;color:#999;">로딩 중...</div></div>'
     + '</div>';
   document.body.appendChild(overlay);
+  scheduleLiveStatusCheck();
 
   try {
     const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
@@ -2932,11 +2936,38 @@ async function loadUpdates() {
 
 // ===================== 라이브 체크 =====================
 const POPULAR_IDS = ['y1026','devil0108','khm11903','phonics1','rrvv17','yuambo','lshooooo','wnnw','joey1114'];
+let liveStatusTimer = null;
+
+function getCurrentLiveLinks() {
+  const links = new Set();
+  const addLinks = selector => {
+    document.querySelectorAll(selector).forEach(link => links.add(link));
+  };
+
+  if (currentTab === 'notices') {
+    addLinks('#container .page.active .live-link[data-bjid]');
+  } else if (currentTab === 'calendar') {
+    addLinks('#calendarContainer .live-link[data-bjid]');
+  } else if (currentTab === 'weekly') {
+    addLinks('#weeklyContainer .live-link[data-bjid]');
+  }
+
+  // 현재 열린 상세/주간 모달은 탭과 별도로 갱신한다.
+  addLinks('#detailBg.show .live-link[data-bjid]');
+  addLinks('.wk-modal-overlay .live-link[data-bjid]');
+  return [...links];
+}
+
+function scheduleLiveStatusCheck(delay) {
+  clearTimeout(liveStatusTimer);
+  liveStatusTimer = setTimeout(checkLiveStatus, delay || 0);
+}
 
 async function checkLiveStatus() {
-  const liveLinks = document.querySelectorAll('.live-link[data-bjid]');
+  if (document.hidden) return;
+  const liveLinks = getCurrentLiveLinks();
   if (liveLinks.length === 0) return;
-  const allIds = [...new Set([...liveLinks].map(el => el.dataset.bjid))];
+  const allIds = [...new Set(liveLinks.map(el => el.dataset.bjid).filter(Boolean))];
   const popular = allIds.filter(id => POPULAR_IDS.includes(id));
   const others = allIds.filter(id => !POPULAR_IDS.includes(id));
 
@@ -2946,24 +2977,30 @@ async function checkLiveStatus() {
     });
   }
 
-  // 인기 BJ 먼저 빠르게
-  if (popular.length > 0) {
-    try {
-      const resp = await fetch(API_BASE + '/api/live-check?ids=' + popular.join(','));
-      applyResults(await resp.json());
-    } catch(e) {}
+  async function checkBatch(ids) {
+    const resp = await fetch(API_BASE + '/api/live-check?ids=' + encodeURIComponent(ids.join(',')));
+    if (!resp.ok) throw new Error('LIVE 상태 확인 실패');
+    applyResults(await resp.json());
   }
-  // 나머지 백그라운드
-  if (others.length > 0) {
+
+  // 인기 BJ를 먼저 확인하고, API 상한에 맞춰 나머지를 나눈다.
+  const batches = [];
+  if (popular.length > 0) batches.push(popular);
+  for (let i = 0; i < others.length; i += 50) {
+    batches.push(others.slice(i, i + 50));
+  }
+  for (const batch of batches) {
     try {
-      const resp = await fetch(API_BASE + '/api/live-check?ids=' + others.join(','));
-      applyResults(await resp.json());
+      await checkBatch(batch);
     } catch(e) {}
   }
 }
 
 // 30초마다 라이브 체크
 setInterval(checkLiveStatus, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) scheduleLiveStatusCheck();
+});
 
 loadAll();
 switchTab('calendar');

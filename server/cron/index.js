@@ -47,9 +47,11 @@ function createRunner({
 
 function start() {
   const runner = createRunner();
+  let stopped = false;
 
   // 수집이 끝난 뒤 파싱한다. 이전 파싱이 진행 중이면 같은 Promise를 공유해 중복 실행하지 않는다.
-  cron.schedule("*/5 * * * *", () => {
+  const scheduledTask = cron.schedule("*/5 * * * *", () => {
+    if (stopped) return;
     const includeRest = new Date().getMinutes() % 30 === 0;
     void runner.runCycle({ includeRest });
   });
@@ -58,6 +60,13 @@ function start() {
   void runner.runCycle({ includeRest: true });
 
   console.log("[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, bootstrap enabled");
+
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    scheduledTask.stop();
+    if (typeof scheduledTask.destroy === "function") scheduledTask.destroy();
+  };
 }
 
 module.exports = { start, createRunner };
