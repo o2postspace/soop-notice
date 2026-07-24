@@ -21,11 +21,12 @@ const DEFAULT_OPTIONS = Object.freeze({
   scaleDownActiveRequestsPerWorker: 4,
   scaleUpLagMs: 80,
   criticalLagMs: 250,
-  scaleDownLagMs: 60,
+  scaleDownLagMs: 30,
   scaleUpCooldownMs: 2_000,
   scaleDownQuietMs: 60_000,
   crashRestartDelayMs: 500,
   gracefulShutdownMs: 15_000,
+  debugMetrics: false,
 });
 
 const POSITIVE_OPTION_NAMES = [
@@ -227,13 +228,24 @@ function decideWorkerCount(state, overrides = {}) {
     };
   }
 
-  // 표본이 빠졌거나 event loop가 아직 바쁘면 worker를 줄이지 않는다.
-  if (!telemetryComplete || eventLoopLagMs > options.scaleDownLagMs) {
+  // 표본이 빠지면 안전하게 축소 타이머를 취소한다.
+  if (!telemetryComplete) {
     return {
       action: "hold",
       targetWorkers: currentWorkers,
       underloadSince: null,
-      reasons: [!telemetryComplete ? "incomplete-telemetry" : "event-loop-not-quiet"],
+      reasons: ["incomplete-telemetry"],
+    };
+  }
+
+  // 간헐적인 JSON 직렬화/GC 지연 때문에 지속 저부하 시간이 매번 초기화되지 않게
+  // 현재 표본에서만 축소를 보류한다. 확장 판단에는 위의 lag 기준이 그대로 적용된다.
+  if (eventLoopLagMs > options.scaleDownLagMs) {
+    return {
+      action: "hold",
+      targetWorkers: currentWorkers,
+      underloadSince: previousUnderloadSince,
+      reasons: ["event-loop-not-quiet"],
     };
   }
 
@@ -583,6 +595,19 @@ function startPrimaryRuntime({ startPrimary, options, logger }) {
       underloadSince,
     }, options);
     underloadSince = decision.underloadSince;
+
+    if (options.debugMetrics) {
+      const quietForMs = underloadSince === null ? 0 : Math.max(0, now - underloadSince);
+      logger.log(
+        `[adaptive-cluster] metrics workers=${workers.length}`
+        + ` fresh=${metrics.freshWorkers}/${workers.length}`
+        + ` rps=${metrics.requestsPerSecond.toFixed(1)}`
+        + ` active=${metrics.activeRequests.toFixed(0)}`
+        + ` lag=${metrics.eventLoopLagMs.toFixed(1)}ms`
+        + ` action=${decision.action} target=${decision.targetWorkers}`
+        + ` quiet=${quietForMs}ms reasons=${decision.reasons.join(",")}`,
+      );
+    }
 
     if (decision.action === "scale-up") {
       desiredWorkers = decision.targetWorkers;

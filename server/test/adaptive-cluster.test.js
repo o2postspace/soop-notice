@@ -123,6 +123,20 @@ test("부하가 돌아오거나 telemetry가 끊기면 축소 타이머를 취�
   assert.ok(missing.reasons.includes("incomplete-telemetry"));
 });
 
+test("간헐적인 event-loop 지연은 쌓인 저부하 시간을 초기화하지 않는다", () => {
+  const decision = decide({
+    currentWorkers: 8,
+    eventLoopLagMs: 50,
+    now: 100_000,
+    underloadSince: 50_000,
+  });
+
+  assert.equal(decision.action, "hold");
+  assert.equal(decision.targetWorkers, 8);
+  assert.equal(decision.underloadSince, 50_000);
+  assert.ok(decision.reasons.includes("event-loop-not-quiet"));
+});
+
 test("telemetry가 끊긴 worker가 있으면 여유 worker를 하나 보강한다", () => {
   const decision = decide({
     currentWorkers: 3,
