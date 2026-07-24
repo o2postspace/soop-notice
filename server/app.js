@@ -55,7 +55,7 @@ function start() {
     scaleDownActiveRequestsPerWorker: positiveNumber("ADAPTIVE_SCALE_DOWN_ACTIVE", 4),
     scaleUpLagMs: positiveNumber("ADAPTIVE_SCALE_UP_LAG_MS", 80),
     criticalLagMs: positiveNumber("ADAPTIVE_CRITICAL_LAG_MS", 250),
-    scaleDownLagMs: positiveNumber("ADAPTIVE_SCALE_DOWN_LAG_MS", 30),
+    scaleDownLagMs: positiveNumber("ADAPTIVE_SCALE_DOWN_LAG_MS", 60),
     scaleUpCooldownMs: nonNegativeNumber("ADAPTIVE_SCALE_UP_COOLDOWN_MS", 2_000),
     scaleDownQuietMs: positiveNumber("ADAPTIVE_SCALE_DOWN_QUIET_MS", 60_000),
     sampleIntervalMs: positiveNumber("ADAPTIVE_SAMPLE_INTERVAL_MS", 1_000),

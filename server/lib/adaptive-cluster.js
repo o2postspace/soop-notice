@@ -21,7 +21,7 @@ const DEFAULT_OPTIONS = Object.freeze({
   scaleDownActiveRequestsPerWorker: 4,
   scaleUpLagMs: 80,
   criticalLagMs: 250,
-  scaleDownLagMs: 30,
+  scaleDownLagMs: 60,
   scaleUpCooldownMs: 2_000,
   scaleDownQuietMs: 60_000,
   crashRestartDelayMs: 500,
