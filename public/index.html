@@ -834,7 +834,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
   .samguk-title {
     font-size: 20px;
@@ -872,6 +872,27 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     text-decoration: none;
   }
   .samguk-sheet-link:hover { border-color: #5B6AED; color: #5B6AED; }
+  .samguk-subtabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .samguk-subtab {
+    padding: 8px 20px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #999;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .samguk-subtab:hover { color: #5B6AED; }
+  .samguk-subtab.active { color: #5B6AED; border-bottom-color: #5B6AED; }
   .samguk-filterbar {
     display: flex;
     align-items: center;
@@ -891,112 +912,281 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
   .samguk-filter-btn:hover { border-color: #5B6AED; color: #5B6AED; }
   .samguk-filter-btn.active { background: #5B6AED; border-color: #5B6AED; color: #fff; }
+  .samguk-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
   .samguk-nation {
     background: #fff;
-    border-radius: 12px;
+    border-radius: 14px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    margin-bottom: 14px;
     overflow: hidden;
   }
   .samguk-nation-header {
     display: flex;
     align-items: center;
-    gap: 9px;
-    padding: 11px 14px;
+    gap: 10px;
+    padding: 13px 16px;
     border-bottom: 1px solid #eee;
   }
   .samguk-nation-name {
     color: #fff;
-    border-radius: 5px;
-    padding: 3px 10px;
-    font-size: 12px;
+    border-radius: 7px;
+    padding: 4px 12px;
+    font-size: 14px;
     font-weight: 800;
   }
   .samguk-nation-count { color: #999; font-size: 11px; }
-  .samguk-table-wrap { overflow-x: auto; }
-  .samguk-table {
-    width: 100%;
-    min-width: 1280px;
-    border-collapse: collapse;
+  .samguk-nation-summary {
+    margin-left: auto;
+    color: #5B6AED;
     font-size: 11px;
-  }
-  .samguk-table th {
-    background: #fafafa;
-    color: #888;
-    padding: 7px 8px;
-    border-bottom: 1px solid #eee;
-    text-align: center;
-    white-space: nowrap;
     font-weight: 700;
   }
-  .samguk-table td {
-    color: #444;
-    padding: 7px 8px;
-    border-bottom: 1px solid #f1f1f1;
-    text-align: center;
-    white-space: nowrap;
+  .samguk-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    gap: 9px;
+    padding: 14px;
   }
-  .samguk-table tr:last-child td { border-bottom: none; }
-  .samguk-table tbody tr:hover { background: #fafbff; }
-  .samguk-member-cell {
+  .samguk-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    text-align: left;
-    min-width: 126px;
+    gap: 6px;
+    padding: 12px 9px 10px;
+    border-radius: 10px;
+    background: #f8f8ff;
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    position: relative;
+    min-width: 0;
   }
-  .samguk-profile {
-    width: 30px;
-    height: 30px;
+  .samguk-card:hover {
+    background: #eef0ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .samguk-card-profile {
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     object-fit: cover;
     background: #eee;
     flex-shrink: 0;
   }
-  .samguk-member-link {
+  .samguk-card-name {
     color: #333;
+    font-size: 13px;
     font-weight: 700;
+    text-align: center;
     text-decoration: none;
   }
-  .samguk-member-link:hover { color: #5B6AED; }
-  .samguk-job {
+  .samguk-card-name:hover { color: #5B6AED; }
+  .samguk-card-crew {
+    color: #999;
+    font-size: 9px;
+    line-height: 1;
+  }
+  .samguk-card-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 19px;
+  }
+  .samguk-job,
+  .samguk-level {
     display: inline-block;
-    border-radius: 9px;
-    background: #eef0ff;
-    color: #5B6AED;
-    padding: 2px 7px;
-    font-size: 10px;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 9px;
     font-weight: 700;
+  }
+  .samguk-job { color: #fff; }
+  .samguk-level { background: #eef0ff; color: #5B6AED; }
+  .samguk-horse {
+    width: 100%;
+    min-height: 21px;
+    border-radius: 5px;
+    background: #f0f1f8;
+    color: #777;
+    padding: 3px 6px;
+    font-size: 9px;
+    text-align: center;
+  }
+  .samguk-equips {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+  }
+  .samguk-equip {
+    border-radius: 4px;
+    padding: 3px 4px;
+    font-size: 8px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .samguk-equip-weapon { color: #e67e22; background: #fef3e2; }
+  .samguk-equip-helmet { color: #2980b9; background: #ebf5fb; }
+  .samguk-equip-armor { color: #27ae60; background: #eafaf1; }
+  .samguk-equip-shoes { color: #8e44ad; background: #f4ecf7; }
+  .samguk-stats {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    padding-top: 2px;
+  }
+  .samguk-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    border-radius: 4px;
+    background: #fff;
+    padding: 3px 1px;
+  }
+  .samguk-stat-label { color: #aaa; font-size: 7px; }
+  .samguk-stat-value { color: #555; font-size: 9px; font-weight: 800; }
+  .samguk-card-btns {
+    display: flex;
+    gap: 4px;
+    margin-top: 1px;
   }
   .samguk-empty-value { color: #ccc; }
   .samguk-soop-link {
     display: inline-block;
-    border-radius: 5px;
+    border-radius: 10px;
     background: #5B6AED;
     color: #fff;
-    padding: 3px 8px;
-    font-size: 10px;
+    padding: 3px 10px;
+    font-size: 9px;
     font-weight: 700;
     text-decoration: none;
   }
   .samguk-soop-link:hover { background: #4a58d4; }
+  .samguk-live-link { background: #bbb; }
+  .samguk-live-link:hover { background: #999; }
+
+  /* 삼국지 무력랭킹 */
+  .samguk-ranking {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .samguk-ranking-guide {
+    color: #999;
+    font-size: 11px;
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .samguk-ranking-section {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .samguk-ranking-header {
+    color: #333;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 14px 18px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .samguk-ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .samguk-ranking-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .samguk-ranking-table th {
+    color: #999;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .samguk-ranking-table td {
+    color: #333;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-bottom: 1px solid #f8f8f8;
+  }
+  .samguk-ranking-table tr:hover { background: #f8f8ff; }
+  .samguk-rank-num {
+    width: 34px;
+    color: #5B6AED;
+    font-weight: 800;
+    text-align: center;
+  }
+  .samguk-rank-1 { color: #e67e22; font-size: 14px; }
+  .samguk-rank-2 { color: #95a5a6; font-size: 13px; }
+  .samguk-rank-3 { color: #cd6133; font-size: 13px; }
+  .samguk-rank-profile {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+    margin-right: 6px;
+    background: #eee;
+  }
+  .samguk-rank-badge {
+    display: inline-block;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .samguk-ranking-empty {
+    color: #aaa;
+    font-size: 12px;
+    text-align: center;
+    padding: 42px 16px;
+  }
   html.dark .samguk-title { color: #e0e0e0; }
   html.dark .samguk-subtitle { color: #777; }
   html.dark .samguk-sync-badge { background: #25263a; border-color: #3e4268; color: #8e98ff; }
   html.dark .samguk-sheet-link,
   html.dark .samguk-filter-btn { background: #1e1e1e; border-color: #444; color: #999; }
   html.dark .samguk-filter-btn.active { background: #5B6AED; border-color: #5B6AED; color: #fff; }
+  html.dark .samguk-subtabs { border-bottom-color: #333; }
+  html.dark .samguk-subtab { color: #666; }
+  html.dark .samguk-subtab:hover,
+  html.dark .samguk-subtab.active { color: #8e98ff; }
   html.dark .samguk-nation { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
-  html.dark .samguk-nation-header,
-  html.dark .samguk-table th,
-  html.dark .samguk-table td { border-color: #333; }
-  html.dark .samguk-table th { background: #191919; color: #777; }
-  html.dark .samguk-table td { color: #bbb; }
-  html.dark .samguk-table tbody tr:hover { background: #252525; }
-  html.dark .samguk-member-link { color: #ddd; }
-  html.dark .samguk-member-link:hover { color: #8e98ff; }
-  html.dark .samguk-profile { background: #333; }
-  html.dark .samguk-job { background: #292b42; color: #8e98ff; }
+  html.dark .samguk-nation-header { border-bottom-color: #333; }
+  html.dark .samguk-card { background: #252525; }
+  html.dark .samguk-card:hover { background: #2a2a2a; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  html.dark .samguk-card-profile,
+  html.dark .samguk-rank-profile { background: #333; }
+  html.dark .samguk-card-name { color: #ddd; }
+  html.dark .samguk-card-name:hover { color: #8e98ff; }
+  html.dark .samguk-level { background: #2a2a3a; color: #8e98ff; }
+  html.dark .samguk-horse { background: #303030; color: #999; }
+  html.dark .samguk-equip-weapon { color: #f0a050; background: #3a2a1a; }
+  html.dark .samguk-equip-helmet { color: #5dade2; background: #1a2a3a; }
+  html.dark .samguk-equip-armor { color: #58d68d; background: #1a3a2a; }
+  html.dark .samguk-equip-shoes { color: #bb8fce; background: #2a1a3a; }
+  html.dark .samguk-stat { background: #202020; }
+  html.dark .samguk-stat-value { color: #bbb; }
+  html.dark .samguk-ranking-section { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .samguk-ranking-header,
+  html.dark .samguk-ranking-table th,
+  html.dark .samguk-ranking-table td { border-color: #333; }
+  html.dark .samguk-ranking-header,
+  html.dark .samguk-ranking-table td { color: #ddd; }
+  html.dark .samguk-ranking-table th { color: #666; }
+  html.dark .samguk-ranking-table tr:hover { background: #252530; }
   html.dark .samguk-empty-value { color: #555; }
 
   /* 캘린더 */
@@ -1511,7 +1701,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .samguk-head { flex-direction: column; gap: 9px; }
     .samguk-title { font-size: 17px; }
     .samguk-actions { width: 100%; }
-    .samguk-table { min-width: 1180px; }
+    .samguk-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 8px; }
+    .samguk-card { padding: 10px 6px 8px; }
+    .samguk-card-profile { width: 40px; height: 40px; }
+    .samguk-card-name { font-size: 11px; }
+    .samguk-nation-header { padding: 10px; }
+    .samguk-nation-name { font-size: 12px; }
+    .samguk-ranking-table { min-width: 520px; }
+    .samguk-ranking-table th, .samguk-ranking-table td { padding: 5px 7px; font-size: 10px; }
+    .samguk-ranking-table .col-equip,
+    .samguk-ranking-table .col-crew { display: none; }
+    .samguk-rank-profile { width: 22px; height: 22px; margin-right: 4px; }
+  }
+  @media (max-width: 360px) {
+    .samguk-cards { grid-template-columns: 1fr; }
   }
 
 
@@ -1627,13 +1830,22 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <a class="samguk-sheet-link" href="https://docs.google.com/spreadsheets/d/1zwIJjl2UTkPREkI37in9e0PAwX9xwFtEU3-ECAYYaeU/edit?gid=1662438953" target="_blank" rel="noopener">원본 시트</a>
       </div>
     </div>
-    <div class="samguk-filterbar">
-      <button class="samguk-filter-btn active" data-nation="all" onclick="setSamgukNation('all')">전체 90</button>
-      <button class="samguk-filter-btn" data-nation="위" onclick="setSamgukNation('위')">위 30</button>
-      <button class="samguk-filter-btn" data-nation="촉" onclick="setSamgukNation('촉')">촉 30</button>
-      <button class="samguk-filter-btn" data-nation="오" onclick="setSamgukNation('오')">오 30</button>
+    <div class="samguk-subtabs">
+      <button class="samguk-subtab active" data-samguktab="status" onclick="switchSamgukTab('status')">현황</button>
+      <button class="samguk-subtab" data-samguktab="ranking" onclick="switchSamgukTab('ranking')">무력랭킹</button>
     </div>
-    <div id="samgukNationList"></div>
+    <div id="samgukStatusTab">
+      <div class="samguk-filterbar">
+        <button class="samguk-filter-btn active" data-nation="all" onclick="setSamgukNation('all')">전체 90</button>
+        <button class="samguk-filter-btn" data-nation="위" onclick="setSamgukNation('위')">위 30</button>
+        <button class="samguk-filter-btn" data-nation="촉" onclick="setSamgukNation('촉')">촉 30</button>
+        <button class="samguk-filter-btn" data-nation="오" onclick="setSamgukNation('오')">오 30</button>
+      </div>
+      <div class="samguk-grid" id="samgukNationList"></div>
+    </div>
+    <div id="samgukRankingTab" style="display:none;">
+      <div class="samguk-ranking" id="samgukPowerRanking"></div>
+    </div>
   </div>
 </div>
 
@@ -2692,7 +2904,7 @@ function switchTab(tab) {
     loadWeekly();
   } else if (tab === 'samguk') {
     document.getElementById('samgukContainer').style.display = '';
-    renderSamguk();
+    switchSamgukTab(currentSamgukTab);
   } else if (tab === 'updates') {
     document.getElementById('updatesContainer').style.display = '';
     loadUpdates();
@@ -2800,20 +3012,8 @@ const SAMGUK_NATIONS = {
   '촉': { label: '蜀 촉나라', color: '#3f8b58' },
   '오': { label: '吳 오나라', color: '#b94d4d' },
 };
-const SAMGUK_VALUE_FIELDS = [
-  ['level', 'Lv'],
-  ['horse', '말'],
-  ['horseLevel', '말강'],
-  ['weapon', '무기'],
-  ['helmet', '두갑'],
-  ['armor', '흉갑'],
-  ['shoes', '각갑'],
-  ['strength', '무력'],
-  ['agility', '기민'],
-  ['vitality', '기력'],
-  ['intelligence', '지모'],
-];
 let currentSamgukNation = 'all';
+let currentSamgukTab = 'status';
 
 function setSamgukNation(nation) {
   currentSamgukNation = nation;
@@ -2823,11 +3023,37 @@ function setSamgukNation(nation) {
   renderSamguk();
 }
 
-function samgukValue(value) {
+function switchSamgukTab(tab) {
+  currentSamgukTab = tab;
+  document.querySelectorAll('.samguk-subtab').forEach(function(button) {
+    button.classList.toggle('active', button.dataset.samguktab === tab);
+  });
+  document.getElementById('samgukStatusTab').style.display = tab === 'status' ? '' : 'none';
+  document.getElementById('samgukRankingTab').style.display = tab === 'ranking' ? '' : 'none';
+  if (tab === 'ranking') renderSamgukPowerRanking();
+  else renderSamguk();
+}
+
+function hasSamgukValue(value) {
+  return value !== null && value !== undefined && value !== '';
+}
+
+function samgukValue(value, suffix) {
   if (value === null || value === undefined || value === '') {
     return '<span class="samguk-empty-value">—</span>';
   }
-  return escapeHtml(String(value));
+  return escapeHtml(String(value)) + (suffix || '');
+}
+
+function samgukNumber(value) {
+  if (!hasSamgukValue(value)) return null;
+  const number = Number(String(value).replace(/,/g, ''));
+  return Number.isFinite(number) ? number : null;
+}
+
+function samgukProfileUrl(soopId) {
+  return 'https://profile.img.sooplive.co.kr/LOGO/'
+    + soopId.slice(0, 2) + '/' + soopId + '/' + soopId + '.jpg';
 }
 
 function renderSamguk() {
@@ -2837,34 +3063,132 @@ function renderSamguk() {
   root.innerHTML = nations.map(function(nation) {
     const meta = SAMGUK_NATIONS[nation];
     const members = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
-    const rows = members.map(function(member) {
-      const profileUrl = 'https://profile.img.sooplive.co.kr/LOGO/'
-        + member.soopId.slice(0, 2) + '/' + member.soopId + '/' + member.soopId + '.jpg';
-      const values = SAMGUK_VALUE_FIELDS.map(function(field) {
-        return '<td>' + samgukValue(member[field[0]]) + '</td>';
-      }).join('');
-      return '<tr>'
-        + '<td><div class="samguk-member-cell">'
-        + '<img class="samguk-profile" src="' + profileUrl + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
-        + '<a class="samguk-member-link" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a>'
-        + '</div></td>'
-        + '<td>' + (member.job ? '<span class="samguk-job">' + escapeHtml(member.job) + '</span>' : '<span class="samguk-empty-value">—</span>') + '</td>'
-        + '<td>' + escapeHtml(member.crew) + '</td>'
-        + values
-        + '<td><a class="samguk-soop-link" href="https://play.sooplive.co.kr/' + member.soopId + '" target="_blank" rel="noopener">SOOP</a></td>'
-        + '</tr>';
+    const strengths = members.map(function(member) { return samgukNumber(member.strength); }).filter(function(value) {
+      return value !== null && value > 0;
+    });
+    const summary = strengths.length
+      ? '평균 무력 ' + (strengths.reduce(function(sum, value) { return sum + value; }, 0) / strengths.length).toFixed(1)
+      : '장비 집계 전';
+    const cards = members.map(function(member) {
+      const profileUrl = samgukProfileUrl(member.soopId);
+      return '<article class="samguk-card" data-bjid="' + member.soopId + '">'
+        + '<img class="samguk-card-profile" src="' + profileUrl + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+        + '<a class="samguk-card-name" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a>'
+        + '<div class="samguk-card-crew">' + escapeHtml(member.crew) + '</div>'
+        + '<div class="samguk-card-info">'
+        + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '')
+        + '<span class="samguk-level">Lv.' + samgukValue(member.level) + '</span>'
+        + '</div>'
+        + '<div class="samguk-horse">말 ' + samgukValue(member.horse) + ' · 강화 ' + samgukValue(member.horseLevel, '강') + '</div>'
+        + '<div class="samguk-equips">'
+        + '<span class="samguk-equip samguk-equip-weapon">무기 ' + samgukValue(member.weapon, '강') + '</span>'
+        + '<span class="samguk-equip samguk-equip-helmet">두갑 ' + samgukValue(member.helmet, '강') + '</span>'
+        + '<span class="samguk-equip samguk-equip-armor">흉갑 ' + samgukValue(member.armor, '강') + '</span>'
+        + '<span class="samguk-equip samguk-equip-shoes">각갑 ' + samgukValue(member.shoes, '강') + '</span>'
+        + '</div>'
+        + '<div class="samguk-stats">'
+        + '<span class="samguk-stat"><span class="samguk-stat-label">무력</span><span class="samguk-stat-value">' + samgukValue(member.strength) + '</span></span>'
+        + '<span class="samguk-stat"><span class="samguk-stat-label">기민</span><span class="samguk-stat-value">' + samgukValue(member.agility) + '</span></span>'
+        + '<span class="samguk-stat"><span class="samguk-stat-label">기력</span><span class="samguk-stat-value">' + samgukValue(member.vitality) + '</span></span>'
+        + '<span class="samguk-stat"><span class="samguk-stat-label">지모</span><span class="samguk-stat-value">' + samgukValue(member.intelligence) + '</span></span>'
+        + '</div>'
+        + '<div class="samguk-card-btns">'
+        + '<a class="samguk-soop-link" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">SOOP</a>'
+        + '<a class="samguk-soop-link samguk-live-link" href="https://play.sooplive.co.kr/' + member.soopId + '" target="_blank" rel="noopener">LIVE</a>'
+        + '</div>'
+        + '</article>';
     }).join('');
-    const headers = SAMGUK_VALUE_FIELDS.map(function(field) { return '<th>' + field[1] + '</th>'; }).join('');
     return '<section class="samguk-nation">'
       + '<div class="samguk-nation-header">'
       + '<span class="samguk-nation-name" style="background:' + meta.color + '">' + meta.label + '</span>'
       + '<span class="samguk-nation-count">' + members.length + '명</span>'
+      + '<span class="samguk-nation-summary">' + summary + '</span>'
       + '</div>'
-      + '<div class="samguk-table-wrap"><table class="samguk-table">'
-      + '<thead><tr><th>스트리머</th><th>장수</th><th>소속</th>' + headers + '<th>방송</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div>'
+      + '<div class="samguk-cards">' + cards + '</div>'
       + '</section>';
   }).join('');
+}
+
+function renderSamgukPowerRanking() {
+  const root = document.getElementById('samgukPowerRanking');
+  if (!root) return;
+
+  const ranked = SAMGUK_MEMBERS.map(function(member) {
+    return { member: member, strength: samgukNumber(member.strength) };
+  }).filter(function(entry) {
+    return entry.strength !== null && entry.strength > 0;
+  }).sort(function(a, b) {
+    return b.strength - a.strength;
+  });
+
+  const nationRows = ['위', '촉', '오'].map(function(nation) {
+    const meta = SAMGUK_NATIONS[nation];
+    const members = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
+    const values = members.map(function(member) { return samgukNumber(member.strength); }).filter(function(value) {
+      return value !== null && value > 0;
+    });
+    const total = values.reduce(function(sum, value) { return sum + value; }, 0);
+    return {
+      nation: nation,
+      meta: meta,
+      known: values.length,
+      total: total,
+      average: values.length ? total / values.length : null,
+    };
+  }).sort(function(a, b) {
+    if (a.average === null && b.average === null) return ['위', '촉', '오'].indexOf(a.nation) - ['위', '촉', '오'].indexOf(b.nation);
+    if (a.average === null) return 1;
+    if (b.average === null) return -1;
+    return b.average - a.average;
+  });
+
+  let html = '<div class="samguk-ranking-guide"><b>삼국지 무력랭킹</b><br>입력된 무력 수치만 집계하며 임의 장비 합산식은 사용하지 않습니다.</div>';
+  html += '<section class="samguk-ranking-section">'
+    + '<div class="samguk-ranking-header">국가 무력 랭킹</div>'
+    + '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table">'
+    + '<thead><tr><th style="width:40px">#</th><th>국가</th><th>집계 인원</th><th>평균 무력</th><th>총 무력</th></tr></thead><tbody>';
+  nationRows.forEach(function(row, index) {
+    const hasData = row.average !== null;
+    html += '<tr>'
+      + '<td class="samguk-rank-num ' + (hasData ? 'samguk-rank-' + (index + 1) : '') + '">' + (hasData ? index + 1 : '—') + '</td>'
+      + '<td><span class="samguk-rank-badge" style="background:' + row.meta.color + '">' + row.meta.label + '</span></td>'
+      + '<td>' + row.known + '/30명</td>'
+      + '<td><b>' + (hasData ? row.average.toFixed(1) : '—') + '</b></td>'
+      + '<td>' + (hasData ? row.total : '—') + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div></section>';
+
+  html += '<section class="samguk-ranking-section">'
+    + '<div class="samguk-ranking-header">개인 무력 랭킹</div>';
+  if (ranked.length === 0) {
+    html += '<div class="samguk-ranking-empty">무력 데이터가 입력되면 순위가 표시됩니다.</div>';
+  } else {
+    html += '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table">'
+      + '<thead><tr><th style="width:40px">#</th><th>스트리머</th><th>장수</th><th>Lv</th><th class="col-equip">장비</th><th>무력</th><th class="col-crew">국가·소속</th></tr></thead><tbody>';
+    ranked.forEach(function(entry, index) {
+      const member = entry.member;
+      const meta = SAMGUK_NATIONS[member.nation];
+      const equips = [
+        '무기 ' + samgukValue(member.weapon, '강'),
+        '두갑 ' + samgukValue(member.helmet, '강'),
+        '흉갑 ' + samgukValue(member.armor, '강'),
+        '각갑 ' + samgukValue(member.shoes, '강'),
+      ].join(' · ');
+      html += '<tr>'
+        + '<td class="samguk-rank-num samguk-rank-' + (index + 1) + '">' + (index + 1) + '</td>'
+        + '<td><img class="samguk-rank-profile" src="' + samgukProfileUrl(member.soopId) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' + escapeHtml(member.name) + '</td>'
+        + '<td>' + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '—') + '</td>'
+        + '<td>Lv.' + samgukValue(member.level) + '</td>'
+        + '<td class="col-equip">' + equips + '</td>'
+        + '<td><b>' + entry.strength + '</b></td>'
+        + '<td class="col-crew"><span class="samguk-rank-badge" style="background:' + meta.color + '">' + meta.label + '</span> ' + escapeHtml(member.crew) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</section>';
+  root.innerHTML = html;
 }
 
 // ===================== 주간 캘린더 =====================
