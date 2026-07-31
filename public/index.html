@@ -818,6 +818,187 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   .tab-btn:hover { color: #5B6AED; }
   .tab-btn.active { color: #5B6AED; border-bottom-color: #5B6AED; }
 
+  /* 삼국지 */
+  #samgukContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+  }
+  .samguk-shell {
+    width: 100%;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+  .samguk-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .samguk-title {
+    font-size: 20px;
+    color: #222;
+    margin-bottom: 5px;
+  }
+  .samguk-subtitle {
+    color: #888;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .samguk-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .samguk-sync-badge {
+    border: 1px solid #d9dcff;
+    background: #f2f3ff;
+    color: #5B6AED;
+    border-radius: 12px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .samguk-sheet-link {
+    border: 1px solid #ddd;
+    color: #666;
+    background: #fff;
+    border-radius: 7px;
+    padding: 5px 11px;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .samguk-sheet-link:hover { border-color: #5B6AED; color: #5B6AED; }
+  .samguk-filterbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+  }
+  .samguk-filter-btn {
+    border: 1px solid #ddd;
+    background: #fff;
+    color: #777;
+    border-radius: 16px;
+    padding: 5px 13px;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .samguk-filter-btn:hover { border-color: #5B6AED; color: #5B6AED; }
+  .samguk-filter-btn.active { background: #5B6AED; border-color: #5B6AED; color: #fff; }
+  .samguk-nation {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .samguk-nation-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 14px;
+    border-bottom: 1px solid #eee;
+  }
+  .samguk-nation-name {
+    color: #fff;
+    border-radius: 5px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .samguk-nation-count { color: #999; font-size: 11px; }
+  .samguk-table-wrap { overflow-x: auto; }
+  .samguk-table {
+    width: 100%;
+    min-width: 1280px;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .samguk-table th {
+    background: #fafafa;
+    color: #888;
+    padding: 7px 8px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  .samguk-table td {
+    color: #444;
+    padding: 7px 8px;
+    border-bottom: 1px solid #f1f1f1;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .samguk-table tr:last-child td { border-bottom: none; }
+  .samguk-table tbody tr:hover { background: #fafbff; }
+  .samguk-member-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    min-width: 126px;
+  }
+  .samguk-profile {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #eee;
+    flex-shrink: 0;
+  }
+  .samguk-member-link {
+    color: #333;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .samguk-member-link:hover { color: #5B6AED; }
+  .samguk-job {
+    display: inline-block;
+    border-radius: 9px;
+    background: #eef0ff;
+    color: #5B6AED;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .samguk-empty-value { color: #ccc; }
+  .samguk-soop-link {
+    display: inline-block;
+    border-radius: 5px;
+    background: #5B6AED;
+    color: #fff;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .samguk-soop-link:hover { background: #4a58d4; }
+  html.dark .samguk-title { color: #e0e0e0; }
+  html.dark .samguk-subtitle { color: #777; }
+  html.dark .samguk-sync-badge { background: #25263a; border-color: #3e4268; color: #8e98ff; }
+  html.dark .samguk-sheet-link,
+  html.dark .samguk-filter-btn { background: #1e1e1e; border-color: #444; color: #999; }
+  html.dark .samguk-filter-btn.active { background: #5B6AED; border-color: #5B6AED; color: #fff; }
+  html.dark .samguk-nation { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .samguk-nation-header,
+  html.dark .samguk-table th,
+  html.dark .samguk-table td { border-color: #333; }
+  html.dark .samguk-table th { background: #191919; color: #777; }
+  html.dark .samguk-table td { color: #bbb; }
+  html.dark .samguk-table tbody tr:hover { background: #252525; }
+  html.dark .samguk-member-link { color: #ddd; }
+  html.dark .samguk-member-link:hover { color: #8e98ff; }
+  html.dark .samguk-profile { background: #333; }
+  html.dark .samguk-job { background: #292b42; color: #8e98ff; }
+  html.dark .samguk-empty-value { color: #555; }
+
   /* 캘린더 */
   #calendarContainer {
     flex: 1;
@@ -1326,6 +1507,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .tab-bar { padding: 0 8px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
     .tab-bar::-webkit-scrollbar { display: none; }
     .tab-btn { padding: 8px 10px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+    #samgukContainer { padding: 10px; }
+    .samguk-head { flex-direction: column; gap: 9px; }
+    .samguk-title { font-size: 17px; }
+    .samguk-actions { width: 100%; }
+    .samguk-table { min-width: 1180px; }
   }
 
 
@@ -1373,6 +1559,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
   <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
+  <button class="tab-btn" data-tab="samguk" onclick="switchTab('samguk')">삼국지</button>
   <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
   <button class="dark-toggle mobile-dark-toggle" id="darkToggleMobile"></button>
 </div>
@@ -1428,6 +1615,27 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="weekly-days" id="weeklyDays"></div>
 </div>
 
+<div id="samgukContainer" style="display:none;">
+  <div class="samguk-shell">
+    <div class="samguk-head">
+      <div>
+        <h2 class="samguk-title">감스트 삼국지 현황</h2>
+        <p class="samguk-subtitle">2026년 8월 1일–10일 · 위·촉·오 참가자 90명<br>장비·레벨 값은 OCR 및 관리 시트 연동 후 표시됩니다.</p>
+      </div>
+      <div class="samguk-actions">
+        <span class="samguk-sync-badge">OCR·시트 연동 준비 중</span>
+        <a class="samguk-sheet-link" href="https://docs.google.com/spreadsheets/d/1zwIJjl2UTkPREkI37in9e0PAwX9xwFtEU3-ECAYYaeU/edit?gid=1662438953" target="_blank" rel="noopener">원본 시트</a>
+      </div>
+    </div>
+    <div class="samguk-filterbar">
+      <button class="samguk-filter-btn active" data-nation="all" onclick="setSamgukNation('all')">전체 90</button>
+      <button class="samguk-filter-btn" data-nation="위" onclick="setSamgukNation('위')">위 30</button>
+      <button class="samguk-filter-btn" data-nation="촉" onclick="setSamgukNation('촉')">촉 30</button>
+      <button class="samguk-filter-btn" data-nation="오" onclick="setSamgukNation('오')">오 30</button>
+    </div>
+    <div id="samgukNationList"></div>
+  </div>
+</div>
 
 <div id="updatesContainer" style="display:none;">
   <div id="updatesList" class="updates-list"></div>
@@ -2469,6 +2677,7 @@ function switchTab(tab) {
   document.getElementById('scrollNav').style.display = 'none';
   document.getElementById('calendarContainer').style.display = 'none';
   document.getElementById('weeklyContainer').style.display = 'none';
+  document.getElementById('samgukContainer').style.display = 'none';
   document.getElementById('updatesContainer').style.display = 'none';
 
   if (tab === 'notices') {
@@ -2481,10 +2690,181 @@ function switchTab(tab) {
   } else if (tab === 'weekly') {
     document.getElementById('weeklyContainer').style.display = '';
     loadWeekly();
+  } else if (tab === 'samguk') {
+    document.getElementById('samgukContainer').style.display = '';
+    renderSamguk();
   } else if (tab === 'updates') {
     document.getElementById('updatesContainer').style.display = '';
     loadUpdates();
   }
+}
+
+// ===================== 삼국지 =====================
+const SAMGUK_MEMBERS = [
+  ['위','버인협회','조경훈','cnsgkcnehd74','조조'],
+  ['위','버인협회','표우','pyowoo','하후돈'],
+  ['위','버인협회','해솔','liloolil',null],
+  ['위','버인협회','윤이샘','yoonesaem',null],
+  ['위','버인협회','비숑','merryou',null],
+  ['위','버인협회','송소미','ry0135',null],
+  ['위','버인협회','제리츄','rariruro',null],
+  ['위','버인협회','뀨복','kkyubog',null],
+  ['위','버인협회','김쁘피','gurm01',null],
+  ['위','버블란','박재박','jaeparkk','전위'],
+  ['위','로스타시티','로기다','hrlim95','장료'],
+  ['위','로스타시티','은초롱','eunchr',null],
+  ['위','로스타시티','리피피','haeri001',null],
+  ['위','로스타시티','시오','siioyeyo',null],
+  ['위','로스타시티','푸마고치','fumagochi',null],
+  ['위','로스타시티','쥬멩이','ju010228',null],
+  ['위','로스타시티','온유일','oneon1y',null],
+  ['위','로스타시티','찐랑','phs6162',null],
+  ['위','로스타시티','아르르','cosmicaaarrr',null],
+  ['위','버블란','공태연','ballty0719',null],
+  ['위','버블란','다시바','tdnlamuron',null],
+  ['위','버블란','루루시','darklucy',null],
+  ['위','버블란','슈니','k4187421',null],
+  ['위','버블란','예요예요','yeyo25',null],
+  ['위','버블란','쩜냥이','hhr001234',null],
+  ['위','버블란','초금비','chogeumbi',null],
+  ['위','버블란','큐티섹시','nnojoke486',null],
+  ['위','로스타시티','한비','imhanbily',null],
+  ['위','버인협회','비쥬','bibitrue',null],
+  ['위','버블란','설채이','aigong7576',null],
+  ['촉','버컴퍼니','감스트','devil0108','유비'],
+  ['촉','버컴퍼니','니니','honeys2',null],
+  ['촉','버컴퍼니','단츄','danchu17','제갈량'],
+  ['촉','버컴퍼니','달묘','nmohoho',null],
+  ['촉','버컴퍼니','망구랑','nmangoquince',null],
+  ['촉','버컴퍼니','바밍','qweasd3456',null],
+  ['촉','버컴퍼니','부르','bureu2002',null],
+  ['촉','버컴퍼니','설이','mini8282',null],
+  ['촉','버컴퍼니','앙또','aangdoxx',null],
+  ['촉','버컴퍼니','유설아','yeveee',null],
+  ['촉','버컴퍼니','유연서','cctvno',null],
+  ['촉','버컴퍼니','앨리스얌','alicehiyam',null],
+  ['촉','버컴퍼니','킹냥이','sa5791',null],
+  ['촉','버컴퍼니','킴나니','sksgml16','관우'],
+  ['촉','버컴퍼니','해리','gofl2237',null],
+  ['촉','꾸한성','꾸티뉴','aksen7833','조자룡'],
+  ['촉','꾸한성','난워니','whiteone325',null],
+  ['촉','꾸한성','다뮤','not15987',null],
+  ['촉','꾸한성','딴딴2당','dbsk0708',null],
+  ['촉','꾸한성','바먀','wooyah21',null],
+  ['촉','꾸한성','서라0','o0opha',null],
+  ['촉','꾸한성','야무지','land4968',null],
+  ['촉','꾸한성','엔쥬','northpole','장비'],
+  ['촉','꾸한성','임민트','mint616',null],
+  ['촉','꾸한성','김옥독','niniru',null],
+  ['촉','꾸한성','리카','lika07',null],
+  ['촉','꾸한성','냥쏘','leesoi34',null],
+  ['촉','꾸한성','윤타미','dbsthdus111',null],
+  ['촉','꾸한성','란다','top6373',null],
+  ['촉','꾸한성','모야','neul0908',null],
+  ['오','지력사무소','지피티','tjrdbs999','손권'],
+  ['오','원더독','황원태','hwt1014','여몽'],
+  ['오','원더독','단수아','tndk321',null],
+  ['오','원더독','딩굴','dinggoolx3',null],
+  ['오','원더독','야뿌','ekrekrnfl9',null],
+  ['오','원더독','연보라','200501',null],
+  ['오','원더독','연치민','yeonchimin',null],
+  ['오','원더독','희꾸미','ddr9463',null],
+  ['오','홍피스','홍타쿠','lhtlgm','태사자'],
+  ['오','홍피스','현단아','hyundana',null],
+  ['오','홍피스','따스히','guqlswls123',null],
+  ['오','지력사무소','김병살','kbs9981','주유'],
+  ['오','지력사무소','김쿼카','quokka1228',null],
+  ['오','지력사무소','라무','5959700','감녕'],
+  ['오','지력사무소','린코','linco00',null],
+  ['오','지력사무소','메루','meuuu3',null],
+  ['오','지력사무소','목츄리','xex3',null],
+  ['오','지력사무소','싱유','singu64',null],
+  ['오','지력사무소','한아련','rkdmsdl782',null],
+  ['오','지력사무소','모나양','monas2',null],
+  ['오','홍피스','보리담','bolidam',null],
+  ['오','홍피스','머라냥','ajfksid0116',null],
+  ['오','홍피스','모아','kimghdus',null],
+  ['오','홍피스','고채린','rjsdnr115',null],
+  ['오','홍피스','힙비','rlawlsthfw',null],
+  ['오','홍피스','연우얌','eunnnny2',null],
+  ['오','홍피스','류버들','buddleee',null],
+  ['오','원더독','감초','33h2101',null],
+  ['오','원더독','아린','59590423',null],
+  ['오','원더독','채하','fbcogk',null],
+].map(function(row) {
+  return { nation: row[0], crew: row[1], name: row[2], soopId: row[3], job: row[4] };
+});
+
+const SAMGUK_NATIONS = {
+  '위': { label: '魏 위나라', color: '#4169a8' },
+  '촉': { label: '蜀 촉나라', color: '#3f8b58' },
+  '오': { label: '吳 오나라', color: '#b94d4d' },
+};
+const SAMGUK_VALUE_FIELDS = [
+  ['level', 'Lv'],
+  ['horse', '말'],
+  ['horseLevel', '말강'],
+  ['weapon', '무기'],
+  ['helmet', '두갑'],
+  ['armor', '흉갑'],
+  ['shoes', '각갑'],
+  ['strength', '무력'],
+  ['agility', '기민'],
+  ['vitality', '기력'],
+  ['intelligence', '지모'],
+];
+let currentSamgukNation = 'all';
+
+function setSamgukNation(nation) {
+  currentSamgukNation = nation;
+  document.querySelectorAll('.samguk-filter-btn').forEach(function(button) {
+    button.classList.toggle('active', button.dataset.nation === nation);
+  });
+  renderSamguk();
+}
+
+function samgukValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return '<span class="samguk-empty-value">—</span>';
+  }
+  return escapeHtml(String(value));
+}
+
+function renderSamguk() {
+  const root = document.getElementById('samgukNationList');
+  if (!root) return;
+  const nations = currentSamgukNation === 'all' ? ['위', '촉', '오'] : [currentSamgukNation];
+  root.innerHTML = nations.map(function(nation) {
+    const meta = SAMGUK_NATIONS[nation];
+    const members = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
+    const rows = members.map(function(member) {
+      const profileUrl = 'https://profile.img.sooplive.co.kr/LOGO/'
+        + member.soopId.slice(0, 2) + '/' + member.soopId + '/' + member.soopId + '.jpg';
+      const values = SAMGUK_VALUE_FIELDS.map(function(field) {
+        return '<td>' + samgukValue(member[field[0]]) + '</td>';
+      }).join('');
+      return '<tr>'
+        + '<td><div class="samguk-member-cell">'
+        + '<img class="samguk-profile" src="' + profileUrl + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+        + '<a class="samguk-member-link" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a>'
+        + '</div></td>'
+        + '<td>' + (member.job ? '<span class="samguk-job">' + escapeHtml(member.job) + '</span>' : '<span class="samguk-empty-value">—</span>') + '</td>'
+        + '<td>' + escapeHtml(member.crew) + '</td>'
+        + values
+        + '<td><a class="samguk-soop-link" href="https://play.sooplive.co.kr/' + member.soopId + '" target="_blank" rel="noopener">SOOP</a></td>'
+        + '</tr>';
+    }).join('');
+    const headers = SAMGUK_VALUE_FIELDS.map(function(field) { return '<th>' + field[1] + '</th>'; }).join('');
+    return '<section class="samguk-nation">'
+      + '<div class="samguk-nation-header">'
+      + '<span class="samguk-nation-name" style="background:' + meta.color + '">' + meta.label + '</span>'
+      + '<span class="samguk-nation-count">' + members.length + '명</span>'
+      + '</div>'
+      + '<div class="samguk-table-wrap"><table class="samguk-table">'
+      + '<thead><tr><th>스트리머</th><th>장수</th><th>소속</th>' + headers + '<th>방송</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div>'
+      + '</section>';
+  }).join('');
 }
 
 // ===================== 주간 캘린더 =====================
