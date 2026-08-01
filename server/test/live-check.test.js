@@ -2,10 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
 const {
+  DEFAULT_ALLOWED_BJ_IDS,
   createLiveStatusService,
   createRouter,
   parseBjIds,
 } = require("../routes/live-check")._test;
+const { members: samgukMembers } = require("../data/samguk-fallback.json");
 
 function stationResponse(isLive) {
   return {
@@ -21,6 +23,11 @@ test("BJ ID를 검증하고 중복을 제거한다", () => {
   });
   assert.match(parseBjIds("../invalid").error, /유효하지 않은/);
   assert.match(parseBjIds(Array.from({ length: 51 }, (_, i) => `bj${i}`).join(",")).error, /최대 50개/);
+});
+
+test("삼국지 참가자도 기본 LIVE 조회 허용 목록에 포함한다", () => {
+  assert.equal(samgukMembers.length, 90);
+  assert.ok(samgukMembers.every(member => DEFAULT_ALLOWED_BJ_IDS.has(member.soopId)));
 });
 
 test("라우트가 입력 오류를 거부하고 공유 캐시 헤더를 설정한다", async (t) => {

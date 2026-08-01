@@ -4,3 +4,5 @@ node_modules/
 .vercel/
 
 .vercel
+__pycache__/
+*.pyc

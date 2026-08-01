@@ -1,5 +1,6 @@
 const { Router } = require("express");
 const { BJ_LIST } = require("../lib/bj-list");
+const SAMGUK_FALLBACK = require("../data/samguk-fallback.json");
 
 const HEADERS = {
   Referer: "https://www.sooplive.co.kr/",
@@ -8,6 +9,10 @@ const HEADERS = {
 };
 const BJ_ID_PATTERN = /^[A-Za-z0-9_]{1,30}$/;
 const MAX_IDS = 50;
+const DEFAULT_ALLOWED_BJ_IDS = new Set([
+  ...Object.keys(BJ_LIST),
+  ...SAMGUK_FALLBACK.members.map(member => member.soopId).filter(Boolean),
+]);
 
 function positiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -152,7 +157,7 @@ function createLiveStatusService(options = {}) {
 
 function createRouter(options = {}) {
   const router = Router();
-  const allowedBjIds = options.allowedBjIds || new Set(Object.keys(BJ_LIST));
+  const allowedBjIds = options.allowedBjIds || DEFAULT_ALLOWED_BJ_IDS;
   const service = options.service || createLiveStatusService({
     ttlMs: positiveInt(process.env.LIVE_CHECK_TTL_MS, 20_000),
     failureTtlMs: positiveInt(process.env.LIVE_CHECK_FAILURE_TTL_MS, 5_000),
@@ -189,6 +194,7 @@ const router = createRouter();
 module.exports = router;
 module.exports._test = {
   BJ_ID_PATTERN,
+  DEFAULT_ALLOWED_BJ_IDS,
   MAX_IDS,
   createConcurrencyLimiter,
   createLiveStatusService,

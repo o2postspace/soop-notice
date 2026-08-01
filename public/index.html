@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>숲공지 - SOOP 스트리머 공지사항 대시보드 | soopnotice</title>
 <link rel="icon" href="/logo.png" type="image/png">
+<link rel="stylesheet" href="/samguk.css?v=20260802">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-9J4PTFHT9S"></script>
 <script>
@@ -1959,16 +1960,19 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="samguk-head">
       <div>
         <h2 class="samguk-title">감스트 삼국지 현황</h2>
-        <p class="samguk-subtitle">2026년 8월 1일–10일 · 위·촉·오 참가자 90명<br>장비·레벨 값은 OCR 및 관리 시트 연동 후 표시됩니다.</p>
+        <p class="samguk-subtitle">2026년 8월 1일–10일 · 위·촉·오 참가자 90명<br>강화·기량·영토는 관리 시트와 동기화되며 검수 상태를 함께 표시합니다.</p>
       </div>
       <div class="samguk-actions">
-        <span class="samguk-sync-badge">OCR·시트 연동 준비 중</span>
-        <a class="samguk-sheet-link" href="https://docs.google.com/spreadsheets/d/1zwIJjl2UTkPREkI37in9e0PAwX9xwFtEU3-ECAYYaeU/edit?gid=1662438953" target="_blank" rel="noopener">원본 시트</a>
+        <span class="samguk-sync-badge" id="samgukSyncBadge">데이터 불러오는 중</span>
+        <a class="samguk-sheet-link" href="https://threekingdoms.notion.site/" target="_blank" rel="noopener">삼국지 위키</a>
+        <a class="samguk-sheet-link" href="https://docs.google.com/spreadsheets/d/19lI8z-C2ieRze6ahONjD68L08ZWQvzBfsXxhO4eUDe4/edit?gid=0" target="_blank" rel="noopener">관리 시트</a>
       </div>
     </div>
     <div class="samguk-subtabs">
       <button class="samguk-subtab active" data-samguktab="status" onclick="switchSamgukTab('status')">현황</button>
       <button class="samguk-subtab" data-samguktab="ranking" onclick="switchSamgukTab('ranking')">무력랭킹</button>
+      <button class="samguk-subtab" data-samguktab="territory" onclick="switchSamgukTab('territory')">영토</button>
+      <button class="samguk-subtab" data-samguktab="info" onclick="switchSamgukTab('info')">게임정보</button>
     </div>
     <div id="samgukStatusTab">
       <div class="samguk-filterbar">
@@ -1981,6 +1985,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div id="samgukRankingTab" style="display:none;">
       <div class="samguk-ranking" id="samgukPowerRanking"></div>
+    </div>
+    <div id="samgukTerritoryTab" style="display:none;">
+      <div id="samgukTerritoryMap"></div>
+    </div>
+    <div id="samgukInfoTab" style="display:none;">
+      <div id="samgukGameInfo"></div>
     </div>
   </div>
 </div>
@@ -3173,6 +3183,7 @@ function switchTab(tab, options) {
   } else if (tab === 'samguk') {
     document.getElementById('samgukContainer').style.display = '';
     switchSamgukTab(currentSamgukTab);
+    if (window.loadSamgukData) window.loadSamgukData();
   } else if (tab === 'community') {
     document.getElementById('communityContainer').style.display = '';
     communityInitialize();
@@ -3304,7 +3315,11 @@ function switchSamgukTab(tab) {
   });
   document.getElementById('samgukStatusTab').style.display = tab === 'status' ? '' : 'none';
   document.getElementById('samgukRankingTab').style.display = tab === 'ranking' ? '' : 'none';
+  document.getElementById('samgukTerritoryTab').style.display = tab === 'territory' ? '' : 'none';
+  document.getElementById('samgukInfoTab').style.display = tab === 'info' ? '' : 'none';
   if (tab === 'ranking') renderSamgukPowerRanking();
+  else if (tab === 'territory' && window.renderSamgukTerritory) window.renderSamgukTerritory();
+  else if (tab === 'info' && window.renderSamgukInfo) window.renderSamgukInfo();
   else renderSamguk();
 }
 
@@ -3325,6 +3340,13 @@ function samgukNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function samgukReviewBadge(member) {
+  const status = member && member.reviewStatus;
+  if (!status) return '';
+  const className = status === '확정' ? 'is-confirmed' : status === '충돌' ? 'is-conflict' : 'is-pending';
+  return '<span class="samguk-review-badge ' + className + '">' + escapeHtml(status) + '</span>';
+}
+
 function samgukProfileUrl(soopId) {
   return 'https://profile.img.sooplive.co.kr/LOGO/'
     + soopId.slice(0, 2) + '/' + soopId + '/' + soopId + '.jpg';
@@ -3334,7 +3356,7 @@ function renderSamguk() {
   const root = document.getElementById('samgukNationList');
   if (!root) return;
   const nations = currentSamgukNation === 'all' ? ['위', '촉', '오'] : [currentSamgukNation];
-  root.innerHTML = nations.map(function(nation) {
+  root.innerHTML = (window.samgukSourceNoteHtml || '') + nations.map(function(nation) {
     const meta = SAMGUK_NATIONS[nation];
     const members = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
     const strengths = members.map(function(member) { return samgukNumber(member.strength); }).filter(function(value) {
@@ -3349,6 +3371,7 @@ function renderSamguk() {
         + '<img class="samguk-card-profile" src="' + profileUrl + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
         + '<a class="samguk-card-name" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a>'
         + '<div class="samguk-card-crew">' + escapeHtml(member.crew) + '</div>'
+        + samgukReviewBadge(member)
         + '<div class="samguk-card-info">'
         + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '')
         + '<span class="samguk-level">Lv.' + samgukValue(member.level) + '</span>'
@@ -3368,7 +3391,7 @@ function renderSamguk() {
         + '</div>'
         + '<div class="samguk-card-btns">'
         + '<a class="samguk-soop-link" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">SOOP</a>'
-        + '<a class="samguk-soop-link samguk-live-link" href="https://play.sooplive.co.kr/' + member.soopId + '" target="_blank" rel="noopener">LIVE</a>'
+        + '<a class="samguk-soop-link samguk-live-link live-link" data-bjid="' + member.soopId + '" href="https://play.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">LIVE</a>'
         + '</div>'
         + '</article>';
     }).join('');
@@ -3416,7 +3439,9 @@ function renderSamgukPowerRanking() {
     return b.average - a.average;
   });
 
-  let html = '<div class="samguk-ranking-guide"><b>삼국지 무력랭킹</b><br>입력된 무력 수치만 집계하며 임의 장비 합산식은 사용하지 않습니다.</div>';
+  let html = '<div class="samguk-ranking-guide"><b>삼국지 무력랭킹</b><br>'
+    + escapeHtml(window.samgukDataNote || '입력된 무력 수치만 집계하며 임의 장비 합산식은 사용하지 않습니다.')
+    + '</div>';
   html += '<section class="samguk-ranking-section">'
     + '<div class="samguk-ranking-header">국가 무력 랭킹</div>'
     + '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table">'
@@ -3455,7 +3480,7 @@ function renderSamgukPowerRanking() {
         + '<td>' + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '—') + '</td>'
         + '<td>Lv.' + samgukValue(member.level) + '</td>'
         + '<td class="col-equip">' + equips + '</td>'
-        + '<td><b>' + entry.strength + '</b></td>'
+        + '<td><b>' + entry.strength + '</b> ' + samgukReviewBadge(member) + '</td>'
         + '<td class="col-crew"><span class="samguk-rank-badge" style="background:' + meta.color + '">' + meta.label + '</span> ' + escapeHtml(member.crew) + '</td>'
         + '</tr>';
     });
@@ -4570,6 +4595,8 @@ function getCurrentLiveLinks() {
     addLinks('#calendarContainer .live-link[data-bjid]');
   } else if (currentTab === 'weekly') {
     addLinks('#weeklyContainer .live-link[data-bjid]');
+  } else if (currentTab === 'samguk') {
+    addLinks('#samgukContainer .live-link[data-bjid]');
   }
 
   // 현재 열린 상세/주간 모달은 탭과 별도로 갱신한다.
@@ -4660,6 +4687,7 @@ document.addEventListener('click', function(e) {
   if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
 });
 </script>
+<script src="/samguk.js?v=20260802"></script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

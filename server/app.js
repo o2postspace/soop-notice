@@ -57,6 +57,7 @@ function createApp(requestMetricsMiddleware) {
   app.use("/api/admin", require("./routes/admin"));
   app.use("/api/live-check", require("./routes/live-check"));
   app.use("/api/crew", require("./routes/crew"));
+  app.use("/api/samguk", require("./routes/samguk"));
   app.use("/api/community", require("./routes/community"));
 
   return app;
