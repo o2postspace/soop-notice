@@ -152,9 +152,55 @@ function normalizeTimestamp(value) {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : raw;
 }
 
-function normalizeReviewStatus(value, fallback = "미확인") {
+function normalizeReviewStatus(value, fallback = "기준값") {
   const raw = String(value || "").trim();
-  return raw || fallback;
+  if (!raw || ["검수대기", "미확인", "pending"].includes(raw.toLowerCase())) return fallback;
+  return raw;
+}
+
+function normalizeSingleSourceType(value) {
+  const token = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  if (["fmkorea", "fmk", "fm코리아", "에펨코리아", "에펨"].includes(token)) return "fmkorea";
+  if (["broadcast", "방송", "직접방송", "방송화면", "다시보기", "클립", "vod", "soop"].includes(token)) {
+    return "broadcast";
+  }
+  if (["sheet", "googlesheet", "시트", "구글시트", "공개현황표", "관리자입력"].includes(token)) return "sheet";
+  return null;
+}
+
+function normalizeSourceType(value) {
+  const sources = new Set(String(value || "").split(/[,|+\/·]/).map(normalizeSingleSourceType).filter(Boolean));
+  const canonical = ["sheet", "fmkorea", "broadcast"].filter(source => sources.has(source));
+  return canonical.length > 0 ? canonical.join("+") : "sheet";
+}
+
+function normalizeSourceCount(value, rowNumber, warnings) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 1;
+  const parsed = Number(raw.replace(/,/g, ""));
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    warnings.push(`${rowNumber}행 교차검증수 값 '${raw}'을(를) 1로 처리했습니다.`);
+    return 1;
+  }
+  return parsed;
+}
+
+function normalizeVerificationStatus(value) {
+  const token = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  if (["broadcastverified", "방송교차검증", "방송검증", "직접방송확인"].includes(token)) {
+    return "broadcast-verified";
+  }
+  if (["crossverified", "교차검증", "교차검증완료", "verified", "검증완료"].includes(token)) {
+    return "cross-verified";
+  }
+  if (["conflict", "충돌", "불일치"].includes(token)) return "conflict";
+  return "baseline";
 }
 
 function parseMembersCsv(text) {
@@ -178,9 +224,13 @@ function parseMembersCsv(text) {
     agility: { aliases: ["기민"], required: true },
     vitality: { aliases: ["기력"], required: true },
     intelligence: { aliases: ["지모"], required: true },
+    powerScore: { aliases: ["무력점수", "powerScore"], required: false },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["최근근거", "근거", "근거(URL/타임코드)"], required: true },
-    reviewStatus: { aliases: ["검수상태"], required: true },
+    reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
+    sourceType: { aliases: ["출처종류", "출처", "출처종류/출처"], required: false },
+    sourceCount: { aliases: ["교차검증수"], required: false },
+    verificationStatus: { aliases: ["검증상태"], required: false },
   });
 
   const members = [];
@@ -222,6 +272,10 @@ function parseMembersCsv(text) {
       agility: nullableNumber(cell(row, columns.agility), "기민", rowNumber, warnings),
       vitality: nullableNumber(cell(row, columns.vitality), "기력", rowNumber, warnings),
       intelligence: nullableNumber(cell(row, columns.intelligence), "지모", rowNumber, warnings),
+      powerScore: nullableNumber(cell(row, columns.powerScore), "무력점수", rowNumber, warnings),
+      sourceType: normalizeSourceType(cell(row, columns.sourceType)),
+      sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
+      verificationStatus: normalizeVerificationStatus(cell(row, columns.verificationStatus)),
       reviewStatus: normalizeReviewStatus(cell(row, columns.reviewStatus)),
       observedAt: normalizeTimestamp(cell(row, columns.observedAt)),
       evidence: cell(row, columns.evidence) || null,
@@ -259,7 +313,10 @@ function parseTerritoriesCsv(text) {
     level: { aliases: ["레벨", "영토레벨"], required: true },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["근거", "최근근거"], required: true },
-    reviewStatus: { aliases: ["검수상태"], required: true },
+    reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
+    sourceType: { aliases: ["출처종류", "출처", "출처종류/출처"], required: false },
+    sourceCount: { aliases: ["교차검증수"], required: false },
+    verificationStatus: { aliases: ["검증상태"], required: false },
   });
 
   const territories = [];
@@ -295,6 +352,9 @@ function parseTerritoriesCsv(text) {
       capital: parseBoolean(cell(row, columns.capital)),
       facility: normalizeFacility(cell(row, columns.facility), rowNumber, warnings),
       level: nullableNumber(cell(row, columns.level), "레벨", rowNumber, warnings),
+      sourceType: normalizeSourceType(cell(row, columns.sourceType)),
+      sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
+      verificationStatus: normalizeVerificationStatus(cell(row, columns.verificationStatus)),
       reviewStatus: normalizeReviewStatus(cell(row, columns.reviewStatus)),
       observedAt: normalizeTimestamp(cell(row, columns.observedAt)),
       evidence: cell(row, columns.evidence) || null,
@@ -429,7 +489,7 @@ function newestObservedAt(members, territories, fallback) {
 function fallbackWarning(error, lastGood) {
   const prefix = lastGood
     ? "Google Sheet 갱신에 실패해 마지막 정상 자료를 표시합니다."
-    : "Google Sheet를 읽지 못해 초기 검수대기 스냅샷을 표시합니다.";
+    : "Google Sheet를 읽지 못해 초기 기준값 스냅샷을 표시합니다.";
   if (error?.code === "upstream_http" && /HTTP (?:401|403)/.test(error.message)) {
     return `${prefix} 시트의 링크 공개 보기 권한을 확인하세요.`;
   }

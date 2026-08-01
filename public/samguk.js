@@ -136,9 +136,13 @@
       agility: cleanValue(pick(row, ['agility', 'stat_agility', '기민'])),
       vitality: cleanValue(pick(row, ['vitality', 'stat_vitality', '기력'])),
       intelligence: cleanValue(pick(row, ['intelligence', 'stat_intelligence', '지모'])),
+      powerScore: cleanValue(pick(row, ['powerScore', 'power_score', 'power', '무력점수', '무력 점수'])),
+      sourceType: pick(row, ['sourceType', 'source_type', 'sourceTypes', '근거종류', '출처종류', '관측경로']),
+      sourceCount: cleanValue(pick(row, ['sourceCount', 'source_count', '교차검증수', '출처수'])),
+      verificationStatus: pick(row, ['verificationStatus', 'verification_status', '검증상태']),
       reviewStatus: pick(row, ['reviewStatus', 'review_status', '검수상태']),
       observedAt: pick(row, ['observedAt', 'observed_at', '최종확인', '확인시각']),
-      evidence: pick(row, ['evidence', '최근근거', '근거URL']),
+      evidence: pick(row, ['evidence', 'evidenceUrl', 'evidence_url', '최근근거', '근거URL']),
     };
   }
 
@@ -148,7 +152,8 @@
     const byName = new Map(normalized.filter(row => row.name).map(row => [String(row.name), row]));
     const valueFields = [
       'level', 'horse', 'horseLevel', 'weapon', 'helmet', 'armor', 'shoes',
-      'strength', 'agility', 'vitality', 'intelligence', 'reviewStatus', 'observedAt', 'evidence',
+      'strength', 'agility', 'vitality', 'intelligence', 'powerScore',
+      'sourceType', 'sourceCount', 'verificationStatus', 'reviewStatus', 'observedAt', 'evidence',
     ];
 
     SAMGUK_MEMBERS.forEach(function (member) {
@@ -179,6 +184,9 @@
       capital: rawCapital === true || ['Y', 'TRUE', '1', '수도'].includes(capitalText),
       facility: pick(row, ['facility', 'facilityType', '시설', '거점유형']) || '없음',
       level: cleanValue(pick(row, ['level', '영토레벨', '성레벨'])),
+      sourceType: pick(row, ['sourceType', 'source_type', '근거종류', '출처종류']),
+      sourceCount: cleanValue(pick(row, ['sourceCount', 'source_count', '교차검증수', '출처수'])),
+      verificationStatus: pick(row, ['verificationStatus', 'verification_status', '검증상태']),
       reviewStatus: pick(row, ['reviewStatus', '검수상태']),
       observedAt: pick(row, ['observedAt', '확인시각', '최종확인']),
       evidence: pick(row, ['evidence', '근거URL', '근거']),
@@ -199,20 +207,13 @@
   function sourceNote(data) {
     const isSheet = data && String(data.source || '').indexOf('google-sheet') === 0;
     const updatedAt = data && data.updatedAt;
-    const memberReviewRows = SAMGUK_MEMBERS.filter(member => member.reviewStatus && member.reviewStatus !== '확정').length;
-    const territoryReviewRows = data && Array.isArray(data.territories)
-      ? data.territories.filter(row => row.reviewStatus && row.reviewStatus !== '확정').length
-      : 0;
+    const crossVerifiedMembers = SAMGUK_MEMBERS.filter(member => Number(member.sourceCount) >= 2).length;
     const sourceLabel = data && data.source === 'google-sheet-last-good'
       ? 'Google 관리 시트 마지막 정상값'
       : isSheet ? 'Google 관리 시트' : '초기 공개자료 스냅샷';
-    const reviewParts = [];
-    if (memberReviewRows) reviewParts.push('참가자 ' + memberReviewRows + '명');
-    if (territoryReviewRows) reviewParts.push('영토 ' + territoryReviewRows + '개');
-    const reviewText = reviewParts.length ? ' · 검수대기/미확인 ' + reviewParts.join(' · ') : '';
     return '<div class="samguk-source-note"><strong>' + safeText(sourceLabel) + '</strong> · '
-      + safeText(formatTime(updatedAt)) + reviewText
-      + '<br>강화·기량은 방송 화면과 제보를 확인해 정리한 값이라 실제 서버와 차이가 날 수 있습니다. '
+      + safeText(formatTime(updatedAt)) + (crossVerifiedMembers ? ' · 교차검증 ' + crossVerifiedMembers + '명' : ' · 시트 기준')
+      + '<br>시트·에펨코리아·방송 관측값을 교차 확인해 필드별 최신값을 표시합니다. '
       + '영토는 표시된 마지막 갱신 시각 기준이며 점령 진행 중에는 반영이 늦을 수 있습니다.</div>';
   }
 
@@ -262,10 +263,10 @@
       .filter(row => row.title && row.description);
 
     window.samgukDataNote = data.source === 'google-sheet' && !data.stale
-      ? 'Google 관리 시트의 입력값을 집계합니다. 검수 상태는 각 행에 표시됩니다.'
+      ? 'Google 관리 시트를 원장으로 사용하며 교차 확인된 필드별 최신값을 집계합니다.'
       : String(data.source || '').indexOf('google-sheet') === 0
-        ? '마지막으로 정상 확인된 관리 시트 값을 집계합니다. 갱신 시각과 검수 상태를 확인하세요.'
-        : '초기 공개자료의 검수대기 값이 포함된 참고 순위입니다. 방송 화면 확인 후 확정됩니다.';
+        ? '마지막으로 정상 확인된 관리 시트의 최신값을 집계합니다.'
+        : '초기 공개자료 스냅샷을 표시하며 새 관측값이 들어오면 최신값으로 교체됩니다.';
     window.samgukSourceNoteHtml = sourceNote(data);
     setBadge(data, mode);
 
@@ -377,7 +378,6 @@
     const counts = { '위': 0, '촉': 0, '오': 0, '미점령': 0 };
     territories.forEach(function (territory) { counts[territory.owner] = (counts[territory.owner] || 0) + 1; });
     const occupied = territories.filter(territory => territory.owner !== '미점령');
-    const territoryReviewRows = territories.filter(territory => territory.reviewStatus && territory.reviewStatus !== '확정').length;
     const rows = occupied.map(function (territory) {
       return '<tr><td><b>' + territory.number + '번</b>' + (territory.number === 27 ? ' · 특수' : '') + '</td>'
         + '<td>' + ownerBadge(territory.owner) + '</td>'
@@ -395,13 +395,12 @@
       + '<div class="samguk-territory-kpi is-wu"><span class="samguk-territory-kpi-label">吳 오</span><b class="samguk-territory-kpi-value">' + counts['오'] + '</b></div>'
       + '<div class="samguk-territory-kpi is-empty"><span class="samguk-territory-kpi-label">미점령</span><b class="samguk-territory-kpi-value">' + counts['미점령'] + '</b></div>'
       + '</div>'
-      + (territoryReviewRows ? '<div class="samguk-territory-review-note">검수대기/미확인 영토 ' + territoryReviewRows + '개가 포함된 참고 현황입니다.</div>' : '')
       + '<section class="samguk-map-panel"><div class="samguk-map-head"><h3 class="samguk-map-title">' + territories.length + '개 영토 현황</h3>'
       + '<div class="samguk-map-legend"><span><i style="background:#4169a8"></i>위</span><span><i style="background:#3f8b58"></i>촉</span>'
       + '<span><i style="background:#b94d4d"></i>오</span><span><i style="background:#a7abb3"></i>미점령</span><span>★ 수도</span><span>금색 테두리 27번 특수지</span></div></div>'
       + renderTerritorySvg(territories) + '</section>'
       + '<section class="samguk-territory-table-panel"><div class="samguk-ranking-header">점령 영토 ' + occupied.length + '개</div>'
-      + '<div class="samguk-territory-table-wrap"><table class="samguk-territory-table"><thead><tr><th>영토</th><th>소유국</th><th>수도</th><th>시설</th><th>레벨</th><th>검수</th><th>기준 시각</th></tr></thead><tbody>'
+      + '<div class="samguk-territory-table-wrap"><table class="samguk-territory-table"><thead><tr><th>영토</th><th>소유국</th><th>수도</th><th>시설</th><th>레벨</th><th>검증 기준</th><th>기준 시각</th></tr></thead><tbody>'
       + (rows || '<tr><td colspan="7">아직 점령된 영토가 없습니다.</td></tr>')
       + '</tbody></table></div></section></div>';
   };

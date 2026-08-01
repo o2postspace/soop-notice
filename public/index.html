@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>숲공지 - SOOP 스트리머 공지사항 대시보드 | soopnotice</title>
 <link rel="icon" href="/logo.png" type="image/png">
-<link rel="stylesheet" href="/samguk.css?v=20260802">
+<link rel="stylesheet" href="/samguk.css?v=20260802b">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-9J4PTFHT9S"></script>
 <script>
@@ -1073,18 +1073,25 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   .samguk-live-link { background: #bbb; }
   .samguk-live-link:hover { background: #999; }
 
-  /* 삼국지 성장랭킹 */
+  /* 삼국지 무력랭킹 */
   .samguk-ranking {
     max-width: 1200px;
     margin: 0 auto;
   }
   .samguk-ranking-guide {
-    color: #999;
+    color: #74788a;
     font-size: 11px;
     line-height: 1.6;
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    padding: 11px 14px;
+    border: 1px solid #e7e9f5;
+    border-radius: 10px;
+    background: #fafaff;
   }
+  .samguk-ranking-guide b { color: #4e556f; }
+  .samguk-ranking-filter { justify-content: center; margin: 0 0 14px; }
+  .samguk-ranking-scope { color: #5B6AED; font-weight: 700; }
   .samguk-ranking-section {
     background: #fff;
     border-radius: 14px;
@@ -1098,6 +1105,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     font-weight: 700;
     padding: 14px 18px;
     border-bottom: 1px solid #f0f0f0;
+  }
+  .samguk-ranking-header small {
+    margin-left: 6px;
+    color: #999;
+    font-size: 10px;
+    font-weight: 500;
   }
   .samguk-ranking-table {
     width: 100%;
@@ -1121,6 +1134,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     padding: 7px 12px;
     border-bottom: 1px solid #f8f8f8;
   }
+  .samguk-ranking-table td:last-child { border-right: 0; }
   .samguk-ranking-table tr:hover { background: #f8f8ff; }
   .samguk-rank-num {
     width: 34px;
@@ -1148,6 +1162,88 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     padding: 2px 7px;
     border-radius: 4px;
   }
+  .samguk-rank-name {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .samguk-rank-name:hover { color: #5B6AED; }
+  .samguk-rank-score {
+    color: #4f5fe0;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .samguk-rank-coverage {
+    color: #777;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .samguk-observation-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 3px;
+    min-width: 155px;
+  }
+  .samguk-source-badge,
+  .samguk-verification-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 17px;
+    border-radius: 8px;
+    padding: 1px 6px;
+    font-size: 8px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .samguk-source-badge { border: 1px solid #d9dceb; background: #f5f6fb; color: #71778e; }
+  .samguk-source-badge.is-sheet { border-color: #bfe1ca; background: #edf8f0; color: #34774a; }
+  .samguk-source-badge.is-fmkorea { border-color: #cbd5f4; background: #f0f3ff; color: #4c62a5; }
+  .samguk-source-badge.is-broadcast { border-color: #f0c8c8; background: #fff1f1; color: #b55353; }
+  .samguk-verification-badge { border: 1px solid #cfd3f7; background: #f0f1ff; color: #5361cf; }
+  .samguk-verification-badge.is-cross { border-color: #e6cf9d; background: #fff7e5; color: #997326; }
+  .samguk-observed-link,
+  .samguk-observed-time {
+    color: #999;
+    font-size: 8px;
+    white-space: nowrap;
+  }
+  .samguk-observed-link { text-decoration: underline; text-underline-offset: 2px; }
+  .samguk-observed-link:hover { color: #5B6AED; }
+  .samguk-job-ranking-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+  .samguk-job-ranking-card {
+    overflow: hidden;
+    border: 1px solid #ececf3;
+    border-radius: 9px;
+    background: #fff;
+  }
+  .samguk-job-ranking-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 10px;
+    border-bottom: 1px solid #f0f0f3;
+  }
+  .samguk-job-ranking-count { margin-left: auto; color: #999; font-size: 9px; }
+  .samguk-job-rank-row {
+    display: grid;
+    grid-template-columns: 24px minmax(90px, 1fr) auto;
+    align-items: center;
+    column-gap: 7px;
+    padding: 7px 9px;
+    border-bottom: 1px solid #f5f5f8;
+  }
+  .samguk-job-rank-row:last-child { border-bottom: 0; }
+  .samguk-job-rank-person { min-width: 0; }
+  .samguk-job-rank-person .samguk-observation-meta { min-width: 0; margin-top: 3px; }
+  .samguk-job-rank-score { color: #4f5fe0; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .samguk-job-rank-nation { margin-left: 4px; color: #999; font-size: 8px; }
   .samguk-ranking-empty {
     color: #aaa;
     font-size: 12px;
@@ -1181,6 +1277,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .samguk-stat { background: #202020; }
   html.dark .samguk-stat-value { color: #bbb; }
   html.dark .samguk-ranking-section { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  html.dark .samguk-ranking-guide { background: #1d1d26; border-color: #333545; color: #85899a; }
+  html.dark .samguk-ranking-guide b { color: #b0b4c7; }
   html.dark .samguk-ranking-header,
   html.dark .samguk-ranking-table th,
   html.dark .samguk-ranking-table td { border-color: #333; }
@@ -1188,6 +1286,22 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .samguk-ranking-table td { color: #ddd; }
   html.dark .samguk-ranking-table th { color: #666; }
   html.dark .samguk-ranking-table tr:hover { background: #252530; }
+  html.dark .samguk-rank-name { color: #ddd; }
+  html.dark .samguk-rank-name:hover { color: #8e98ff; }
+  html.dark .samguk-rank-score,
+  html.dark .samguk-job-rank-score { color: #8e98ff; }
+  html.dark .samguk-rank-coverage { color: #888; }
+  html.dark .samguk-source-badge { background: #272832; border-color: #404250; color: #999dac; }
+  html.dark .samguk-source-badge.is-sheet { background: #1c3023; border-color: #31523c; color: #78bd8e; }
+  html.dark .samguk-source-badge.is-fmkorea { background: #22283a; border-color: #384666; color: #91a7e8; }
+  html.dark .samguk-source-badge.is-broadcast { background: #382222; border-color: #613b3b; color: #e39494; }
+  html.dark .samguk-verification-badge { background: #272940; border-color: #41466d; color: #99a2f6; }
+  html.dark .samguk-verification-badge.is-cross { background: #372f1f; border-color: #5d4d2c; color: #d8ba76; }
+  html.dark .samguk-observed-link,
+  html.dark .samguk-observed-time { color: #777; }
+  html.dark .samguk-job-ranking-card { background: #202020; border-color: #34343c; }
+  html.dark .samguk-job-ranking-title,
+  html.dark .samguk-job-rank-row { border-color: #303038; }
   html.dark .samguk-empty-value { color: #555; }
 
   /* 커뮤니티 */
@@ -1817,10 +1931,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .samguk-nation-header { padding: 10px; }
     .samguk-nation-name { font-size: 12px; }
     .samguk-ranking-table { min-width: 520px; }
+    .samguk-ranking-table.is-personal { min-width: 650px; }
     .samguk-ranking-table th, .samguk-ranking-table td { padding: 5px 7px; font-size: 10px; }
     .samguk-ranking-table .col-equip,
     .samguk-ranking-table .col-crew { display: none; }
     .samguk-rank-profile { width: 22px; height: 22px; margin-right: 4px; }
+    .samguk-ranking-guide { padding: 9px 10px; font-size: 10px; text-align: left; }
+    .samguk-ranking-filter { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; }
+    .samguk-job-ranking-grid { grid-template-columns: 1fr; gap: 8px; padding: 8px; }
+    .samguk-observation-meta { min-width: 140px; }
     #communityContainer { padding: 10px 0; }
     .community-shell { max-width: none; }
     .community-heading { padding: 0 10px; flex-direction: column; gap: 8px; }
@@ -1960,7 +2079,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="samguk-head">
       <div>
         <h2 class="samguk-title">감스트 삼국지 현황</h2>
-        <p class="samguk-subtitle">2026년 8월 1일–10일 · 위·촉·오 참가자 90명<br>강화·기량·영토는 관리 시트와 동기화되며 검수 상태를 함께 표시합니다.</p>
+        <p class="samguk-subtitle">2026년 8월 1일–10일 · 위·촉·오 참가자 90명<br>시트·에펨코리아·방송 관측값을 교차 확인하고 최신값으로 동기화합니다.</p>
       </div>
       <div class="samguk-actions">
         <span class="samguk-sync-badge" id="samgukSyncBadge">데이터 불러오는 중</span>
@@ -1970,7 +2089,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div class="samguk-subtabs">
       <button class="samguk-subtab active" data-samguktab="status" onclick="switchSamgukTab('status')">현황</button>
-      <button class="samguk-subtab" data-samguktab="ranking" onclick="switchSamgukTab('ranking')">성장랭킹</button>
+      <button class="samguk-subtab" data-samguktab="ranking" onclick="switchSamgukTab('ranking')">무력랭킹</button>
       <button class="samguk-subtab" data-samguktab="territory" onclick="switchSamgukTab('territory')">영토</button>
       <button class="samguk-subtab" data-samguktab="info" onclick="switchSamgukTab('info')">게임정보</button>
     </div>
@@ -3305,7 +3424,8 @@ function setSamgukNation(nation) {
   document.querySelectorAll('.samguk-filter-btn').forEach(function(button) {
     button.classList.toggle('active', button.dataset.nation === nation);
   });
-  renderSamguk();
+  if (currentSamgukTab === 'ranking') renderSamgukPowerRanking();
+  else renderSamguk();
 }
 
 function switchSamgukTab(tab) {
@@ -3356,10 +3476,77 @@ function samgukEquipmentTotal(member) {
 }
 
 function samgukReviewBadge(member) {
-  const status = member && member.reviewStatus;
-  if (!status) return '';
-  const className = status === '확정' ? 'is-confirmed' : status === '충돌' ? 'is-conflict' : 'is-pending';
-  return '<span class="samguk-review-badge ' + className + '">' + escapeHtml(status) + '</span>';
+  const sourceCount = samgukObservationSourceCount(member);
+  const isCross = sourceCount >= 2;
+  return '<span class="samguk-review-badge ' + (isCross ? 'is-confirmed' : 'is-baseline') + '">'
+    + (isCross ? '교차검증 ' + sourceCount : '시트 기준') + '</span>';
+}
+
+function samgukObservationSourceCount(member) {
+  const explicit = samgukNumber(member && member.sourceCount);
+  if (explicit !== null && explicit > 0) return Math.floor(explicit);
+  const status = String(member && member.verificationStatus || '');
+  const matched = status.match(/(\d+)/);
+  return matched ? Math.max(1, Number(matched[1])) : 1;
+}
+
+function samgukSourceKinds(member) {
+  const raw = member && member.sourceType;
+  const chunks = Array.isArray(raw) ? raw : String(raw || 'sheet').split(/[,|+\/·]/);
+  const found = new Set();
+  chunks.forEach(function(chunk) {
+    const value = String(chunk || '').trim().toLowerCase();
+    if (!value) return;
+    if (/broadcast|stream|soop|ocr|방송/.test(value)) found.add('broadcast');
+    if (/fmkorea|fmk|에펨|펨코/.test(value)) found.add('fmkorea');
+    if (/sheet|google|시트|관리표/.test(value)) found.add('sheet');
+  });
+  if (!found.size) found.add('sheet');
+  return ['sheet', 'fmkorea', 'broadcast'].filter(function(kind) { return found.has(kind); });
+}
+
+function samgukSourceBadges(member) {
+  const labels = { sheet: '시트', fmkorea: '에펨코리아', broadcast: '방송' };
+  return samgukSourceKinds(member).map(function(kind) {
+    return '<span class="samguk-source-badge is-' + kind + '">' + labels[kind] + '</span>';
+  }).join('');
+}
+
+function samgukSafeEvidenceUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const url = new URL(value, location.origin);
+    return url.protocol === 'https:' ? url.href : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function samgukObservedLabel(value) {
+  if (!hasSamgukValue(value)) return '';
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleString('ko-KR', {
+      month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+  return String(value).slice(0, 24);
+}
+
+function samgukObservationMeta(member) {
+  const sourceCount = samgukObservationSourceCount(member);
+  const observed = samgukObservedLabel(member && member.observedAt);
+  const evidenceUrl = samgukSafeEvidenceUrl(member && member.evidence);
+  const verification = '<span class="samguk-verification-badge' + (sourceCount >= 2 ? ' is-cross' : '') + '">'
+    + (sourceCount >= 2 ? '교차검증 ' + sourceCount : '시트 기준') + '</span>';
+  let time = '';
+  if (evidenceUrl) {
+    time = '<a class="samguk-observed-link" href="' + escapeHtml(evidenceUrl)
+      + '" target="_blank" rel="noopener">' + escapeHtml(observed || '근거 보기') + '</a>';
+  } else if (observed) {
+    time = '<span class="samguk-observed-time">' + escapeHtml(observed) + '</span>';
+  }
+  return '<span class="samguk-observation-meta">' + samgukSourceBadges(member) + verification + time + '</span>';
 }
 
 function samgukProfileUrl(soopId) {
@@ -3426,84 +3613,152 @@ function renderSamgukPowerRanking() {
   const root = document.getElementById('samgukPowerRanking');
   if (!root) return;
 
-  const growthRanked = SAMGUK_MEMBERS.map(function(member) {
-    return { member: member, growth: samgukGrowthScore(member) };
-  }).filter(function(entry) {
-    return entry.growth !== null && entry.growth > 0;
-  }).sort(function(a, b) {
-    return b.growth - a.growth || a.member.name.localeCompare(b.member.name, 'ko');
+  const hasPowerScore = SAMGUK_MEMBERS.some(function(member) {
+    const value = samgukNumber(member.powerScore);
+    return value !== null && value > 0;
   });
-  const strengthRanked = SAMGUK_MEMBERS.map(function(member) {
-    return { member: member, strength: samgukNumber(member.strength) };
+  const scoreField = hasPowerScore ? 'powerScore' : 'strength';
+  const scoreLabel = hasPowerScore ? '무력점수' : '무력 스탯';
+  const scoreOf = function(member) {
+    const value = samgukNumber(member[scoreField]);
+    return value !== null && value > 0 ? value : null;
+  };
+  const formatScore = function(value) {
+    if (value === null || !Number.isFinite(value)) return '—';
+    return value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+  };
+  const allRanked = SAMGUK_MEMBERS.map(function(member) {
+    return { member: member, score: scoreOf(member) };
   }).filter(function(entry) {
-    return entry.strength !== null && entry.strength > 0;
+    return entry.score !== null;
   }).sort(function(a, b) {
-    return b.strength - a.strength || a.member.name.localeCompare(b.member.name, 'ko');
+    return b.score - a.score || a.member.name.localeCompare(b.member.name, 'ko');
   });
+  const scopedRanked = allRanked.filter(function(entry) {
+    return currentSamgukNation === 'all' || entry.member.nation === currentSamgukNation;
+  });
+  const scopeLabel = currentSamgukNation === 'all'
+    ? '전체 국가'
+    : (SAMGUK_NATIONS[currentSamgukNation] || {}).label || currentSamgukNation;
+
+  function aggregateObservationMeta(entries) {
+    if (!entries.length) return '<span class="samguk-observed-time">관측 없음</span>';
+    const sourceTypes = new Set();
+    let crossVerifiedMembers = 0;
+    let latestMember = null;
+    let latestTime = -Infinity;
+    entries.forEach(function(entry) {
+      if (!latestMember) latestMember = entry.member;
+      samgukSourceKinds(entry.member).forEach(function(kind) { sourceTypes.add(kind); });
+      if (samgukObservationSourceCount(entry.member) >= 2) crossVerifiedMembers += 1;
+      const time = new Date(entry.member.observedAt || 0).getTime();
+      if (Number.isFinite(time) && time > latestTime) {
+        latestTime = time;
+        latestMember = entry.member;
+      }
+    });
+    const sourceHtml = samgukSourceBadges({ sourceType: Array.from(sourceTypes) });
+    const verifyHtml = '<span class="samguk-verification-badge' + (crossVerifiedMembers ? ' is-cross' : '') + '">'
+      + (crossVerifiedMembers ? crossVerifiedMembers + '명 교차검증' : '시트 기준') + '</span>';
+    const observed = latestMember ? samgukObservedLabel(latestMember.observedAt) : '';
+    const evidenceUrl = latestMember ? samgukSafeEvidenceUrl(latestMember.evidence) : '';
+    const observedHtml = evidenceUrl
+      ? '<a class="samguk-observed-link" href="' + escapeHtml(evidenceUrl) + '" target="_blank" rel="noopener">' + escapeHtml(observed || '최근 근거') + '</a>'
+      : observed ? '<span class="samguk-observed-time">' + escapeHtml(observed) + '</span>' : '';
+    return '<span class="samguk-observation-meta">' + sourceHtml + verifyHtml + observedHtml + '</span>';
+  }
 
   const nationRows = ['위', '촉', '오'].map(function(nation) {
-    const meta = SAMGUK_NATIONS[nation];
-    const members = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
-    const values = members.map(samgukGrowthScore).filter(function(value) {
-      return value !== null && value > 0;
-    });
-    const total = values.reduce(function(sum, value) { return sum + value; }, 0);
+    const roster = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
+    const entries = allRanked.filter(function(entry) { return entry.member.nation === nation; });
+    const total = entries.reduce(function(sum, entry) { return sum + entry.score; }, 0);
     return {
       nation: nation,
-      meta: meta,
-      known: values.length,
-      total: total,
-      average: values.length ? total / values.length : null,
+      meta: SAMGUK_NATIONS[nation],
+      roster: roster.length,
+      entries: entries,
+      known: entries.length,
+      total: entries.length ? total : null,
+      average: entries.length ? total / entries.length : null,
     };
+  }).sort(function(a, b) {
+    if (a.average === null && b.average === null) return a.nation.localeCompare(b.nation, 'ko');
+    if (a.average === null) return 1;
+    if (b.average === null) return -1;
+    return b.average - a.average;
   });
 
-  let html = '<div class="samguk-ranking-guide"><b>삼국지 성장랭킹 · 기량 투자량</b><br>'
-    + '<b>기량점수 = 무력 + 기민 + 기력 + 지모</b>. 각 단계가 기량점수 1을 쓰므로 입력된 투자량을 비교합니다.<br>'
-    + '직업별 효율과 장비·말·각인 효과가 달라 <b>종합 전투력은 아닙니다.</b> '
-    + '<a href="https://threekingdoms.notion.site/872f648a81d1821ea42581f61a4fc57e" target="_blank" rel="noopener">공식 기량 안내</a><br>'
-    + '<span class="samguk-ranking-coverage">기량 양수 관측 ' + growthRanked.length + '/90명 · 무력 양수 관측 ' + strengthRanked.length + '/90명 · 원 자료의 0은 미입력 여부를 구분할 수 없어 합계·순위에서 제외</span><br>'
-    + escapeHtml(window.samgukDataNote || '검수 상태와 관측 범위를 함께 확인하세요.')
+  let html = '<div class="samguk-ranking-guide"><b>삼국지 ' + scoreLabel + ' 랭킹</b><br>';
+  if (hasPowerScore) {
+    html += '기존 충동서버와 같이 시트의 별도 <b>무력점수</b>를 그대로 사용합니다. 무력 스탯과 점수 스케일은 섞지 않습니다.<br>';
+  } else {
+    html += '별도 무력점수가 입력되기 전까지 양수로 관측된 <b>무력 스탯</b> 최신값만 사용합니다. 다른 기량과 합산하지 않습니다.<br>';
+  }
+  html += '<span class="samguk-rank-coverage">관측 범위 ' + allRanked.length + '/' + SAMGUK_MEMBERS.length
+    + '명 · 국가 평균은 관측된 인원 기준 · 0과 빈값은 순위에서 제외</span><br>'
+    + escapeHtml(window.samgukDataNote || '시트·에펨코리아·방송 관측값 중 교차 확인된 최신값을 사용합니다.')
     + '</div>';
+
   html += '<section class="samguk-ranking-section">'
-    + '<div class="samguk-ranking-header">국가 기량 현황 · 표본 차이로 국가 순위는 보류</div>'
+    + '<div class="samguk-ranking-header">국가 ' + scoreLabel + ' 평균·총합 <small>전체 국가 비교 · 관측 범위 병기</small></div>'
     + '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table">'
-    + '<thead><tr><th>국가</th><th>양수 관측</th><th>기량 관측합</th><th>관측자 평균</th><th>비교 상태</th></tr></thead><tbody>';
-  nationRows.forEach(function(row) {
-    const hasData = row.average !== null;
+    + '<thead><tr><th style="width:40px">#</th><th>국가</th><th>관측 범위</th><th>평균</th><th>총합</th><th>관측 근거</th></tr></thead><tbody>';
+  let previousNationAverage = null;
+  let nationRank = 0;
+  nationRows.forEach(function(row, index) {
+    if (row.average !== null && row.average !== previousNationAverage) nationRank = index + 1;
+    previousNationAverage = row.average;
     html += '<tr>'
+      + '<td class="samguk-rank-num samguk-rank-' + nationRank + '">' + (row.average === null ? '—' : nationRank) + '</td>'
       + '<td><span class="samguk-rank-badge" style="background:' + row.meta.color + '">' + row.meta.label + '</span></td>'
-      + '<td>' + row.known + '/30명</td>'
-      + '<td>' + (hasData ? row.total : '—') + '</td>'
-      + '<td><b>' + (hasData ? row.average.toFixed(1) : '—') + '</b></td>'
-      + '<td>' + (row.known === 30 ? '전체 관측' : '순위 보류') + '</td>'
+      + '<td><span class="samguk-rank-coverage">' + row.known + '/' + row.roster + '명 ('
+      + (row.roster ? Math.round(row.known / row.roster * 100) : 0) + '%)</span></td>'
+      + '<td><b class="samguk-rank-score">' + formatScore(row.average) + '</b></td>'
+      + '<td>' + formatScore(row.total) + '</td>'
+      + '<td>' + aggregateObservationMeta(row.entries) + '</td>'
       + '</tr>';
   });
   html += '</tbody></table></div></section>';
 
+  html += '<div class="samguk-filterbar samguk-ranking-filter" aria-label="무력랭킹 국가 필터">'
+    + ['all', '위', '촉', '오'].map(function(nation) {
+      const count = nation === 'all' ? SAMGUK_MEMBERS.length : SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; }).length;
+      const label = nation === 'all' ? '전체' : nation;
+      return '<button class="samguk-filter-btn' + (currentSamgukNation === nation ? ' active' : '')
+        + '" data-nation="' + nation + '" onclick="setSamgukNation(\'' + nation + '\')">' + label + ' ' + count + '</button>';
+    }).join('') + '</div>';
+
   html += '<section class="samguk-ranking-section">'
-    + '<div class="samguk-ranking-header">개인 기량 투자 랭킹 · 입력된 양수 관측치의 합</div>';
-  if (growthRanked.length === 0) {
-    html += '<div class="samguk-ranking-empty">기량 데이터가 입력되면 순위가 표시됩니다.</div>';
+    + '<div class="samguk-ranking-header">개인 전체 ' + scoreLabel + ' 랭킹 <small class="samguk-ranking-scope">' + escapeHtml(scopeLabel)
+    + ' · ' + scopedRanked.length + '명</small></div>';
+  if (!scopedRanked.length) {
+    html += '<div class="samguk-ranking-empty">' + scoreLabel + ' 데이터가 입력되면 순위가 표시됩니다.</div>';
   } else {
-    html += '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table">'
-      + '<thead><tr><th style="width:40px">#</th><th>스트리머</th><th>장수</th><th>Lv</th><th>기량점수</th><th>무력</th><th class="col-equip">기민 · 기력 · 지모</th><th class="col-equip">강화 관측합</th><th class="col-crew">국가·소속</th></tr></thead><tbody>';
-    let previousGrowth = null;
+    html += '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table is-personal">'
+      + '<thead><tr><th style="width:40px">#</th><th>스트리머</th><th>장수</th><th class="col-level">Lv</th><th class="col-equip">장비</th><th>'
+      + scoreLabel + '</th><th>관측 근거</th><th class="col-crew">국가·소속</th></tr></thead><tbody>';
+    let previousScore = null;
     let sharedRank = 0;
-    growthRanked.forEach(function(entry, index) {
+    scopedRanked.forEach(function(entry, index) {
       const member = entry.member;
-      const meta = SAMGUK_NATIONS[member.nation];
-      if (entry.growth !== previousGrowth) sharedRank = index + 1;
-      previousGrowth = entry.growth;
-      const equipmentTotal = samgukEquipmentTotal(member);
+      const meta = SAMGUK_NATIONS[member.nation] || { label: member.nation || '—', color: '#777' };
+      if (entry.score !== previousScore) sharedRank = index + 1;
+      previousScore = entry.score;
+      const equipment = [
+        '무기 ' + samgukValue(member.weapon, '강'),
+        '두갑 ' + samgukValue(member.helmet, '강'),
+        '흉갑 ' + samgukValue(member.armor, '강'),
+        '각갑 ' + samgukValue(member.shoes, '강'),
+      ].join(' · ');
       html += '<tr>'
         + '<td class="samguk-rank-num samguk-rank-' + sharedRank + '">' + sharedRank + '</td>'
-        + '<td><img class="samguk-rank-profile" src="' + samgukProfileUrl(member.soopId) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' + escapeHtml(member.name) + '</td>'
+        + '<td><img class="samguk-rank-profile" src="' + samgukProfileUrl(member.soopId) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+        + '<a class="samguk-rank-name" href="https://www.sooplive.com/' + encodeURIComponent(member.soopId) + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a></td>'
         + '<td>' + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '—') + '</td>'
-        + '<td>Lv.' + samgukValue(member.level) + '</td>'
-        + '<td><b>' + entry.growth + '</b> ' + samgukReviewBadge(member) + '</td>'
-        + '<td>' + samgukValue(member.strength) + '</td>'
-        + '<td class="col-equip">' + samgukValue(member.agility) + ' · ' + samgukValue(member.vitality) + ' · ' + samgukValue(member.intelligence) + '</td>'
-        + '<td class="col-equip">' + samgukValue(equipmentTotal, '강') + '</td>'
+        + '<td class="col-level">Lv.' + samgukValue(member.level) + '</td>'
+        + '<td class="col-equip">' + equipment + '</td>'
+        + '<td><b class="samguk-rank-score">' + formatScore(entry.score) + '</b></td>'
+        + '<td>' + samgukObservationMeta(member) + '</td>'
         + '<td class="col-crew"><span class="samguk-rank-badge" style="background:' + meta.color + '">' + meta.label + '</span> ' + escapeHtml(member.crew) + '</td>'
         + '</tr>';
     });
@@ -3511,30 +3766,41 @@ function renderSamgukPowerRanking() {
   }
   html += '</section>';
 
+  const jobGroups = {};
+  scopedRanked.forEach(function(entry) {
+    const job = String(entry.member.job || '').trim();
+    if (!job) return;
+    if (!jobGroups[job]) jobGroups[job] = [];
+    jobGroups[job].push(entry);
+  });
+  const jobNames = Object.keys(jobGroups).sort(function(a, b) {
+    return jobGroups[b].length - jobGroups[a].length || a.localeCompare(b, 'ko');
+  });
   html += '<section class="samguk-ranking-section">'
-    + '<div class="samguk-ranking-header">개인 무력 스탯 랭킹 · 직업별 효율이 달라 종합 전투력 순위가 아님</div>';
-  if (strengthRanked.length === 0) {
-    html += '<div class="samguk-ranking-empty">무력 데이터가 입력되면 순위가 표시됩니다.</div>';
+    + '<div class="samguk-ranking-header">직업별 ' + scoreLabel + ' TOP 5 <small class="samguk-ranking-scope">' + escapeHtml(scopeLabel) + '</small></div>';
+  if (!jobNames.length) {
+    html += '<div class="samguk-ranking-empty">직업과 ' + scoreLabel + ' 데이터가 입력되면 표시됩니다.</div>';
   } else {
-    html += '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table">'
-      + '<thead><tr><th style="width:40px">#</th><th>스트리머</th><th>장수</th><th>무력(관측)</th><th>기량점수</th><th class="col-crew">국가·소속</th></tr></thead><tbody>';
-    let previousStrength = null;
-    let strengthRank = 0;
-    strengthRanked.forEach(function(entry, index) {
-      const member = entry.member;
-      const meta = SAMGUK_NATIONS[member.nation];
-      if (entry.strength !== previousStrength) strengthRank = index + 1;
-      previousStrength = entry.strength;
-      html += '<tr>'
-        + '<td class="samguk-rank-num samguk-rank-' + strengthRank + '">' + strengthRank + '</td>'
-        + '<td><img class="samguk-rank-profile" src="' + samgukProfileUrl(member.soopId) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' + escapeHtml(member.name) + '</td>'
-        + '<td>' + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '—') + '</td>'
-        + '<td><b>' + entry.strength + '</b> ' + samgukReviewBadge(member) + '</td>'
-        + '<td>' + samgukValue(samgukGrowthScore(member)) + '</td>'
-        + '<td class="col-crew"><span class="samguk-rank-badge" style="background:' + meta.color + '">' + meta.label + '</span> ' + escapeHtml(member.crew) + '</td>'
-        + '</tr>';
+    html += '<div class="samguk-job-ranking-grid">';
+    jobNames.forEach(function(job) {
+      const entries = jobGroups[job].slice(0, 5);
+      html += '<article class="samguk-job-ranking-card">'
+        + '<div class="samguk-job-ranking-title"><span class="samguk-job" style="background:#5B6AED">' + escapeHtml(job) + '</span>'
+        + '<span class="samguk-job-ranking-count">관측 ' + jobGroups[job].length + '명</span></div>';
+      entries.forEach(function(entry, index) {
+        const member = entry.member;
+        html += '<div class="samguk-job-rank-row">'
+          + '<span class="samguk-rank-num samguk-rank-' + (index + 1) + '">' + (index + 1) + '</span>'
+          + '<div class="samguk-job-rank-person"><a class="samguk-rank-name" href="https://www.sooplive.com/' + encodeURIComponent(member.soopId)
+          + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a>'
+          + '<span class="samguk-job-rank-nation">' + escapeHtml(member.nation) + ' · ' + escapeHtml(member.crew) + '</span>'
+          + samgukObservationMeta(member) + '</div>'
+          + '<b class="samguk-job-rank-score">' + formatScore(entry.score) + '</b>'
+          + '</div>';
+      });
+      html += '</article>';
     });
-    html += '</tbody></table></div>';
+    html += '</div>';
   }
   html += '</section>';
   root.innerHTML = html;
@@ -4737,7 +5003,7 @@ document.addEventListener('click', function(e) {
   if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
 });
 </script>
-<script src="/samguk.js?v=20260802"></script>
+<script src="/samguk.js?v=20260802b"></script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

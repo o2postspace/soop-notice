@@ -275,16 +275,16 @@ def add_guide_sheet(
 
     instructions = [
         ("생성 시각", generated_at.strftime("%Y-%m-%d %H:%M:%S KST")),
-        ("운영 원칙", "확인한 화면마다 관측입력에 새 행을 추가합니다. 기존 행을 덮어쓰거나 삭제하지 않습니다."),
+        ("운영 원칙", "확인한 화면마다 완전한 스냅샷 한 행을 추가합니다. 기존 행을 덮어쓰거나 삭제하지 않습니다."),
         ("1. 방송 확인", "방송모니터링에서 LIVE 링크를 열고 레벨·말·장비·능력치를 확인합니다."),
-        ("2. 값 기록", "관측입력에는 화면에서 보인 항목만 적고, 근거 URL/타임코드와 확인시각을 함께 남깁니다."),
-        ("3. 검수", "OCR/외부 수집값은 검수대기, 사람이 확인한 값은 검수자·검수시각을 적은 뒤 확정으로 바꿉니다."),
-        ("4. 현황/랭킹", "현재현황은 확정값을 우선 반영합니다. 기량합계는 무력+기민+기력+지모의 투자량이며 장비 강화나 종합 전투력과 합산하지 않습니다."),
-        ("5. 영토 기록", "영토 변화도 영토입력에 새 행으로만 추가합니다. 영토현황은 확정값 우선, 없으면 최신 검수대기 값을 표시합니다."),
+        ("2. 값 기록", "관측입력에는 현재 스냅샷 전체와 근거 URL/타임코드·확인시각·증거해시를 함께 남깁니다."),
+        ("3. 교차검증", "서로 다른 두 출처가 같은 값을 확인하거나 방송의 서로 다른 두 프레임이 일치한 스냅샷만 추가합니다."),
+        ("4. 현황/랭킹", "현재현황은 교차검증된 최신 스냅샷 한 행을 통째로 반영합니다. 별도 무력점수가 없으면 무력 스탯만 비교합니다."),
+        ("5. 영토 기록", "영토 변화도 교차검증된 완전한 스냅샷을 영토입력에 추가하고 가장 최근 확인시각의 행을 표시합니다."),
         ("OCR 연결", "OCR설정에 캡처 해상도와 항목별 좌표를 넣으면 추후 모니터링 프로그램에서 그대로 사용할 수 있습니다."),
-        ("초기 데이터", "공개 지통실 조회값을 검수대기로 넣었습니다." if has_snapshot else "현재 네트워크 스냅샷 없이 90명 명단만 넣었습니다."),
-        ("초기 영토", "공개 지도 60개를 검수대기로 넣었습니다." if has_territory else "영토 원본 없이 빈 입력 구조만 만들었습니다."),
-        ("주의", "필터 사용은 가능하지만 관측입력 행을 임의 정렬하지 마세요. 최신값은 아래에 추가된 확정행을 기준으로 계산합니다."),
+        ("초기 데이터", "공개 지통실 조회값을 시트 기준값으로 넣었습니다." if has_snapshot else "현재 네트워크 스냅샷 없이 90명 명단만 넣었습니다."),
+        ("초기 영토", "공개 지도 60개를 시트 기준값으로 넣었습니다." if has_territory else "영토 원본 없이 빈 입력 구조만 만들었습니다."),
+        ("주의", "후보값은 이 시트에 넣지 않습니다. 교차검증 프로그램이 승격한 완전한 스냅샷만 아래에 추가하세요."),
     ]
     for row_index, (label, text) in enumerate(instructions, start=3):
         ws.cell(row_index, 1, label)
@@ -299,8 +299,8 @@ def add_guide_sheet(
 
     legend_row = 16
     ws.cell(legend_row, 1, "색상")
-    ws.cell(legend_row, 2, "확정")
-    ws.cell(legend_row, 3, "검수대기")
+    ws.cell(legend_row, 2, "교차검증")
+    ws.cell(legend_row, 3, "시트 기준값")
     ws.cell(legend_row, 4, "충돌/오류")
     ws.cell(legend_row, 5, "오래됨")
     for cell in ws[legend_row][:5]:
@@ -321,8 +321,11 @@ def add_reference_sheet(wb: Workbook) -> None:
     groups = {
         1: ("국가", ["위", "촉", "오"]),
         3: ("활동상태", ["활동", "휴식", "하차"]),
-        5: ("근거종류", ["방송화면", "다시보기", "클립", "공개현황표", "관리자입력", "OCR"]),
-        7: ("검수상태", ["검수대기", "확정", "반려", "충돌"]),
+        5: ("근거종류", [
+            "시트", "에펨코리아", "방송", "시트+에펨코리아", "시트+방송",
+            "에펨코리아+방송", "시트+에펨코리아+방송",
+        ]),
+        7: ("검증상태", ["기준값", "교차검증", "방송교차검증", "충돌"]),
         9: ("모니터링상태", ["대기", "수동확인", "OCR연결", "중지"]),
         11: ("방송상태", ["확인필요", "LIVE", "OFFLINE", "확인실패"]),
         16: ("영토소유", ["위", "촉", "오", "미점령"]),
@@ -530,17 +533,19 @@ def add_observations_sheet(
     headers = [
         "observation_id", "player_id", "확인시각", "근거종류", "근거(URL/타임코드)",
         "레벨", "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
-        "무력", "기민", "기력", "지모", "기록자", "검수상태", "검수자", "검수시각",
-        "OCR신뢰도", "메모", "입력시각",
+        "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
+        "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모", "입력시각",
     ]
     ws.append(headers)
     comments = {
         1: "행을 고유하게 식별합니다. 자동 생성값을 가급적 수정하지 마세요.",
         3: "방송 화면에서 실제로 확인한 시각입니다.",
         5: "방송 URL, 다시보기 URL과 타임코드 등 재검증 가능한 근거입니다.",
-        18: "OCR/외부 수집값은 검수대기, 사람이 확인한 뒤 확정으로 바꿉니다.",
-        21: "0~100. 수기 입력은 공란이어도 됩니다.",
-        23: "값을 시트에 입력한 시각입니다.",
+        17: "기량과 별개로 외부 랭킹이 제공한 점수만 기록합니다. 임의 계산값을 넣지 않습니다.",
+        18: "서로 다른 출처의 일치 개수입니다. 방송은 서로 다른 프레임 두 장을 한 출처의 교차검증으로 봅니다.",
+        19: "후보값은 넣지 않습니다. 기준값·교차검증·방송교차검증 스냅샷만 현재현황에 반영됩니다.",
+        23: "0~100. 방송교차검증은 95 이상인 서로 다른 두 프레임이 필요합니다.",
+        25: "값을 시트에 입력한 시각입니다.",
     }
     for column, text in comments.items():
         ws.cell(1, column).comment = Comment(text, "SOOPNOTICE")
@@ -570,13 +575,14 @@ def add_observations_sheet(
                 nonzero_snapshot_value(snap, "stat_agility", "agility"),
                 nonzero_snapshot_value(snap, "stat_vitality", "vitality"),
                 nonzero_snapshot_value(snap, "stat_intelligence", "intelligence"),
+                nonzero_snapshot_value(snap, "power_score", "powerScore", "power"),
             ]
             if not any(value not in (None, "") for value in values):
                 continue
             ws.append([
                 f"INIT-{generated_at:%Y%m%d}-{index:03d}", member["player_id"], fetched_at,
-                "공개현황표", source_url, *values, "초기 1회 수집", "검수대기", "", "", "",
-                "공개 지통실 수기/제보값. 원 데이터 갱신시각이 없어 방송 화면 재확인 필요.", fetched_at,
+                "시트", source_url, *values, 1, "기준값", "", f"INIT-{generated_at:%Y%m%d}",
+                "초기 1회 수집", "", "공개 지통실의 시작 기준 스냅샷.", fetched_at,
             ])
             initial_count += 1
 
@@ -588,23 +594,23 @@ def add_observations_sheet(
     style_body(ws, 2, MAX_INPUT_ROW, len(headers))
     for row in range(2, MAX_INPUT_ROW + 1):
         ws.cell(row, 3).number_format = "yyyy-mm-dd hh:mm:ss"
-        ws.cell(row, 20).number_format = "yyyy-mm-dd hh:mm:ss"
-        ws.cell(row, 23).number_format = "yyyy-mm-dd hh:mm:ss"
+        ws.cell(row, 25).number_format = "yyyy-mm-dd hh:mm:ss"
         ws.cell(row, 1).fill = PatternFill("solid", fgColor="F2F4F7")
         ws.cell(row, 1).protection = Protection(locked=True)
 
     add_list_validation(ws, f"B2:B{MAX_INPUT_ROW}", "'참가자'!$A$2:$A$91")
-    add_list_validation(ws, f"D2:D{MAX_INPUT_ROW}", "'기준정보'!$E$2:$E$7")
-    add_list_validation(ws, f"R2:R{MAX_INPUT_ROW}", "'기준정보'!$G$2:$G$5")
+    add_list_validation(ws, f"D2:D{MAX_INPUT_ROW}", "'기준정보'!$E$2:$E$8")
+    add_list_validation(ws, f"S2:S{MAX_INPUT_ROW}", "'기준정보'!$G$2:$G$5")
     add_whole_validation(ws, f"F2:F{MAX_INPUT_ROW}", 10000)
     add_whole_validation(ws, f"H2:L{MAX_INPUT_ROW}", 999)
-    add_whole_validation(ws, f"M2:P{MAX_INPUT_ROW}", 1000000)
-    add_whole_validation(ws, f"U2:U{MAX_INPUT_ROW}", 100)
+    add_whole_validation(ws, f"M2:Q{MAX_INPUT_ROW}", 1000000)
+    add_whole_validation(ws, f"R2:R{MAX_INPUT_ROW}", 10)
+    add_whole_validation(ws, f"W2:W{MAX_INPUT_ROW}", 100)
 
-    status_range = f"R2:R{MAX_INPUT_ROW}"
+    status_range = f"S2:S{MAX_INPUT_ROW}"
     status_colors = {
-        "확정": COLORS["green"], "검수대기": COLORS["yellow"],
-        "반려": COLORS["gray"], "충돌": COLORS["red"],
+        "교차검증": COLORS["green"], "방송교차검증": COLORS["green"],
+        "기준값": COLORS["blue"], "충돌": COLORS["red"],
     }
     for status, color in status_colors.items():
         ws.conditional_formatting.add(
@@ -618,50 +624,39 @@ def add_observations_sheet(
             fill=PatternFill("solid", fgColor=COLORS["red"]),
         ),
     )
-    ws.auto_filter.ref = f"A1:W{MAX_INPUT_ROW}"
+    ws.auto_filter.ref = f"A1:Y{MAX_INPUT_ROW}"
     ws.freeze_panes = "F2"
-    set_widths(ws, [22, 12, 20, 16, 48, 10, 16, 11, 12, 12, 12, 12, 11, 11, 11, 11, 16, 14, 14, 20, 13, 52, 20])
+    set_widths(ws, [22, 12, 20, 16, 48, 10, 16, 11, 12, 12, 12, 12, 11, 11, 11, 11, 12, 13, 18, 44, 18, 16, 13, 52, 20])
     ws.sheet_properties.tabColor = "FFC000"
     return initial_count
 
 
-def latest_formula(row: int, source_column: str) -> str:
-    return latest_filtered_formula(
-        sheet="관측입력",
-        key_column="B",
-        status_column="R",
-        row=row,
-        source_column=source_column,
-    )
-
-
-def latest_filtered_formula(
-    *, sheet: str, key_column: str, status_column: str, row: int, source_column: str
+def latest_snapshot_row_formula(
+    *, sheet: str, key_column: str, status_column: str, timestamp_column: str, row: int
 ) -> str:
-    """Return the latest non-empty value with confirmed rows taking priority.
-
-    Google Sheets can import Excel's LOOKUP array idiom while repeatedly returning
-    the first result-range cell. FILTER + INDEX is evaluated consistently by both.
-    """
-    value_range = f"{sheet}!${source_column}$2:${source_column}${MAX_INPUT_ROW}"
+    """Return one latest accepted snapshot row so values and provenance never mix."""
     key_range = f"{sheet}!${key_column}$2:${key_column}${MAX_INPUT_ROW}"
     status_range = f"{sheet}!${status_column}$2:${status_column}${MAX_INPUT_ROW}"
+    timestamp_range = f"{sheet}!${timestamp_column}$2:${timestamp_column}${MAX_INPUT_ROW}"
+    row_range = f"ROW({sheet}!${key_column}$2:${key_column}${MAX_INPUT_ROW})"
+    accepted = (
+        f'(({status_range}="기준값")+({status_range}="교차검증")+'
+        f'({status_range}="방송교차검증"))>0'
+    )
+    maximum = f'MAX(FILTER({timestamp_range},{key_range}=$A{row},{accepted}))'
+    filtered = (
+        f'FILTER({row_range},{key_range}=$A{row},{accepted},'
+        f'{timestamp_range}={maximum})'
+    )
+    return f'=IFERROR(INDEX({filtered},ROWS({filtered})),"")'
 
-    def latest(status: str) -> str:
-        filtered = (
-            f'FILTER({value_range},{key_range}=$A{row},'
-            f'{status_range}="{status}",{value_range}<>"")'
-        )
-        return f"INDEX({filtered},ROWS({filtered}))"
 
-    return f'=IFERROR({latest("확정")},IFERROR({latest("검수대기")},""))'
-
-
-def latest_review_formula(*, sheet: str, key_column: str, status_column: str, row: int) -> str:
-    key_range = f"{sheet}!${key_column}$2:${key_column}${MAX_INPUT_ROW}"
-    status_range = f"{sheet}!${status_column}$2:${status_column}${MAX_INPUT_ROW}"
-    filtered = f'FILTER({status_range},{key_range}=$A{row},{status_range}<>"")'
-    return f'=IFERROR(INDEX({filtered},ROWS({filtered})),"미확인")'
+def snapshot_value_formula(
+    *, row: int, selected_row_column: str, sheet: str, source_column: str
+) -> str:
+    selected = f"${selected_row_column}{row}"
+    value = f"INDEX({sheet}!${source_column}:${source_column},{selected})"
+    return f'=IF({selected}="","",IF({value}="","",{value}))'
 
 
 def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
@@ -669,13 +664,15 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
     headers = [
         "player_id", "국가", "세력/길드", "닉네임", "SOOP_ID", "장수/직업", "레벨", "말",
         "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화", "장비총강화",
-        "무력", "기민", "기력", "지모", "최종확인", "최근근거", "검수상태", "신선도",
-        "기량합계", "기량공동순위", "정렬순번",
+        "무력", "기민", "기력", "지모", "무력점수", "최종확인", "최근근거", "출처종류",
+        "교차검증수", "검증상태", "신선도", "기량합계", "랭킹점수", "공동순위",
+        "정렬순번", "선택원본행",
     ]
     ws.append(headers)
     source_columns = {
         7: "F", 8: "G", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
-        15: "M", 16: "N", 17: "O", 18: "P",
+        15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 20: "C", 21: "E",
+        22: "D", 23: "R", 24: "S",
     }
     for row_index, member in enumerate(roster, start=2):
         participant_row = row_index
@@ -683,38 +680,44 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
         for column in range(2, 7):
             participant_column = get_column_letter(column)
             ws.cell(row_index, column, f"=참가자!{participant_column}{participant_row}")
-        for column, source in source_columns.items():
-            ws.cell(row_index, column, latest_formula(row_index, source))
-        ws.cell(row_index, 14, f'=IF(COUNT(J{row_index}:M{row_index})=0,"",SUM(J{row_index}:M{row_index}))')
-        ws.cell(row_index, 19, latest_formula(row_index, "C"))
-        ws.cell(row_index, 20, latest_formula(row_index, "E"))
         ws.cell(
             row_index,
-            21,
-            latest_review_formula(
-                sheet="관측입력", key_column="B", status_column="R", row=row_index
+            30,
+            latest_snapshot_row_formula(
+                sheet="관측입력", key_column="B", status_column="S",
+                timestamp_column="C", row=row_index,
             ),
         )
+        for column, source in source_columns.items():
+            ws.cell(
+                row_index,
+                column,
+                snapshot_value_formula(
+                    row=row_index, selected_row_column="AD", sheet="관측입력", source_column=source
+                ),
+            )
+        ws.cell(row_index, 14, f'=IF(COUNT(J{row_index}:M{row_index})=0,"",SUM(J{row_index}:M{row_index}))')
         ws.cell(
             row_index,
-            22,
-            f'=IF(S{row_index}="","미확인",IF(NOW()-S{row_index}<=1/24,"최신",IF(NOW()-S{row_index}<=6/24,"확인 필요","오래됨")))',
+            25,
+            f'=IF(T{row_index}="","미확인",IF(NOW()-T{row_index}<=1/24,"최신",IF(NOW()-T{row_index}<=6/24,"확인 필요","오래됨")))',
         )
-        ws.cell(row_index, 23, f'=IF(COUNT(O{row_index}:R{row_index})=0,"",SUM(O{row_index}:R{row_index}))')
-        ws.cell(row_index, 24, f'=IF(OR(W{row_index}="",W{row_index}<=0),"",RANK.EQ(W{row_index},$W$2:$W$91,0))')
-        ws.cell(row_index, 25, f'=IF(OR(W{row_index}="",W{row_index}<=0),"",RANK.EQ(W{row_index},$W$2:$W$91,0)+COUNTIF($W$2:W{row_index},W{row_index})-1)')
+        ws.cell(row_index, 26, f'=IF(COUNT(O{row_index}:R{row_index})=0,"",SUM(O{row_index}:R{row_index}))')
+        ws.cell(row_index, 27, f'=IF(COUNT($S$2:$S$91)>0,S{row_index},O{row_index})')
+        ws.cell(row_index, 28, f'=IF(OR(AA{row_index}="",AA{row_index}<=0),"",RANK.EQ(AA{row_index},$AA$2:$AA$91,0))')
+        ws.cell(row_index, 29, f'=IF(OR(AA{row_index}="",AA{row_index}<=0),"",RANK.EQ(AA{row_index},$AA$2:$AA$91,0)+COUNTIF($AA$2:AA{row_index},AA{row_index})-1)')
     style_header(ws, 1, len(headers))
     style_body(ws, 2, len(roster) + 1, len(headers))
     for row in range(2, len(roster) + 2):
         ws.cell(row, 2).fill = NATION_FILLS[roster[row - 2]["nation"]]
-        ws.cell(row, 19).number_format = "yyyy-mm-dd hh:mm:ss"
+        ws.cell(row, 20).number_format = "yyyy-mm-dd hh:mm:ss"
     status_colors = {
-        "확정": COLORS["green"], "검수대기": COLORS["yellow"],
-        "충돌": COLORS["red"], "미확인": COLORS["gray"],
+        "교차검증": COLORS["green"], "방송교차검증": COLORS["green"],
+        "기준값": COLORS["blue"], "충돌": COLORS["red"],
     }
     for status, color in status_colors.items():
         ws.conditional_formatting.add(
-            "U2:U91",
+            "X2:X91",
             CellIsRule(operator="equal", formula=[f'"{status}"'], fill=PatternFill("solid", fgColor=color)),
         )
     freshness_colors = {
@@ -723,13 +726,14 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
     }
     for status, color in freshness_colors.items():
         ws.conditional_formatting.add(
-            "V2:V91",
+            "Y2:Y91",
             CellIsRule(operator="equal", formula=[f'"{status}"'], fill=PatternFill("solid", fgColor=color)),
         )
-    ws.column_dimensions["Y"].hidden = True
-    ws.auto_filter.ref = "A1:X91"
+    ws.column_dimensions["AC"].hidden = True
+    ws.column_dimensions["AD"].hidden = True
+    ws.auto_filter.ref = "A1:AB91"
     ws.freeze_panes = "G2"
-    set_widths(ws, [12, 9, 18, 16, 20, 16, 9, 16, 10, 11, 11, 11, 11, 13, 10, 10, 10, 10, 20, 46, 14, 14, 11, 11, 10])
+    set_widths(ws, [12, 9, 18, 16, 20, 16, 9, 16, 10, 11, 11, 11, 11, 13, 10, 10, 10, 10, 12, 20, 46, 14, 13, 18, 14, 11, 12, 11, 10, 11])
     ws.sheet_properties.tabColor = "4472C4"
 
 
@@ -737,27 +741,32 @@ def add_ranking_sheet(wb: Workbook) -> None:
     ws = wb.create_sheet("무력랭킹")
     headers = [
         "공동순위", "player_id", "국가", "세력/길드", "닉네임", "장수/직업",
-        "레벨", "기량합계", "무력", "기민", "기력", "지모", "장비총강화",
-        "최종확인", "근거", "검수상태", "정렬순번",
+        "레벨", "랭킹점수", "기준", "무력점수", "무력", "기민", "기력", "지모",
+        "장비총강화", "최종확인", "출처종류", "교차검증수", "검증상태", "근거", "정렬순번",
     ]
     ws.append(headers)
-    source_columns = ["X", "A", "B", "C", "D", "F", "G", "W", "O", "P", "Q", "R", "N", "S", "T", "U"]
+    source_columns = {
+        1: "AB", 2: "A", 3: "B", 4: "C", 5: "D", 6: "F", 7: "G", 8: "AA",
+        10: "S", 11: "O", 12: "P", 13: "Q", 14: "R", 15: "N", 16: "T",
+        17: "V", 18: "W", 19: "X", 20: "U",
+    }
     for row in range(2, 92):
-        ws.cell(row, 17, row - 1)
-        for column, source in enumerate(source_columns, start=1):
+        ws.cell(row, 21, row - 1)
+        for column, source in source_columns.items():
             ws.cell(
                 row,
                 column,
-                f'=IFERROR(INDEX(현재현황!${source}$2:${source}$91,MATCH($Q{row},현재현황!$Y$2:$Y$91,0)),"")',
+                f'=IFERROR(INDEX(현재현황!${source}$2:${source}$91,MATCH($U{row},현재현황!$AC$2:$AC$91,0)),"")',
             )
+        ws.cell(row, 9, '=IF(COUNT(현재현황!$S$2:$S$91)>0,"무력점수","무력 스탯")')
     style_header(ws, 1, len(headers))
     style_body(ws, 2, 91, len(headers))
     for row in range(2, 92):
-        ws.cell(row, 14).number_format = "yyyy-mm-dd hh:mm:ss"
-    ws.column_dimensions["Q"].hidden = True
-    ws.auto_filter.ref = "A1:P91"
+        ws.cell(row, 16).number_format = "yyyy-mm-dd hh:mm:ss"
+    ws.column_dimensions["U"].hidden = True
+    ws.auto_filter.ref = "A1:T91"
     ws.freeze_panes = "A2"
-    set_widths(ws, [11, 12, 9, 18, 16, 16, 10, 12, 10, 10, 10, 10, 14, 20, 48, 14, 10])
+    set_widths(ws, [11, 12, 9, 18, 16, 16, 10, 12, 12, 12, 10, 10, 10, 10, 14, 20, 14, 13, 18, 48, 10])
     ws.sheet_properties.tabColor = "C00000"
 
 
@@ -769,7 +778,7 @@ def add_territory_input_sheet(
     headers = [
         "territory_observation_id", "영토ID", "확인시각", "근거종류", "근거(URL/타임코드)",
         "번호", "X", "Y", "소유국", "수도", "시설", "레벨", "특수지", "점령상태",
-        "점령률", "검수상태", "검수자", "검수시각", "메모", "입력시각",
+        "점령률", "검증상태", "교차검증수", "증거해시", "메모", "입력시각",
     ]
     ws.append(headers)
     for index, territory in enumerate(territories, start=1):
@@ -778,7 +787,7 @@ def add_territory_input_sheet(
                 f"TINIT-{generated_at:%Y%m%d}-{index:03d}",
                 territory["id"],
                 excel_timestamp,
-                "공개현황표",
+                "시트",
                 TERRITORY_URL,
                 territory["number"],
                 territory["x"],
@@ -790,10 +799,10 @@ def add_territory_input_sheet(
                 "Y" if territory["special"] else "N",
                 territory["capture_status"],
                 territory["capture_rate"],
-                "검수대기",
+                "기준값",
+                1,
                 "",
-                "",
-                "공개 지도 초기값. 방송 화면 또는 운영 기록으로 재확인 필요.",
+                "공개 지도 초기 기준 스냅샷.",
                 excel_timestamp,
             ]
         )
@@ -807,7 +816,6 @@ def add_territory_input_sheet(
     style_body(ws, 2, MAX_INPUT_ROW, len(headers))
     for row in range(2, MAX_INPUT_ROW + 1):
         ws.cell(row, 3).number_format = "yyyy-mm-dd hh:mm:ss"
-        ws.cell(row, 18).number_format = "yyyy-mm-dd hh:mm:ss"
         ws.cell(row, 20).number_format = "yyyy-mm-dd hh:mm:ss"
         ws.cell(row, 1).fill = PatternFill("solid", fgColor="F2F4F7")
         ws.cell(row, 1).protection = Protection(locked=True)
@@ -816,7 +824,7 @@ def add_territory_input_sheet(
         ws.cell(row, 5).font = LINK_FONT
 
     add_list_validation(ws, f"B2:B{MAX_INPUT_ROW}", "'영토현황'!$A$2:$A$61")
-    add_list_validation(ws, f"D2:D{MAX_INPUT_ROW}", "'기준정보'!$E$2:$E$7")
+    add_list_validation(ws, f"D2:D{MAX_INPUT_ROW}", "'기준정보'!$E$2:$E$8")
     add_list_validation(ws, f"I2:I{MAX_INPUT_ROW}", "'기준정보'!$P$2:$P$5")
     add_list_validation(ws, f"J2:J{MAX_INPUT_ROW}", "'기준정보'!$R$2:$R$3")
     add_list_validation(ws, f"K2:K{MAX_INPUT_ROW}", "'기준정보'!$T$2:$T$5")
@@ -827,10 +835,11 @@ def add_territory_input_sheet(
     add_whole_validation(ws, f"G2:H{MAX_INPUT_ROW}", 10000)
     add_whole_validation(ws, f"L2:L{MAX_INPUT_ROW}", 999)
     add_whole_validation(ws, f"O2:O{MAX_INPUT_ROW}", 100)
+    add_whole_validation(ws, f"Q2:Q{MAX_INPUT_ROW}", 10)
 
     for status, color in {
-        "확정": COLORS["green"], "검수대기": COLORS["yellow"],
-        "반려": COLORS["gray"], "충돌": COLORS["red"],
+        "교차검증": COLORS["green"], "방송교차검증": COLORS["green"],
+        "기준값": COLORS["blue"], "충돌": COLORS["red"],
     }.items():
         ws.conditional_formatting.add(
             f"P2:P{MAX_INPUT_ROW}",
@@ -850,36 +859,41 @@ def add_territory_input_sheet(
     return initial_count
 
 
-def territory_latest_formula(row: int, source_column: str) -> str:
-    return latest_filtered_formula(
-        sheet="영토입력",
-        key_column="B",
-        status_column="P",
-        row=row,
-        source_column=source_column,
-    )
-
-
 def add_territory_current_sheet(wb: Workbook, territories: list[dict]) -> None:
     ws = wb.create_sheet("영토현황")
     headers = [
         "영토ID", "번호", "X", "Y", "소유국", "수도", "시설", "레벨", "특수지",
-        "점령상태", "점령률", "최종확인", "근거", "검수상태", "메모",
+        "점령상태", "점령률", "최종확인", "근거", "출처종류", "교차검증수",
+        "검증상태", "메모", "선택원본행",
     ]
     ws.append(headers)
     source_columns = {
         2: "F", 3: "G", 4: "H", 5: "I", 6: "J", 7: "K", 8: "L",
-        9: "M", 10: "N", 11: "O", 12: "C", 13: "E", 15: "S",
+        9: "M", 10: "N", 11: "O", 12: "C", 13: "E", 14: "D", 15: "Q", 17: "S",
     }
     for row_index, territory in enumerate(territories, start=2):
         ws.cell(row_index, 1, territory["id"])
-        for column, source in source_columns.items():
-            ws.cell(row_index, column, territory_latest_formula(row_index, source))
         ws.cell(
             row_index,
-            14,
-            latest_review_formula(
-                sheet="영토입력", key_column="B", status_column="P", row=row_index
+            18,
+            latest_snapshot_row_formula(
+                sheet="영토입력", key_column="B", status_column="P",
+                timestamp_column="C", row=row_index,
+            ),
+        )
+        for column, source in source_columns.items():
+            ws.cell(
+                row_index,
+                column,
+                snapshot_value_formula(
+                    row=row_index, selected_row_column="R", sheet="영토입력", source_column=source
+                ),
+            )
+        ws.cell(
+            row_index,
+            16,
+            snapshot_value_formula(
+                row=row_index, selected_row_column="R", sheet="영토입력", source_column="P"
             ),
         )
 
@@ -888,24 +902,26 @@ def add_territory_current_sheet(wb: Workbook, territories: list[dict]) -> None:
         style_body(ws, 2, len(territories) + 1, len(headers))
     for row in range(2, len(territories) + 2):
         ws.cell(row, 12).number_format = "yyyy-mm-dd hh:mm:ss"
-    for owner, color in {
-        "위": COLORS["wei"], "촉": COLORS["shu"], "오": COLORS["wu"], "미점령": COLORS["gray"],
-    }.items():
-        ws.conditional_formatting.add(
-            f"E2:E{len(territories) + 1}",
-            CellIsRule(operator="equal", formula=[f'"{owner}"'], fill=PatternFill("solid", fgColor=color)),
-        )
-    for status, color in {
-        "확정": COLORS["green"], "검수대기": COLORS["yellow"],
-        "충돌": COLORS["red"], "미확인": COLORS["gray"],
-    }.items():
-        ws.conditional_formatting.add(
-            f"N2:N{len(territories) + 1}",
-            CellIsRule(operator="equal", formula=[f'"{status}"'], fill=PatternFill("solid", fgColor=color)),
-        )
-    ws.auto_filter.ref = f"A1:O{len(territories) + 1}"
+    if territories:
+        for owner, color in {
+            "위": COLORS["wei"], "촉": COLORS["shu"], "오": COLORS["wu"], "미점령": COLORS["gray"],
+        }.items():
+            ws.conditional_formatting.add(
+                f"E2:E{len(territories) + 1}",
+                CellIsRule(operator="equal", formula=[f'"{owner}"'], fill=PatternFill("solid", fgColor=color)),
+            )
+        for status, color in {
+            "교차검증": COLORS["green"], "방송교차검증": COLORS["green"],
+            "기준값": COLORS["blue"], "충돌": COLORS["red"],
+        }.items():
+            ws.conditional_formatting.add(
+                f"P2:P{len(territories) + 1}",
+                CellIsRule(operator="equal", formula=[f'"{status}"'], fill=PatternFill("solid", fgColor=color)),
+            )
+    ws.column_dimensions["R"].hidden = True
+    ws.auto_filter.ref = f"A1:Q{len(territories) + 1}"
     ws.freeze_panes = "E2"
-    set_widths(ws, [14, 9, 9, 9, 11, 9, 13, 9, 10, 13, 10, 20, 48, 14, 48])
+    set_widths(ws, [14, 9, 9, 9, 11, 9, 13, 9, 10, 13, 10, 20, 48, 14, 13, 18, 48, 11])
     ws.sheet_properties.tabColor = "548235"
 
 
@@ -917,7 +933,7 @@ def add_ocr_sheet(wb: Workbook) -> None:
         ("level", "레벨"), ("horse", "말"), ("horse_level", "말강화"),
         ("weapon", "무기강화"), ("helmet", "두갑강화"), ("armor", "흉갑강화"),
         ("shoes", "각갑강화"), ("strength", "무력"), ("agility", "기민"),
-        ("vitality", "기력"), ("intelligence", "지모"),
+        ("vitality", "기력"), ("intelligence", "지모"), ("powerScore", "무력점수"),
     ]
     for key, label in fields:
         ws.append(["default", label, "", "", "", "", "1920x1080", 1, "N", "", f"OCR key: {key}"])
@@ -933,14 +949,14 @@ def add_ocr_sheet(wb: Workbook) -> None:
 
 def add_change_log_sheet(wb: Workbook) -> None:
     ws = wb.create_sheet("변경로그")
-    headers = ["change_id", "확정시각", "확인시각", "player_id", "항목", "이전값", "새값", "근거", "기록자", "검수자", "observation_id"]
+    headers = ["change_id", "승격시각", "확인시각", "player_id", "항목", "이전값", "새값", "근거", "출처", "교차검증수", "observation_id"]
     ws.append(headers)
     style_header(ws, 1, len(headers))
     style_body(ws, 2, 501, len(headers))
     for row in range(2, 502):
         ws.cell(row, 2).number_format = "yyyy-mm-dd hh:mm:ss"
         ws.cell(row, 3).number_format = "yyyy-mm-dd hh:mm:ss"
-    ws["A2"] = "자동화 연결 전에는 관측입력이 원본 이력입니다. 이 시트는 확정 이벤트 자동 기록용으로 예약되어 있습니다."
+    ws["A2"] = "후보는 로컬 append-only 큐에 보관하고, 교차검증으로 최신값이 승격된 이벤트만 이 시트에 기록합니다."
     ws.merge_cells("A2:K2")
     ws["A2"].fill = PatternFill("solid", fgColor=COLORS["yellow"])
     ws["A2"].alignment = Alignment(wrap_text=True)
@@ -966,7 +982,7 @@ def build_workbook(
     wb.remove(wb.active)
     wb.properties.title = "SOOPNOTICE 삼국지 방송 추적 시트"
     wb.properties.creator = "SOOPNOTICE"
-    wb.properties.description = "90명 방송 모니터링, 장비·기량 검수, 60개 영토 현황 및 기량 투자 랭킹"
+    wb.properties.description = "90명 방송 모니터링, 장비·기량 교차검증, 60개 영토 현황 및 무력 랭킹"
     wb.calculation.fullCalcOnLoad = True
     wb.calculation.forceFullCalc = True
     wb.calculation.calcMode = "auto"
@@ -1002,11 +1018,11 @@ def build_workbook(
         territory_ids = [check["영토현황"].cell(row, 1).value for row in range(2, 62)]
         if len(set(territory_ids)) != 60:
             raise RuntimeError("영토 ID 고유성 검증 실패")
-        pending_count = sum(
-            check["영토입력"].cell(row, 16).value == "검수대기" for row in range(2, 62)
+        baseline_count = sum(
+            check["영토입력"].cell(row, 16).value == "기준값" for row in range(2, 62)
         )
-        if pending_count != 60:
-            raise RuntimeError(f"영토 초기 검수대기 행 검증 실패: {pending_count}")
+        if baseline_count != 60:
+            raise RuntimeError(f"영토 초기 기준값 행 검증 실패: {baseline_count}")
         special_rows = [
             row for row in range(2, 62)
             if check["영토입력"].cell(row, 13).value == "Y"
@@ -1015,30 +1031,35 @@ def build_workbook(
             raise RuntimeError("27번 특수 영토 검증 실패")
     seed_zero_cells = []
     for row in range(2, min(initial_count, 90) + 2):
-        for column in range(8, 17):
+        for column in range(8, 18):
             if check["관측입력"].cell(row, column).value == 0:
                 seed_zero_cells.append(check["관측입력"].cell(row, column).coordinate)
     if seed_zero_cells:
         raise RuntimeError(f"초기 강화/기량 0값 정규화 실패: {seed_zero_cells[:5]}")
     current_formula = str(check["현재현황"]["G2"].value or "")
-    growth_formula = str(check["현재현황"]["W2"].value or "")
-    growth_rank_formula = str(check["현재현황"]["X2"].value or "")
+    current_evidence_formula = str(check["현재현황"]["U2"].value or "")
+    current_row_formula = str(check["현재현황"]["AD2"].value or "")
+    growth_formula = str(check["현재현황"]["Z2"].value or "")
+    growth_rank_formula = str(check["현재현황"]["AB2"].value or "")
     ranking_score_formula = str(check["무력랭킹"]["H2"].value or "")
     territory_formula = str(check["영토현황"]["E2"].value or "") if territories else ""
-    if "확정" not in current_formula or "검수대기" not in current_formula:
-        raise RuntimeError("현재현황 확정/검수대기 fallback 수식 검증 실패")
-    if territories and ("확정" not in territory_formula or "검수대기" not in territory_formula):
-        raise RuntimeError("영토현황 확정/검수대기 fallback 수식 검증 실패")
-    if "FILTER(" not in current_formula or "LOOKUP(" in current_formula:
-        raise RuntimeError("현재현황 Google Sheets 호환 수식 검증 실패")
+    territory_row_formula = str(check["영토현황"]["R2"].value or "") if territories else ""
+    if not all(status in current_row_formula for status in ("기준값", "교차검증", "방송교차검증")):
+        raise RuntimeError("현재현황 교차검증 스냅샷 선택 수식 검증 실패")
+    if territories and not all(status in territory_row_formula for status in ("기준값", "교차검증", "방송교차검증")):
+        raise RuntimeError("영토현황 교차검증 스냅샷 선택 수식 검증 실패")
+    if "FILTER(" not in current_row_formula or "MAX(FILTER(" not in current_row_formula:
+        raise RuntimeError("현재현황 최신 확인시각 수식 검증 실패")
+    if "$AD2" not in current_formula or "$AD2" not in current_evidence_formula:
+        raise RuntimeError("현재현황 값/근거 원본행 일치 검증 실패")
+    if territories and "$R2" not in territory_formula:
+        raise RuntimeError("영토현황 원본행 일치 검증 실패")
     if "SUM(O2:R2)" not in growth_formula:
         raise RuntimeError("현재현황 기량합계 수식 검증 실패")
-    if "RANK.EQ(W2,$W$2:$W$91,0)" not in growth_rank_formula:
-        raise RuntimeError("현재현황 기량 공동순위 수식 검증 실패")
-    if "현재현황!$W$2:$W$91" not in ranking_score_formula:
-        raise RuntimeError("무력랭킹 기량합계 연결 수식 검증 실패")
-    if territories and ("FILTER(" not in territory_formula or "LOOKUP(" in territory_formula):
-        raise RuntimeError("영토현황 Google Sheets 호환 수식 검증 실패")
+    if "RANK.EQ(AA2,$AA$2:$AA$91,0)" not in growth_rank_formula:
+        raise RuntimeError("현재현황 무력 공동순위 수식 검증 실패")
+    if "현재현황!$AA$2:$AA$91" not in ranking_score_formula:
+        raise RuntimeError("무력랭킹 점수 연결 수식 검증 실패")
     check.close()
 
     with zipfile.ZipFile(output_path) as archive:
@@ -1057,7 +1078,7 @@ def build_workbook(
         "territories": len(territories),
         "territory_initial_observations": territory_initial_count,
         "sheets": expected,
-        "formula_qa": "confirmed_then_pending",
+        "formula_qa": "latest_cross_verified_snapshot",
         "zip_qa": "ok",
         "generated_at": generated_at.isoformat(),
     }

@@ -1,15 +1,47 @@
 const cron = require("node-cron");
+const path = require("node:path");
 const fetchNotices = require("./fetch-notices");
 const parseHot = require("./parse-hot");
 const cleanupCommunity = require("./cleanup-community");
+const {
+  DEFAULT_QUEUE_PATH: DEFAULT_SAMGUK_QUEUE_PATH,
+  promote: promoteSamgukObservations,
+} = require("../scripts/samguk-promote-observations");
+
+const DEFAULT_SAMGUK_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_SAMGUK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+function samgukTrackingConfig(env = process.env) {
+  const parsedWindowMs = Number(env.SAMGUK_CONSENSUS_WINDOW_MS);
+  const windowMs = Number.isFinite(parsedWindowMs)
+    && parsedWindowMs > 0
+    && parsedWindowMs <= MAX_SAMGUK_WINDOW_MS
+    ? parsedWindowMs
+    : DEFAULT_SAMGUK_WINDOW_MS;
+  const configuredQueuePath = String(env.SAMGUK_OBSERVATION_QUEUE_PATH || "").trim();
+  const queuePath = configuredQueuePath
+    ? (path.isAbsolute(configuredQueuePath)
+      ? configuredQueuePath
+      : path.resolve(__dirname, "..", configuredQueuePath))
+    : DEFAULT_SAMGUK_QUEUE_PATH;
+  return Object.freeze({
+    enabled: env.SAMGUK_TRACKING_ENABLED === "1",
+    write: env.SAMGUK_TRACKING_WRITE_ENABLED === "1",
+    queuePath,
+    windowMs,
+  });
+}
 
 function createRunner({
   fetchNoticesFn = fetchNotices,
   parseHotFn = parseHot,
+  promoteSamgukFn = promoteSamgukObservations,
+  samgukTracking = samgukTrackingConfig(),
   logger = console,
 } = {}) {
   const fetchRuns = new Map();
   let parseRun = null;
+  let samgukPromotionRun = null;
 
   function runFetch(mode) {
     if (fetchRuns.has(mode)) return fetchRuns.get(mode);
@@ -36,6 +68,24 @@ function createRunner({
     return parseRun;
   }
 
+  function runSamgukPromotion() {
+    if (!samgukTracking.enabled) return Promise.resolve(null);
+    if (samgukPromotionRun) return samgukPromotionRun;
+
+    samgukPromotionRun = Promise.resolve()
+      .then(() => promoteSamgukFn({
+        queuePath: samgukTracking.queuePath,
+        windowMs: samgukTracking.windowMs,
+        write: samgukTracking.write,
+      }))
+      .catch((error) => {
+        logger.error("[cron] samguk promotion failed:", error.message);
+        return null;
+      })
+      .finally(() => { samgukPromotionRun = null; });
+    return samgukPromotionRun;
+  }
+
   async function runCycle({ includeRest = false } = {}) {
     const fetchTasks = [runFetch("popular")];
     if (includeRest) fetchTasks.push(runFetch("rest"));
@@ -43,7 +93,7 @@ function createRunner({
     await runParse();
   }
 
-  return { runCycle };
+  return { runCycle, runSamgukPromotion, samgukTracking };
 }
 
 function start() {
@@ -55,6 +105,7 @@ function start() {
     if (stopped) return;
     const includeRest = new Date().getMinutes() % 30 === 0;
     void runner.runCycle({ includeRest });
+    void runner.runSamgukPromotion();
   });
   const cleanupTask = cron.schedule("17 4 * * *", () => {
     if (stopped) return;
@@ -65,8 +116,12 @@ function start() {
 
   // 재기동 직후에도 전체 공지를 먼저 갱신하고 캘린더를 백필한다.
   void runner.runCycle({ includeRest: true });
+  void runner.runSamgukPromotion();
 
-  console.log("[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, bootstrap enabled");
+  const trackingMode = runner.samgukTracking.enabled
+    ? (runner.samgukTracking.write ? "write" : "dry-run")
+    : "disabled";
+  console.log(`[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, samguk=${trackingMode}, bootstrap enabled`);
 
   return () => {
     if (stopped) return;
@@ -78,4 +133,4 @@ function start() {
   };
 }
 
-module.exports = { start, createRunner };
+module.exports = { start, createRunner, samgukTrackingConfig };

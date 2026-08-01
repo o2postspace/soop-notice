@@ -8,6 +8,7 @@ const {
   createSamgukSheetService,
   parseCsv,
   parseMembersCsv,
+  parseTerritoriesCsv,
   readTextLimited,
 } = require("../lib/samguk-sheet");
 const { createRouter } = require("../routes/samguk")._test;
@@ -65,10 +66,12 @@ const PAYLOAD_KEYS = [
 ].sort();
 const MEMBER_KEYS = [
   "agility", "armor", "crew", "evidence", "helmet", "horse", "horseLevel", "intelligence", "job", "level",
-  "name", "nation", "observedAt", "reviewStatus", "shoes", "soopId", "strength", "vitality", "weapon",
+  "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
+  "sourceType", "strength", "verificationStatus", "vitality", "weapon",
 ].sort();
 const TERRITORY_KEYS = [
-  "capital", "evidence", "facility", "id", "level", "number", "observedAt", "owner", "reviewStatus", "x", "y",
+  "capital", "evidence", "facility", "id", "level", "number", "observedAt", "owner", "reviewStatus",
+  "sourceCount", "sourceType", "verificationStatus", "x", "y",
 ].sort();
 const RULE_KEYS = ["category", "description", "reviewStatus", "sourceDate", "sourceUrl", "title"].sort();
 
@@ -87,6 +90,10 @@ test("현재현황은 열 순서가 아니라 헤더명으로 계약 필드를 �
   assert.equal(result.members[0].strength, 1234);
   assert.equal(result.members[0].evidence, "https://example.com/vod\n01:23");
   assert.equal(result.members[0].observedAt, "2026-08-01T17:30:00.000Z");
+  assert.equal(result.members[0].powerScore, null);
+  assert.equal(result.members[0].sourceType, "sheet");
+  assert.equal(result.members[0].sourceCount, 1);
+  assert.equal(result.members[0].verificationStatus, "baseline");
 
   const reordered = makeCsv(
     [...MEMBER_HEADERS].reverse(),
@@ -96,6 +103,88 @@ test("현재현황은 열 순서가 아니라 헤더명으로 계약 필드를 �
     ]].reverse()],
   );
   assert.equal(parseMembersCsv(reordered).members[0].soopId, "bj_1");
+});
+
+test("현재현황의 선택형 무력점수와 교차검증 메타데이터를 정규화한다", () => {
+  const headers = [
+    ...MEMBER_HEADERS,
+    "무력점수", "출처종류/출처", "교차검증수", "검증상태",
+  ];
+  const base = [
+    "촉", "테스트", "관우", "test_kwanwoo", "관우", "20", "적토마", "3", "5", "4", "4", "4",
+    "40", "10", "20", "5", "2026-08-02 03:00:00", "https://www.fmkorea.com/1", "확정",
+  ];
+  const parsed = parseMembersCsv(makeCsv(headers, [[
+    ...base, "12,345", "에펨코리아", "3", "교차검증",
+  ]]));
+
+  assert.equal(parsed.members[0].powerScore, 12345);
+  assert.equal(parsed.members[0].sourceType, "fmkorea");
+  assert.equal(parsed.members[0].sourceCount, 3);
+  assert.equal(parsed.members[0].verificationStatus, "cross-verified");
+
+  const combined = parseMembersCsv(makeCsv(headers, [[
+    ...base, "12,345", "방송/시트·에펨코리아", "3", "방송교차검증",
+  ]]));
+  assert.equal(combined.members[0].sourceType, "sheet+fmkorea+broadcast");
+  assert.equal(combined.members[0].verificationStatus, "broadcast-verified");
+
+  const invalid = parseMembersCsv(makeCsv(headers, [[
+    ...base, "not-a-score", "직접 방송", "0", "",
+  ]]));
+  assert.equal(invalid.members[0].powerScore, null);
+  assert.equal(invalid.members[0].sourceType, "broadcast");
+  assert.equal(invalid.members[0].sourceCount, 1);
+  assert.equal(invalid.members[0].verificationStatus, "baseline");
+  assert.match(invalid.warnings.join(" "), /무력점수/);
+  assert.match(invalid.warnings.join(" "), /교차검증수/);
+
+  for (const [input, expected] of [
+    ["기준값", "baseline"],
+    ["방송교차검증", "broadcast-verified"],
+    ["충돌", "conflict"],
+    ["알 수 없음", "baseline"],
+  ]) {
+    const status = parseMembersCsv(makeCsv(headers, [[...base, "", "시트", "1", input]]));
+    assert.equal(status.members[0].verificationStatus, expected);
+  }
+});
+
+test("새 검증상태 헤더를 verificationStatus와 호환 reviewStatus가 함께 읽는다", () => {
+  const headers = MEMBER_HEADERS.map(header => header === "검수상태" ? "검증상태" : header);
+  const row = [
+    "오", "테스트", "주유", "test_juyu", "주유", "20", "적토마", "3", "5", "4", "4", "4",
+    "30", "15", "10", "20", "2026-08-02 03:00:00", "방송 00:10:00", "방송교차검증",
+  ];
+  const member = parseMembersCsv(makeCsv(headers, [row])).members[0];
+
+  assert.equal(member.reviewStatus, "방송교차검증");
+  assert.equal(member.verificationStatus, "broadcast-verified");
+});
+
+test("호환 검수대기 값은 별도 승인 절차 없이 기준값으로 정규화한다", () => {
+  const row = [
+    "위", "테스트", "조조", "test_jojo", "조조", "20", "적토마", "3", "5", "4", "4", "4",
+    "30", "15", "10", "20", "2026-08-02 03:00:00", "시트", "검수대기",
+  ];
+  const member = parseMembersCsv(makeCsv(MEMBER_HEADERS, [row])).members[0];
+
+  assert.equal(member.reviewStatus, "기준값");
+  assert.equal(member.verificationStatus, "baseline");
+});
+
+test("영토현황은 기존 검수상태와 새 검증상태 헤더를 모두 지원한다", () => {
+  const headers = TERRITORY_HEADERS.map(header => header === "검수상태" ? "검증상태" : header);
+  const row = [
+    "T001", "1", "634", "115", "위", "TRUE", "장원", "3",
+    "2026-08-02 03:00:00", "방송 00:20:00", "검수대기",
+  ];
+  const territory = parseTerritoriesCsv(makeCsv(headers, [row])).territories[0];
+
+  assert.equal(territory.reviewStatus, "기준값");
+  assert.equal(territory.sourceType, "sheet");
+  assert.equal(territory.sourceCount, 1);
+  assert.equal(territory.verificationStatus, "baseline");
 });
 
 test("필수 헤더 누락과 응답 크기 초과를 거부한다", async () => {
@@ -130,7 +219,7 @@ test("Google Sheet 세 탭을 읽어 정규 payload 계약으로 반환한다", 
   assert.ok(state.urls.every(url => !url.includes("vercel.app")));
 });
 
-test("갱신 오류에는 마지막 정상값을 유지하고 cold 오류에는 검수대기 seed를 쓴다", async () => {
+test("갱신 오류에는 마지막 정상값을 유지하고 cold 오류에는 기준값 seed를 쓴다", async () => {
   const state = {};
   const service = createSamgukSheetService({
     fetchImpl: googleFetch(sheetCsv(), state),
@@ -154,8 +243,13 @@ test("갱신 오류에는 마지막 정상값을 유지하고 cold 오류에는 
   assert.equal(fallback.stale, true);
   assert.equal(fallback.members.length, 90);
   assert.equal(fallback.territories.length, 60);
-  assert.ok(fallback.members.every(member => member.reviewStatus === "검수대기"));
-  assert.ok(fallback.territories.every(territory => territory.reviewStatus === "검수대기"));
+  assert.ok(fallback.members.every(member => member.powerScore === null));
+  assert.ok(fallback.members.every(member => member.sourceType === "sheet"));
+  assert.ok(fallback.members.every(member => member.sourceCount === 1));
+  assert.ok(fallback.members.every(member => member.verificationStatus === "baseline"));
+  assert.ok(fallback.members.every(member => member.reviewStatus === "기준값"));
+  assert.ok(fallback.territories.every(territory => territory.reviewStatus === "기준값"));
+  assert.doesNotMatch(JSON.stringify(fallback), /검수대기/);
   assert.match(fallback.warnings.join(" "), /0 sentinel은 미입력 여부/);
   assert.equal(fallback.members.some(member => [
     member.horseLevel, member.weapon, member.helmet, member.armor, member.shoes,
@@ -180,6 +274,10 @@ test("fallback 최신 스냅샷은 기량 랭킹 품질 기준을 만족한다",
   );
 
   assert.equal(snapshot.members.length, 90);
+  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "powerScore")));
+  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "sourceType")));
+  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "sourceCount")));
+  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "verificationStatus")));
   assert.equal(snapshot.members.some(member => numericFields.some(field => member[field] === 0)), false);
   assert.equal(snapshot.members.filter(member => member.strength > 0).length, 24);
   assert.equal(snapshot.members.filter(member => growthScore(member) > 0).length, 30);
@@ -188,15 +286,25 @@ test("fallback 최신 스냅샷은 기량 랭킹 품질 기준을 만족한다",
   assert.equal(growthScore(snapshot.members.find(member => member.name === "감스트")), 50);
 });
 
-test("삼국지 화면은 기량점수를 네 기량의 합으로 정의하고 전투력과 구분한다", () => {
+test("삼국지 카드의 기량합계는 네 기량만 사용한다", () => {
   const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
   assert.match(
     html,
-    /samgukPositiveTotal\(member, \['strength', 'agility', 'vitality', 'intelligence'\]\)/,
+    /function samgukGrowthScore\(member\) \{\s*return samgukPositiveTotal\(member, \['strength', 'agility', 'vitality', 'intelligence'\]\);\s*\}/,
   );
-  assert.match(html, /기량점수\s*=\s*무력\s*\+\s*기민\s*\+\s*기력\s*\+\s*지모/);
-  assert.match(html, /종합 전투력은 아닙니다/);
+  assert.doesNotMatch(html, /function samgukGrowthScore\(member\)[\s\S]{0,200}powerScore/);
+});
+
+test("무력랭킹은 전체 데이터셋에서 무력점수와 무력 스탯 스케일을 섞지 않는다", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
+
+  assert.match(html, /const scoreField = hasPowerScore \? 'powerScore' : 'strength';/);
+  assert.match(html, /const scoreLabel = hasPowerScore \? '무력점수' : '무력 스탯';/);
+  assert.match(html, /samgukNumber\(member\[scoreField\]\)/);
+  assert.match(html, /무력 스탯과 점수 스케일은 섞지 않습니다/);
+  assert.match(html, /별도 무력점수가 입력되기 전까지[^\n]+무력 스탯/);
+  assert.doesNotMatch(html, /member\.powerScore\s*(?:\|\||\?\?)\s*member\.strength/);
 });
 
 test("참가자나 영토가 일부만 계산되면 정상 시트로 채택하지 않는다", async () => {

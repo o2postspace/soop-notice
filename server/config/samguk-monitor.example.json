@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "permissionConfirmed": false,
+  "display": ":0.0",
+  "ffmpegPath": "/usr/bin/ffmpeg",
+  "idlePollMs": 60000,
+  "livePollMs": 15000,
+  "captureTimeoutMs": 8000,
+  "cropRetentionMs": 0,
+  "ocr": {
+    "command": "/absolute/path/to/samguk-ocr-adapter",
+    "args": ["--input", "{input}", "--field", "{field}"],
+    "timeoutMs": 5000,
+    "maxOutputBytes": 4096,
+    "minConfidence": 0.95
+  },
+  "targets": [
+    {
+      "id": "example-player",
+      "enabled": false,
+      "playerId": "P001",
+      "bjId": "example_bj",
+      "sourceUrl": "https://play.sooplive.com/example_bj",
+      "sampleIntervalMs": 60000,
+      "rois": [
+        {
+          "id": "strength",
+          "field": "strength",
+          "x": 100,
+          "y": 100,
+          "width": 180,
+          "height": 64
+        }
+      ]
+    }
+  ]
+}

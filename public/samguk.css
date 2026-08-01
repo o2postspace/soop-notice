@@ -38,6 +38,11 @@
   color: #28763b;
 }
 
+.samguk-review-badge.is-baseline {
+  background: #f0f1ff;
+  color: #5361cf;
+}
+
 .samguk-review-badge.is-pending {
   background: #fff4d6;
   color: #8a6513;
@@ -323,6 +328,7 @@ html.dark .samguk-territory-table th { background: #292929; }
 html.dark .samguk-territory-table th,
 html.dark .samguk-territory-table td { border-color: #363636; color: #bbb; }
 html.dark .samguk-review-badge.is-confirmed { background: #1d3525; color: #85d399; }
+html.dark .samguk-review-badge.is-baseline { background: #272940; color: #99a2f6; }
 html.dark .samguk-review-badge.is-pending { background: #3b3320; color: #e4c56d; }
 html.dark .samguk-review-badge.is-conflict { background: #3c2525; color: #e68a8a; }
 html.dark .samguk-territory-review-note { background: #3b3320; color: #e4c56d; }
