@@ -22,6 +22,7 @@ MAX_INPUT_ROW = 5001
 FONT_NAME = "Noto Sans CJK KR"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/19lI8z-C2ieRze6ahONjD68L08ZWQvzBfsXxhO4eUDe4/edit?gid=0"
 WIKI_URL = "https://threekingdoms.notion.site/"
+SKILL_STATS_URL = "https://threekingdoms.notion.site/872f648a81d1821ea42581f61a4fc57e"
 FMKOREA_RULES_URL = "https://www.fmkorea.com/10143176987"
 FMKOREA_SLIDES_URL = "https://www.fmkorea.com/10143088032"
 FACTIONS_URL = "https://gamcom-3kingdom.vercel.app/factions"
@@ -278,7 +279,7 @@ def add_guide_sheet(
         ("1. 방송 확인", "방송모니터링에서 LIVE 링크를 열고 레벨·말·장비·능력치를 확인합니다."),
         ("2. 값 기록", "관측입력에는 화면에서 보인 항목만 적고, 근거 URL/타임코드와 확인시각을 함께 남깁니다."),
         ("3. 검수", "OCR/외부 수집값은 검수대기, 사람이 확인한 값은 검수자·검수시각을 적은 뒤 확정으로 바꿉니다."),
-        ("4. 현황/랭킹", "현재현황은 항목별 확정값을 우선 반영하고, 확정값이 없으면 최신 검수대기 값을 참고값으로 표시합니다."),
+        ("4. 현황/랭킹", "현재현황은 확정값을 우선 반영합니다. 기량합계는 무력+기민+기력+지모의 투자량이며 장비 강화나 종합 전투력과 합산하지 않습니다."),
         ("5. 영토 기록", "영토 변화도 영토입력에 새 행으로만 추가합니다. 영토현황은 확정값 우선, 없으면 최신 검수대기 값을 표시합니다."),
         ("OCR 연결", "OCR설정에 캡처 해상도와 항목별 좌표를 넣으면 추후 모니터링 프로그램에서 그대로 사용할 수 있습니다."),
         ("초기 데이터", "공개 지통실 조회값을 검수대기로 넣었습니다." if has_snapshot else "현재 네트워크 스냅샷 없이 90명 명단만 넣었습니다."),
@@ -375,8 +376,8 @@ def add_game_info_sheet(wb: Workbook, generated_at: datetime) -> None:
         (
             "기량",
             "무력 · 기민 · 기력 · 지모",
-            "무력은 공격력, 기민은 이동속도, 기력은 체력, 지모는 절기 가속을 높입니다. 직업마다 기량 구슬 효율이 다르며 직업 변경 시 사용한 절기·기량 구슬의 80%만 반환됩니다.",
-            WIKI_URL,
+            "각 기량은 1단계마다 기량점수 1을 사용합니다. 네 수치의 합은 기량 투자량으로만 사용하며, 직업별 효율과 장비·말·각인 효과가 달라 종합 전투력으로 보지 않습니다.",
+            SKILL_STATS_URL,
         ),
         (
             "장비",
@@ -669,7 +670,7 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
         "player_id", "국가", "세력/길드", "닉네임", "SOOP_ID", "장수/직업", "레벨", "말",
         "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화", "장비총강화",
         "무력", "기민", "기력", "지모", "최종확인", "최근근거", "검수상태", "신선도",
-        "전체순위", "국가순위", "정렬순번",
+        "기량합계", "기량공동순위", "정렬순번",
     ]
     ws.append(headers)
     source_columns = {
@@ -699,9 +700,9 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
             22,
             f'=IF(S{row_index}="","미확인",IF(NOW()-S{row_index}<=1/24,"최신",IF(NOW()-S{row_index}<=6/24,"확인 필요","오래됨")))',
         )
-        ws.cell(row_index, 23, f'=IF(O{row_index}="","",RANK.EQ(O{row_index},$O$2:$O$91,0))')
-        ws.cell(row_index, 24, f'=IF(O{row_index}="","",1+COUNTIFS($B$2:$B$91,B{row_index},$O$2:$O$91,">"&O{row_index}))')
-        ws.cell(row_index, 25, f'=IF(O{row_index}="","",RANK.EQ(O{row_index},$O$2:$O$91,0)+COUNTIF($O$2:O{row_index},O{row_index})-1)')
+        ws.cell(row_index, 23, f'=IF(COUNT(O{row_index}:R{row_index})=0,"",SUM(O{row_index}:R{row_index}))')
+        ws.cell(row_index, 24, f'=IF(OR(W{row_index}="",W{row_index}<=0),"",RANK.EQ(W{row_index},$W$2:$W$91,0))')
+        ws.cell(row_index, 25, f'=IF(OR(W{row_index}="",W{row_index}<=0),"",RANK.EQ(W{row_index},$W$2:$W$91,0)+COUNTIF($W$2:W{row_index},W{row_index})-1)')
     style_header(ws, 1, len(headers))
     style_body(ws, 2, len(roster) + 1, len(headers))
     for row in range(2, len(roster) + 2):
@@ -734,26 +735,29 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
 
 def add_ranking_sheet(wb: Workbook) -> None:
     ws = wb.create_sheet("무력랭킹")
-    headers = ["순위", "player_id", "국가", "세력/길드", "닉네임", "장수/직업", "레벨", "무력", "장비총강화", "최종확인", "근거"]
+    headers = [
+        "공동순위", "player_id", "국가", "세력/길드", "닉네임", "장수/직업",
+        "레벨", "기량합계", "무력", "기민", "기력", "지모", "장비총강화",
+        "최종확인", "근거", "검수상태", "정렬순번",
+    ]
     ws.append(headers)
-    source_columns = [None, "A", "B", "C", "D", "F", "G", "O", "N", "S", "T"]
+    source_columns = ["X", "A", "B", "C", "D", "F", "G", "W", "O", "P", "Q", "R", "N", "S", "T", "U"]
     for row in range(2, 92):
-        rank = row - 1
-        ws.cell(row, 1, rank)
-        for column in range(2, len(headers) + 1):
-            source = source_columns[column - 1]
+        ws.cell(row, 17, row - 1)
+        for column, source in enumerate(source_columns, start=1):
             ws.cell(
                 row,
                 column,
-                f'=IFERROR(INDEX(현재현황!${source}$2:${source}$91,MATCH($A{row},현재현황!$Y$2:$Y$91,0)),"")',
+                f'=IFERROR(INDEX(현재현황!${source}$2:${source}$91,MATCH($Q{row},현재현황!$Y$2:$Y$91,0)),"")',
             )
     style_header(ws, 1, len(headers))
     style_body(ws, 2, 91, len(headers))
     for row in range(2, 92):
-        ws.cell(row, 10).number_format = "yyyy-mm-dd hh:mm:ss"
-    ws.auto_filter.ref = "A1:K91"
+        ws.cell(row, 14).number_format = "yyyy-mm-dd hh:mm:ss"
+    ws.column_dimensions["Q"].hidden = True
+    ws.auto_filter.ref = "A1:P91"
     ws.freeze_panes = "A2"
-    set_widths(ws, [9, 12, 9, 18, 16, 16, 10, 11, 14, 20, 48])
+    set_widths(ws, [11, 12, 9, 18, 16, 16, 10, 12, 10, 10, 10, 10, 14, 20, 48, 14, 10])
     ws.sheet_properties.tabColor = "C00000"
 
 
@@ -962,7 +966,7 @@ def build_workbook(
     wb.remove(wb.active)
     wb.properties.title = "SOOPNOTICE 삼국지 방송 추적 시트"
     wb.properties.creator = "SOOPNOTICE"
-    wb.properties.description = "90명 방송 모니터링, 장비·기량 검수, 60개 영토 현황 및 무력 랭킹"
+    wb.properties.description = "90명 방송 모니터링, 장비·기량 검수, 60개 영토 현황 및 기량 투자 랭킹"
     wb.calculation.fullCalcOnLoad = True
     wb.calculation.forceFullCalc = True
     wb.calculation.calcMode = "auto"
@@ -1017,6 +1021,9 @@ def build_workbook(
     if seed_zero_cells:
         raise RuntimeError(f"초기 강화/기량 0값 정규화 실패: {seed_zero_cells[:5]}")
     current_formula = str(check["현재현황"]["G2"].value or "")
+    growth_formula = str(check["현재현황"]["W2"].value or "")
+    growth_rank_formula = str(check["현재현황"]["X2"].value or "")
+    ranking_score_formula = str(check["무력랭킹"]["H2"].value or "")
     territory_formula = str(check["영토현황"]["E2"].value or "") if territories else ""
     if "확정" not in current_formula or "검수대기" not in current_formula:
         raise RuntimeError("현재현황 확정/검수대기 fallback 수식 검증 실패")
@@ -1024,6 +1031,12 @@ def build_workbook(
         raise RuntimeError("영토현황 확정/검수대기 fallback 수식 검증 실패")
     if "FILTER(" not in current_formula or "LOOKUP(" in current_formula:
         raise RuntimeError("현재현황 Google Sheets 호환 수식 검증 실패")
+    if "SUM(O2:R2)" not in growth_formula:
+        raise RuntimeError("현재현황 기량합계 수식 검증 실패")
+    if "RANK.EQ(W2,$W$2:$W$91,0)" not in growth_rank_formula:
+        raise RuntimeError("현재현황 기량 공동순위 수식 검증 실패")
+    if "현재현황!$W$2:$W$91" not in ranking_score_formula:
+        raise RuntimeError("무력랭킹 기량합계 연결 수식 검증 실패")
     if territories and ("FILTER(" not in territory_formula or "LOOKUP(" in territory_formula):
         raise RuntimeError("영토현황 Google Sheets 호환 수식 검증 실패")
     check.close()

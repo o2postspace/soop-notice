@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const express = require("express");
 const {
   DEFAULT_MAX_BYTES,
@@ -154,12 +156,47 @@ test("갱신 오류에는 마지막 정상값을 유지하고 cold 오류에는 
   assert.equal(fallback.territories.length, 60);
   assert.ok(fallback.members.every(member => member.reviewStatus === "검수대기"));
   assert.ok(fallback.territories.every(territory => territory.reviewStatus === "검수대기"));
-  assert.match(fallback.warnings.join(" "), /0은 미갱신 가능성/);
+  assert.match(fallback.warnings.join(" "), /0 sentinel은 미입력 여부/);
   assert.equal(fallback.members.some(member => [
     member.horseLevel, member.weapon, member.helmet, member.armor, member.shoes,
     member.strength, member.agility, member.vitality, member.intelligence,
   ].includes(0)), false);
-  assert.equal(fallback.members.find(member => member.name === "김병살").job, "주유");
+  assert.equal(fallback.members.find(member => member.name === "김병살").job, "운책");
+});
+
+test("fallback 최신 스냅샷은 기량 랭킹 품질 기준을 만족한다", () => {
+  const snapshot = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "../data/samguk-fallback.json"),
+    "utf8",
+  ));
+  const numericFields = [
+    "level", "horseLevel", "weapon", "helmet", "armor", "shoes",
+    "strength", "agility", "vitality", "intelligence",
+  ];
+  const growthFields = ["strength", "agility", "vitality", "intelligence"];
+  const growthScore = member => growthFields.reduce(
+    (sum, field) => sum + (Number.isFinite(member[field]) && member[field] > 0 ? member[field] : 0),
+    0,
+  );
+
+  assert.equal(snapshot.members.length, 90);
+  assert.equal(snapshot.members.some(member => numericFields.some(field => member[field] === 0)), false);
+  assert.equal(snapshot.members.filter(member => member.strength > 0).length, 24);
+  assert.equal(snapshot.members.filter(member => growthScore(member) > 0).length, 30);
+  assert.equal(snapshot.members.reduce((sum, member) => sum + growthScore(member), 0), 373);
+  assert.equal(growthScore(snapshot.members.find(member => member.name === "조경훈")), 86);
+  assert.equal(growthScore(snapshot.members.find(member => member.name === "감스트")), 50);
+});
+
+test("삼국지 화면은 기량점수를 네 기량의 합으로 정의하고 전투력과 구분한다", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
+
+  assert.match(
+    html,
+    /samgukPositiveTotal\(member, \['strength', 'agility', 'vitality', 'intelligence'\]\)/,
+  );
+  assert.match(html, /기량점수\s*=\s*무력\s*\+\s*기민\s*\+\s*기력\s*\+\s*지모/);
+  assert.match(html, /종합 전투력은 아닙니다/);
 });
 
 test("참가자나 영토가 일부만 계산되면 정상 시트로 채택하지 않는다", async () => {

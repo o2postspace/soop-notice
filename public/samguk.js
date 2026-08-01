@@ -6,6 +6,7 @@
   const REFRESH_INTERVAL_MS = 60 * 1000;
   const REQUEST_TIMEOUT_MS = 8000;
   const WIKI_URL = 'https://threekingdoms.notion.site/';
+  const SKILL_STATS_URL = 'https://threekingdoms.notion.site/872f648a81d1821ea42581f61a4fc57e';
   const FMKOREA_RULES_URL = 'https://www.fmkorea.com/10143176987';
   const FMKOREA_SLIDES_URL = 'https://www.fmkorea.com/10143088032';
   const OWNER_COLORS = {
@@ -27,8 +28,8 @@
     {
       category: '기량',
       title: '무력 · 기민 · 기력 · 지모',
-      description: '무력은 공격력, 기민은 이동속도, 기력은 체력, 지모는 절기 가속을 높입니다. 직업마다 기량 구슬 효율이 다르며 직업 변경 시 사용한 절기·기량 구슬의 80%만 반환됩니다.',
-      sourceUrl: WIKI_URL,
+      description: '각 기량은 1단계마다 기량점수 1을 사용합니다. 네 수치의 합은 기량 투자량으로만 사용하며, 직업별 효율과 장비·말·각인 효과가 달라 종합 전투력으로 보지 않습니다.',
+      sourceUrl: SKILL_STATS_URL,
     },
     {
       category: '장비',
