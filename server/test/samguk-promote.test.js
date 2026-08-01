@@ -55,6 +55,7 @@ test("단독 후보는 버리고 Sheet와 일치한 최신 후보만 완전 스�
   assert.equal(Object.keys(snapshots[0].fields).length, 12);
   assert.equal(snapshots[0].sourceCount, 2);
   assert.equal(snapshots[0].verification, "cross-source");
+  assert.ok(snapshots[0].sourceTypes.includes(snapshots[0].primarySourceType));
   assert.deepEqual(snapshots[0].sourceTypes, ["fmkorea", "broadcast"]);
 });
 
@@ -73,4 +74,5 @@ test("write 모드는 승격 스냅샷만 writer에 전달한다", async () => {
   assert.equal(result.written, 1);
   assert.equal(written.length, 1);
   assert.equal(written[0].fields.strength, 11);
+  assert.deepEqual(written[0].sourceTypes, ["fmkorea", "broadcast"]);
 });

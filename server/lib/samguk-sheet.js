@@ -1,6 +1,6 @@
 const FALLBACK_PAYLOAD = require("../data/samguk-fallback.json");
 
-const DEFAULT_SHEET_ID = "19lI8z-C2ieRze6ahONjD68L08ZWQvzBfsXxhO4eUDe4";
+const DEFAULT_SHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 const DEFAULT_TABS = Object.freeze({
   members: "현재현황",
   territories: "영토현황",
@@ -416,6 +416,7 @@ function buildCsvUrl(sheetId, sheetName) {
   const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);
   url.searchParams.set("tqx", "out:csv");
   url.searchParams.set("sheet", sheetName);
+  url.searchParams.set("headers", "1");
   return url.toString();
 }
 

@@ -2,7 +2,7 @@
   "source": "fallback-seed",
   "updatedAt": "2026-08-02T03:40:44+09:00",
   "stale": true,
-  "sheetUrl": "https://docs.google.com/spreadsheets/d/19lI8z-C2ieRze6ahONjD68L08ZWQvzBfsXxhO4eUDe4/edit",
+  "sheetUrl": "https://docs.google.com/spreadsheets/d/1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY/edit",
   "members": [
     {"name":"조경훈","soopId":"cnsgkcnehd74","nation":"위","crew":"버인협회","job":"조조","level":null,"horse":"백룡마","horseLevel":null,"weapon":4,"helmet":2,"armor":2,"shoes":2,"strength":86,"agility":null,"vitality":null,"intelligence":null,"powerScore":null,"sourceType":"sheet","sourceCount":1,"verificationStatus":"baseline","reviewStatus":"기준값","observedAt":"2026-08-02T03:40:44+09:00","evidence":"https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84"},
     {"name":"표우","soopId":"pyowoo","nation":"위","crew":"버인협회","job":"하후돈","level":null,"horse":"백룡마","horseLevel":null,"weapon":2,"helmet":null,"armor":null,"shoes":null,"strength":null,"agility":null,"vitality":null,"intelligence":null,"powerScore":null,"sourceType":"sheet","sourceCount":1,"verificationStatus":"baseline","reviewStatus":"기준값","observedAt":"2026-08-02T03:40:44+09:00","evidence":"https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84"},

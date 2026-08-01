@@ -11,6 +11,7 @@
 
 var SAMGUK_OBSERVATION_SHEET = "관측입력";
 var SAMGUK_PARTICIPANT_SHEET = "참가자";
+var SAMGUK_MAX_OBSERVATION_ROW = 5001;
 var SAMGUK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 var SAMGUK_REQUIRED_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
@@ -54,7 +55,8 @@ function doPost(event) {
     }
   } catch (error) {
     console.error("samguk webhook rejected", error && error.message);
-    return samgukJsonResponse_({ ok: false, error: String(error && error.message || "unknown_error") });
+    var errorCode = String(error && error.message || "unknown_error");
+    return samgukJsonResponse_({ ok: false, status: samgukErrorStatus_(errorCode), error: errorCode });
   }
 }
 
@@ -77,7 +79,7 @@ function samgukAppendSnapshot_(snapshot) {
     .getDisplayValues().map(function(row) { return row[0]; });
   if (participantIds.indexOf(snapshot.playerId) < 0) throw new Error("unknown_player");
 
-  var lastRow = sheet.getLastRow();
+  var lastRow = Math.min(sheet.getLastRow(), SAMGUK_MAX_OBSERVATION_ROW);
   if (lastRow > 1) {
     var duplicate = sheet.getRange(2, 1, lastRow - 1, 1)
       .createTextFinder(snapshot.observationId).matchEntireCell(true).findNext();
@@ -128,10 +130,28 @@ function samgukAppendSnapshot_(snapshot) {
     if (headers.indexOf(header) < 0) throw new Error("missing_header:" + header);
   });
 
-  var targetRow = lastRow + 1;
+  var targetRow = samgukFindFirstEmptyObservationRow_(sheet);
   sheet.getRange(targetRow, 1, 1, values.length).setValues([values]);
   SpreadsheetApp.flush();
   return samgukJsonResponse_({ ok: true, duplicate: false, appendedRow: targetRow });
+}
+
+/**
+ * A열에는 구형 워크북의 빈 ID 수식이 남아 있을 수 있으므로 append 위치로 쓰지 않습니다.
+ * player_id가 들어가는 B열의 2:5001 중 첫 빈 행만 사용해 현재현황 수식 범위를 벗어나지 않습니다.
+ */
+function samgukFindFirstEmptyObservationRow_(sheet) {
+  if (sheet.getMaxRows() < SAMGUK_MAX_OBSERVATION_ROW) {
+    sheet.insertRowsAfter(
+      sheet.getMaxRows(),
+      SAMGUK_MAX_OBSERVATION_ROW - sheet.getMaxRows()
+    );
+  }
+  var playerIds = sheet.getRange(2, 2, SAMGUK_MAX_OBSERVATION_ROW - 1, 1).getDisplayValues();
+  for (var index = 0; index < playerIds.length; index += 1) {
+    if (String(playerIds[index][0] || "").trim() === "") return index + 2;
+  }
+  throw new Error("observation_sheet_full");
 }
 
 function samgukValidateSnapshot_(snapshot) {
@@ -167,13 +187,22 @@ function samgukValidateSnapshot_(snapshot) {
   });
   if (!/^[a-f0-9]{64}$/i.test(String(snapshot.evidenceHash || ""))) throw new Error("invalid_evidence_hash");
   if (!snapshot.batchId || String(snapshot.batchId).length > 80) throw new Error("invalid_batch_id");
-  if (!isFinite(Date.parse(snapshot.observedAt))) throw new Error("invalid_observed_at");
+  var observedAt = Date.parse(snapshot.observedAt);
+  if (!isFinite(observedAt)) throw new Error("invalid_observed_at");
+  if (observedAt > Date.now() + SAMGUK_MAX_CLOCK_SKEW_MS) throw new Error("future_observed_at");
   if (snapshot.ocrConfidence !== null && snapshot.ocrConfidence !== undefined
       && (typeof snapshot.ocrConfidence !== "number" || snapshot.ocrConfidence < 0 || snapshot.ocrConfidence > 1)) {
     throw new Error("invalid_ocr_confidence");
   }
   snapshot.ocrConfidence = snapshot.ocrConfidence === undefined ? null : snapshot.ocrConfidence;
   return snapshot;
+}
+
+/** ContentService는 HTTP status setter가 없어 JSON status로 호출자에게 분류를 전달합니다. */
+function samgukErrorStatus_(errorCode) {
+  if (errorCode === "sheet_busy") return 503;
+  if (errorCode === "secret_not_configured" || errorCode === "spreadsheet_not_configured") return 500;
+  return 400;
 }
 
 function samgukSafeCellValue_(value) {

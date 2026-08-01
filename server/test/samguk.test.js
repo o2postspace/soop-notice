@@ -5,6 +5,8 @@ const path = require("node:path");
 const express = require("express");
 const {
   DEFAULT_MAX_BYTES,
+  DEFAULT_SHEET_ID,
+  buildCsvUrl,
   createSamgukSheetService,
   parseCsv,
   parseMembersCsv,
@@ -195,6 +197,17 @@ test("필수 헤더 누락과 응답 크기 초과를 거부한다", async () =>
   );
 });
 
+test("Google gviz CSV URL은 첫 행 헤더와 표준 쿼리 파라미터를 고정한다", () => {
+  const url = new URL(buildCsvUrl(DEFAULT_SHEET_ID, "현재현황"));
+
+  assert.equal(url.origin, "https://docs.google.com");
+  assert.equal(url.pathname, `/spreadsheets/d/${DEFAULT_SHEET_ID}/gviz/tq`);
+  assert.deepEqual([...url.searchParams.keys()].sort(), ["headers", "sheet", "tqx"]);
+  assert.equal(url.searchParams.get("tqx"), "out:csv");
+  assert.equal(url.searchParams.get("sheet"), "현재현황");
+  assert.equal(url.searchParams.get("headers"), "1");
+});
+
 test("Google Sheet 세 탭을 읽어 정규 payload 계약으로 반환한다", async () => {
   const state = {};
   const service = createSamgukSheetService({
@@ -208,6 +221,8 @@ test("Google Sheet 세 탭을 읽어 정규 payload 계약으로 반환한다", 
   assert.deepEqual(Object.keys(payload).sort(), PAYLOAD_KEYS);
   assert.equal(payload.source, "google-sheet");
   assert.equal(payload.stale, false);
+  assert.equal(DEFAULT_SHEET_ID, "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY");
+  assert.equal(payload.sheetUrl, `https://docs.google.com/spreadsheets/d/${DEFAULT_SHEET_ID}/edit`);
   assert.deepEqual(Object.keys(payload.members[0]).sort(), MEMBER_KEYS);
   assert.deepEqual(Object.keys(payload.territories[0]).sort(), TERRITORY_KEYS);
   assert.deepEqual(Object.keys(payload.rules[0]).sort(), RULE_KEYS);
@@ -216,6 +231,8 @@ test("Google Sheet 세 탭을 읽어 정규 payload 계약으로 반환한다", 
   assert.equal(payload.rules[0].title, "영토 수");
   assert.equal(state.urls.length, 3);
   assert.ok(state.urls.every(url => new URL(url).hostname === "docs.google.com"));
+  assert.ok(state.urls.every(url => new URL(url).pathname.includes(`/d/${DEFAULT_SHEET_ID}/`)));
+  assert.ok(state.urls.every(url => new URL(url).searchParams.get("headers") === "1"));
   assert.ok(state.urls.every(url => !url.includes("vercel.app")));
 });
 

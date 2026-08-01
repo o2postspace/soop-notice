@@ -20,7 +20,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 MAX_INPUT_ROW = 5001
 FONT_NAME = "Noto Sans CJK KR"
-SHEET_URL = "https://docs.google.com/spreadsheets/d/19lI8z-C2ieRze6ahONjD68L08ZWQvzBfsXxhO4eUDe4/edit?gid=0"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY/edit"
 WIKI_URL = "https://threekingdoms.notion.site/"
 SKILL_STATS_URL = "https://threekingdoms.notion.site/872f648a81d1821ea42581f61a4fc57e"
 FMKOREA_RULES_URL = "https://www.fmkorea.com/10143176987"
@@ -586,10 +586,6 @@ def add_observations_sheet(
             ])
             initial_count += 1
 
-    start_blank = ws.max_row + 1
-    for row in range(start_blank, MAX_INPUT_ROW + 1):
-        ws.cell(row, 1, f'=IF(B{row}="","","OBS-"&TEXT(ROW()-1,"00000"))')
-
     style_header(ws, 1, len(headers))
     style_body(ws, 2, MAX_INPUT_ROW, len(headers))
     for row in range(2, MAX_INPUT_ROW + 1):
@@ -808,10 +804,6 @@ def add_territory_input_sheet(
         )
 
     initial_count = len(territories)
-    start_blank = ws.max_row + 1
-    for row in range(start_blank, MAX_INPUT_ROW + 1):
-        ws.cell(row, 1, f'=IF(B{row}="","","TERR-"&TEXT(ROW()-1,"00000"))')
-
     style_header(ws, 1, len(headers))
     style_body(ws, 2, MAX_INPUT_ROW, len(headers))
     for row in range(2, MAX_INPUT_ROW + 1):
@@ -1036,6 +1028,18 @@ def build_workbook(
                 seed_zero_cells.append(check["관측입력"].cell(row, column).coordinate)
     if seed_zero_cells:
         raise RuntimeError(f"초기 강화/기량 0값 정규화 실패: {seed_zero_cells[:5]}")
+    for sheet_name, seeded_rows in (
+        ("관측입력", initial_count),
+        ("영토입력", territory_initial_count),
+    ):
+        first_blank_row = seeded_rows + 2
+        ghost_ids = [
+            check[sheet_name].cell(row, 1).coordinate
+            for row in range(first_blank_row, MAX_INPUT_ROW + 1)
+            if check[sheet_name].cell(row, 1).value not in (None, "")
+        ]
+        if ghost_ids:
+            raise RuntimeError(f"{sheet_name} 빈 행 ID 사전 생성 검증 실패: {ghost_ids[:5]}")
     current_formula = str(check["현재현황"]["G2"].value or "")
     current_evidence_formula = str(check["현재현황"]["U2"].value or "")
     current_row_formula = str(check["현재현황"]["AD2"].value or "")
