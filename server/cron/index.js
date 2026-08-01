@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const fetchNotices = require("./fetch-notices");
 const parseHot = require("./parse-hot");
+const cleanupCommunity = require("./cleanup-community");
 
 function createRunner({
   fetchNoticesFn = fetchNotices,
@@ -55,6 +56,12 @@ function start() {
     const includeRest = new Date().getMinutes() % 30 === 0;
     void runner.runCycle({ includeRest });
   });
+  const cleanupTask = cron.schedule("17 4 * * *", () => {
+    if (stopped) return;
+    void cleanupCommunity().catch(error => {
+      console.error("[cron] community cleanup failed:", error.message);
+    });
+  });
 
   // 재기동 직후에도 전체 공지를 먼저 갱신하고 캘린더를 백필한다.
   void runner.runCycle({ includeRest: true });
@@ -66,6 +73,8 @@ function start() {
     stopped = true;
     scheduledTask.stop();
     if (typeof scheduledTask.destroy === "function") scheduledTask.destroy();
+    cleanupTask.stop();
+    if (typeof cleanupTask.destroy === "function") cleanupTask.destroy();
   };
 }
 

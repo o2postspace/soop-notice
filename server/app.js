@@ -2,6 +2,7 @@ require("dotenv").config({ quiet: true });
 const express = require("express");
 const cors = require("cors");
 const { startAdaptiveCluster } = require("./lib/adaptive-cluster");
+const { resolveIdentitySecret } = require("./lib/community-security");
 
 function positiveNumber(name, fallback, { integer = false } = {}) {
   const value = Number(process.env[name]);
@@ -18,11 +19,34 @@ function nonNegativeNumber(name, fallback) {
 
 function createApp(requestMetricsMiddleware) {
   const app = express();
+  app.disable("x-powered-by");
+  const configuredOrigins = new Set([
+    "https://soopnotice.com",
+    "https://www.soopnotice.com",
+    ...String([process.env.CORS_ALLOWED_ORIGINS, process.env.COMMUNITY_ALLOWED_ORIGINS].filter(Boolean).join(","))
+      .split(",")
+      .map(value => value.trim())
+      .filter(Boolean),
+  ]);
+
+  app.set("trust proxy", "loopback");
 
   // 모든 API 요청을 route 실행 전에 측정해 worker 증감 판단에 사용한다.
   if (requestMetricsMiddleware) app.use(requestMetricsMiddleware);
-  app.use(cors());
-  app.use(express.json());
+  app.use(cors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (configuredOrigins.has(origin)) return callback(null, true);
+      if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+  }));
+  // GitHub 서명 검증에는 파싱 전 원문 body가 필요하다.
+  app.use("/webhook", require("./routes/webhook"));
+  app.use(express.json({ limit: "64kb" }));
 
   app.use("/api/notices", require("./routes/notices"));
   app.use("/api/notice-content", require("./routes/notice-content"));
@@ -33,13 +57,17 @@ function createApp(requestMetricsMiddleware) {
   app.use("/api/admin", require("./routes/admin"));
   app.use("/api/live-check", require("./routes/live-check"));
   app.use("/api/crew", require("./routes/crew"));
-  app.use("/webhook", require("./routes/webhook"));
+  app.use("/api/community", require("./routes/community"));
 
   return app;
 }
 
 function start() {
   const port = positiveNumber("PORT", 4000, { integer: true });
+  const host = process.env.HOST || "127.0.0.1";
+  if (!resolveIdentitySecret(process.env)) {
+    throw new Error("COMMUNITY_IDENTITY_SECRET, SERVER_SECRET, or SESSION_SECRET must be configured before startup");
+  }
   const minWorkers = positiveNumber("ADAPTIVE_MIN_WORKERS", 1, { integer: true });
   const maxWorkers = Math.max(
     minWorkers,
@@ -68,9 +96,9 @@ function start() {
     },
     startWorker: ({ requestMetricsMiddleware, workerId }) => {
       const app = createApp(requestMetricsMiddleware);
-      const server = app.listen(port, () => {
+      const server = app.listen(port, host, () => {
         console.log(
-          `soop-notice web worker ${workerId || "standalone"} running on port ${port}`,
+          `soop-notice web worker ${workerId || "standalone"} running on ${host}:${port}`,
         );
       });
       return async () => {

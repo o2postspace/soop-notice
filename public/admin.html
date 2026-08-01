@@ -14,7 +14,7 @@
   .login input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
   .login button { width: 100%; padding: 10px; background: #5B6AED; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
   .admin { max-width: 900px; margin: 0 auto; display: none; }
-  .tabs { display: flex; gap: 0; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 0; margin-bottom: 16px; overflow-x: auto; }
   .tab { padding: 10px 24px; border: none; background: #eee; color: #666; cursor: pointer; font-size: 14px; font-weight: 600; }
   .tab.active { background: #5B6AED; color: #fff; }
   .tab:first-child { border-radius: 6px 0 0 6px; }
@@ -30,10 +30,20 @@
   .btn-sm { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
   .btn-del { background: #ff4757; color: #fff; }
   .btn-edit { background: #5B6AED; color: #fff; }
+  .btn-hide { background: #f2a93b; color: #fff; }
+  .btn-restore { background: #33a06f; color: #fff; }
   .empty { text-align: center; color: #bbb; padding: 30px; }
   .add-form { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
   .add-form input, .add-form select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-right: 6px; margin-bottom: 6px; }
   .add-form button { padding: 6px 16px; background: #5B6AED; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .community-report-filter { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .community-report-filter select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff; }
+  @media (max-width: 700px) {
+    body { padding: 10px; }
+    .tab { padding: 9px 13px; white-space: nowrap; }
+    .item { flex-direction: column; }
+    .item-actions { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>
@@ -47,12 +57,25 @@
   <h1>관리자 페이지</h1>
   <div class="tabs">
     <button class="tab active" onclick="showPanel('feedback')">건의사항</button>
+    <button class="tab" onclick="showPanel('community')">커뮤니티 신고</button>
     <button class="tab" onclick="showPanel('schedules')">캘린더 관리</button>
     <button class="tab" onclick="showPanel('updates')">업데이트 관리</button>
   </div>
 
   <div class="panel active" id="panel-feedback">
     <div id="feedbackList"></div>
+  </div>
+
+  <div class="panel" id="panel-community">
+    <div class="community-report-filter">
+      <select id="communityReportStatus" onchange="loadCommunityReports()">
+        <option value="pending">처리 대기</option>
+        <option value="resolved">처리 완료</option>
+        <option value="dismissed">기각</option>
+      </select>
+      <button class="btn-sm btn-edit" onclick="loadCommunityReports()">새로고침</button>
+    </div>
+    <div id="communityReportList"></div>
   </div>
 
   <div class="panel" id="panel-updates">
@@ -91,14 +114,38 @@
 const API_BASE = "https://api.soopnotice.com";
 let adminKey = '';
 
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function safeId(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
+
+async function adminFetch(path, options) {
+  const request = Object.assign({ method: 'GET', cache: 'no-store' }, options || {});
+  request.headers = Object.assign({ 'Accept': 'application/json', 'X-Admin-Key': adminKey }, request.headers || {});
+  if (request.body && typeof request.body !== 'string') {
+    request.headers['Content-Type'] = 'application/json';
+    request.body = JSON.stringify(request.body);
+  }
+  const response = await fetch(API_BASE + path, request);
+  let data = null;
+  try { data = await response.json(); } catch (error) {}
+  if (!response.ok) throw new Error(data && data.error ? data.error : '요청 실패 (' + response.status + ')');
+  return data;
+}
 
 function showPanel(name) {
   const tabs = document.querySelectorAll('.tab');
-  const names = ['feedback', 'schedules', 'updates'];
+  const names = ['feedback', 'community', 'schedules', 'updates'];
   tabs.forEach((t, i) => t.classList.toggle('active', names[i] === name));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'community') loadCommunityReports();
   if (name === 'schedules') loadSchedules();
   if (name === 'updates') loadUpdateList();
 }
@@ -106,9 +153,7 @@ function showPanel(name) {
 async function login() {
   adminKey = document.getElementById('keyInput').value;
   try {
-    const resp = await fetch(API_BASE + '/api/feedback?key=' + encodeURIComponent(adminKey));
-    if (!resp.ok) { alert('비밀키가 틀립니다'); return; }
-    const data = await resp.json();
+    const data = await adminFetch('/api/feedback');
     document.getElementById('loginBox').style.display = 'none';
     document.getElementById('adminBox').style.display = 'block';
     renderFeedback(data);
@@ -126,8 +171,7 @@ function renderFeedback(data) {
 }
 
 async function loadSchedules() {
-  const resp = await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-schedules');
-  const data = await resp.json();
+  const data = await adminFetch('/api/admin/schedules');
   if (!data.length) {
     document.getElementById('scheduleList').innerHTML = '<div class="empty">일정이 없습니다</div>';
     return;
@@ -141,13 +185,12 @@ async function loadSchedules() {
 
 async function delSchedule(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-schedule&id=' + id);
+  await adminFetch('/api/admin/schedules/' + safeId(id), { method: 'DELETE' });
   loadSchedules();
 }
 
 async function loadUpdateList() {
-  const resp = await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=list-updates');
-  const data = await resp.json();
+  const data = await adminFetch('/api/admin/updates');
   if (!data.length) {
     document.getElementById('updateList').innerHTML = '<div class="empty">작성된 업데이트가 없습니다</div>';
     return;
@@ -162,7 +205,7 @@ async function addUpdate() {
   const title = document.getElementById('updateTitle').value.trim();
   const content = document.getElementById('updateContent').value.trim();
   if (!title || !content) { alert('제목과 내용을 입력하세요'); return; }
-  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-update&title=' + encodeURIComponent(title) + '&content=' + encodeURIComponent(content) + '&category=' + encodeURIComponent(category));
+  await adminFetch('/api/admin/updates', { method: 'POST', body: { title, content, category } });
   document.getElementById('updateTitle').value = '';
   document.getElementById('updateContent').value = '';
   loadUpdateList();
@@ -170,7 +213,7 @@ async function addUpdate() {
 
 async function delUpdate(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=delete-update&id=' + id);
+  await adminFetch('/api/admin/updates/' + safeId(id), { method: 'DELETE' });
   loadUpdateList();
 }
 
@@ -181,10 +224,81 @@ async function addSchedule() {
   const desc = document.getElementById('addDesc').value.trim();
   if (!bj || !date || !time) { alert('스트리머 이름, 날짜, 시간을 입력하세요'); return; }
   const start = date + 'T' + time + ':00+09:00';
-  await fetch(API_BASE + '/api/admin?key=' + encodeURIComponent(adminKey) + '&action=add-schedule&bj_name=' + encodeURIComponent(bj) + '&broadcast_start=' + encodeURIComponent(start) + '&description=' + encodeURIComponent(desc));
+  await adminFetch('/api/admin/schedules', { method: 'POST', body: { bj_name: bj, broadcast_start: start, description: desc } });
   document.getElementById('addBj').value = '';
   document.getElementById('addDesc').value = '';
   loadSchedules();
+}
+
+const communityReasonLabels = {
+  profanity: '비속어·혐오',
+  spam: '도배·광고',
+  personal_info: '개인정보',
+  other: '기타',
+};
+
+async function loadCommunityReports() {
+  const status = document.getElementById('communityReportStatus').value;
+  const list = document.getElementById('communityReportList');
+  list.innerHTML = '<div class="empty">불러오는 중...</div>';
+  try {
+    const data = await adminFetch('/api/community/moderation/reports?status=' + encodeURIComponent(status));
+    renderCommunityReports(Array.isArray(data.items) ? data.items : []);
+  } catch (error) {
+    list.innerHTML = '<div class="empty">' + esc(error.message) + '</div>';
+  }
+}
+
+function renderCommunityReports(items) {
+  const list = document.getElementById('communityReportList');
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">해당 신고가 없습니다</div>';
+    return;
+  }
+  list.innerHTML = items.map(function(report) {
+    const reportId = safeId(report.id);
+    const targetId = safeId(report.targetId);
+    const targetType = report.targetType === 'comment' ? 'comment' : 'post';
+    if (!reportId || !targetId) return '';
+    const target = report.target || {};
+    const title = target.title ? target.title : (targetType === 'post' ? '게시글' : '댓글');
+    const body = target.body || target.excerpt || '대상 내용을 확인할 수 없습니다.';
+    const postMeta = target.postId ? ' · 게시글 #' + safeId(target.postId) : '';
+    return '<div class="item"><div class="item-content">'
+      + '<div class="item-subject">[' + esc(communityReasonLabels[report.reason] || report.reason) + '] '
+      + esc(title) + ' #' + targetId + '</div>'
+      + '<div class="item-body">' + esc(body) + '</div>'
+      + (report.detail ? '<div class="item-body"><strong>신고 내용:</strong> ' + esc(report.detail) + '</div>' : '')
+      + '<div class="item-meta">신고 #' + reportId + postMeta + ' · ' + esc(new Date(report.createdAt).toLocaleString('ko-KR')) + '</div>'
+      + '</div><div class="item-actions">'
+      + '<button class="btn-sm btn-hide" onclick="moderateCommunityTarget(\'' + targetType + '\',' + targetId + ',\'hide\')">숨김</button>'
+      + '<button class="btn-sm btn-restore" onclick="moderateCommunityTarget(\'' + targetType + '\',' + targetId + ',\'restore\')">복구</button>'
+      + '<button class="btn-sm btn-del" onclick="moderateCommunityTarget(\'' + targetType + '\',' + targetId + ',\'delete\')">삭제</button>'
+      + '<button class="btn-sm btn-edit" onclick="updateCommunityReport(' + reportId + ',\'resolved\')">완료</button>'
+      + '<button class="btn-sm" onclick="updateCommunityReport(' + reportId + ',\'dismissed\')">기각</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+async function moderateCommunityTarget(targetType, targetId, action) {
+  if (!confirm('대상을 ' + ({ hide: '숨김', restore: '복구', delete: '삭제' }[action] || action) + ' 처리할까요?')) return;
+  try {
+    await adminFetch('/api/community/moderation/' + targetType + '/' + targetId, {
+      method: 'PATCH',
+      body: { action },
+    });
+    loadCommunityReports();
+  } catch (error) { alert(error.message); }
+}
+
+async function updateCommunityReport(reportId, status) {
+  try {
+    await adminFetch('/api/community/moderation/reports/' + reportId, {
+      method: 'PATCH',
+      body: { status },
+    });
+    loadCommunityReports();
+  } catch (error) { alert(error.message); }
 }
 </script>
 </body>

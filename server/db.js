@@ -3,7 +3,7 @@ const mysql = require("mysql2/promise");
 const configuredConnectionLimit = Number(process.env.DB_CONNECTION_LIMIT);
 const connectionLimit = Number.isInteger(configuredConnectionLimit) && configuredConnectionLimit > 0
   ? configuredConnectionLimit
-  : 12;
+  : 8;
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -13,6 +13,9 @@ const pool = mysql.createPool({
   waitForConnections: true,
   // 적응형 웹 워커가 최대 8개까지 늘어나도 MySQL의 max_connections(151)를 넘지 않는다.
   connectionLimit,
+  queueLimit: 200,
+  connectTimeout: 10_000,
+  enableKeepAlive: true,
   charset: "utf8mb4",
   timezone: "+00:00",
   dateStrings: true, // DATETIME을 문자열로 반환 (Date 객체 변환 방지)

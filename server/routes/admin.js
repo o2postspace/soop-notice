@@ -1,81 +1,136 @@
 const { Router } = require("express");
 const { query, select, toMySQLDate } = require("../db");
+const { requireAdmin } = require("../middleware/admin-auth");
 
 const router = Router();
+router.use(requireAdmin);
+router.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
-router.get("/", async (req, res) => {
-  const ADMIN_KEY = process.env.ADMIN_KEY || "qowlstnrytnsla";
-  if (req.query.key !== ADMIN_KEY) return res.status(403).json({ error: "Forbidden" });
+function positiveId(value) {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
 
-  const action = req.query.action;
+function handleError(res, error) {
+  console.error("admin route error", error);
+  return res.status(500).json({ error: "서버 오류가 발생했습니다" });
+}
 
+router.get("/schedules", async (req, res) => {
   try {
-    if (action === "delete-notice") {
-      const titleNo = parseInt(req.query.title_no);
-      if (!titleNo) return res.status(400).json({ error: "title_no required" });
-      await query("DELETE FROM notices WHERE title_no = ?", [titleNo]);
-      return res.json({ ok: true });
-    }
+    const threeDaysAgo = toMySQLDate(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
+    const data = await select(
+      "SELECT * FROM schedules WHERE broadcast_start >= ? ORDER BY broadcast_start DESC LIMIT 100",
+      [threeDaysAgo],
+    );
+    return res.json(data);
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "delete-schedule") {
-      const id = parseInt(req.query.id);
-      if (!id) return res.status(400).json({ error: "id required" });
-      await query("DELETE FROM schedules WHERE id = ?", [id]);
-      return res.json({ ok: true });
-    }
+router.post("/schedules", async (req, res) => {
+  const { bj_name: bjName, broadcast_start: broadcastStart, description = "" } = req.body || {};
+  if (!bjName || !broadcastStart) return res.status(400).json({ error: "bj_name, broadcast_start required" });
+  const parsedStart = toMySQLDate(broadcastStart);
+  if (!parsedStart) return res.status(400).json({ error: "invalid broadcast_start" });
+  try {
+    await query(
+      `INSERT INTO schedules
+        (bj_id, bj_name, title_no, broadcast_start, description, raw_text, parsed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ["manual", String(bjName).slice(0, 128), Date.now(), parsedStart, String(description).slice(0, 5000), "수동 추가", toMySQLDate(new Date().toISOString())],
+    );
+    return res.status(201).json({ ok: true });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "add-schedule") {
-      const { bj_name, broadcast_start, description } = req.query;
-      if (!bj_name || !broadcast_start) return res.status(400).json({ error: "bj_name, broadcast_start required" });
-      await query(
-        "INSERT INTO schedules (bj_id, bj_name, title_no, broadcast_start, description, raw_text, parsed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ["manual", bj_name, Date.now(), toMySQLDate(broadcast_start), description || "", "수동 추가", toMySQLDate(new Date().toISOString())]
-      );
-      return res.json({ ok: true });
-    }
+router.patch("/schedules/:id", async (req, res) => {
+  const id = positiveId(req.params.id);
+  if (!id) return res.status(400).json({ error: "invalid id" });
+  const sets = [];
+  const params = [];
+  if (req.body?.broadcast_start) {
+    const parsedStart = toMySQLDate(req.body.broadcast_start);
+    if (!parsedStart) return res.status(400).json({ error: "invalid broadcast_start" });
+    sets.push("broadcast_start = ?");
+    params.push(parsedStart);
+  }
+  if (req.body?.description !== undefined) {
+    sets.push("description = ?");
+    params.push(String(req.body.description).slice(0, 5000));
+  }
+  if (req.body?.bj_name) {
+    sets.push("bj_name = ?");
+    params.push(String(req.body.bj_name).slice(0, 128));
+  }
+  if (!sets.length) return res.status(400).json({ error: "nothing to update" });
+  try {
+    params.push(id);
+    await query(`UPDATE schedules SET ${sets.join(", ")} WHERE id = ?`, params);
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "edit-schedule") {
-      const id = parseInt(req.query.id);
-      if (!id) return res.status(400).json({ error: "id required" });
-      const sets = [];
-      const params = [];
-      if (req.query.broadcast_start) { sets.push("broadcast_start = ?"); params.push(toMySQLDate(req.query.broadcast_start)); }
-      if (req.query.description) { sets.push("description = ?"); params.push(req.query.description); }
-      if (req.query.bj_name) { sets.push("bj_name = ?"); params.push(req.query.bj_name); }
-      if (sets.length === 0) return res.status(400).json({ error: "nothing to update" });
-      params.push(id);
-      await query(`UPDATE schedules SET ${sets.join(", ")} WHERE id = ?`, params);
-      return res.json({ ok: true });
-    }
+router.delete("/schedules/:id", async (req, res) => {
+  const id = positiveId(req.params.id);
+  if (!id) return res.status(400).json({ error: "invalid id" });
+  try {
+    await query("DELETE FROM schedules WHERE id = ?", [id]);
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "list-schedules") {
-      const threeDaysAgo = toMySQLDate(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
-      const data = await select("SELECT * FROM schedules WHERE broadcast_start >= ? ORDER BY broadcast_start DESC LIMIT 100", [threeDaysAgo]);
-      return res.json(data);
-    }
+router.get("/updates", async (req, res) => {
+  try {
+    return res.json(await select("SELECT * FROM updates ORDER BY created_at DESC LIMIT 50"));
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "list-updates") {
-      const data = await select("SELECT * FROM updates ORDER BY created_at DESC LIMIT 50");
-      return res.json(data);
-    }
+router.post("/updates", async (req, res) => {
+  const { title, content, category = "업데이트" } = req.body || {};
+  if (!title || !content) return res.status(400).json({ error: "title, content required" });
+  try {
+    await query(
+      "INSERT INTO updates (title, content, category) VALUES (?, ?, ?)",
+      [String(title).slice(0, 512), String(content).slice(0, 20_000), String(category).slice(0, 64)],
+    );
+    return res.status(201).json({ ok: true });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "add-update") {
-      const { title, content, category } = req.query;
-      if (!title || !content) return res.status(400).json({ error: "title, content required" });
-      await query("INSERT INTO updates (title, content, category) VALUES (?, ?, ?)", [title, content, category || "업데이트"]);
-      return res.json({ ok: true });
-    }
+router.delete("/updates/:id", async (req, res) => {
+  const id = positiveId(req.params.id);
+  if (!id) return res.status(400).json({ error: "invalid id" });
+  try {
+    await query("DELETE FROM updates WHERE id = ?", [id]);
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 
-    if (action === "delete-update") {
-      const id = parseInt(req.query.id);
-      if (!id) return res.status(400).json({ error: "id required" });
-      await query("DELETE FROM updates WHERE id = ?", [id]);
-      return res.json({ ok: true });
-    }
-
-    res.status(400).json({ error: "Unknown action" });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+router.delete("/notices/:titleNo", async (req, res) => {
+  const titleNo = positiveId(req.params.titleNo);
+  if (!titleNo) return res.status(400).json({ error: "invalid title_no" });
+  try {
+    await query("DELETE FROM notices WHERE title_no = ?", [titleNo]);
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error);
   }
 });
 

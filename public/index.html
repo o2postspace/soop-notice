@@ -1189,6 +1189,114 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .samguk-ranking-table tr:hover { background: #252530; }
   html.dark .samguk-empty-value { color: #555; }
 
+  /* 커뮤니티 */
+  #communityContainer { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
+  .community-shell { width: 100%; max-width: 1120px; margin: 0 auto; }
+  .community-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+  .community-title { font-size: 20px; color: #222; margin-bottom: 5px; }
+  .community-subtitle { color: #888; font-size: 12px; line-height: 1.55; }
+  .community-anonymous-status { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px; border: 1px solid #d8dae5; border-radius: 14px; background: #fff; color: #777; font-size: 11px; white-space: nowrap; }
+  .community-button, .community-button-secondary, .community-button-danger { min-height: 31px; border-radius: 4px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+  .community-button { border: 1px solid #5B6AED; background: #5B6AED; color: #fff; }
+  .community-button:hover { background: #4a58d4; border-color: #4a58d4; }
+  .community-button-secondary { border: 1px solid #cfd3ea; background: #fff; color: #59607a; }
+  .community-button-secondary:hover { border-color: #5B6AED; color: #5B6AED; }
+  .community-button-secondary.community-active { border-color: #5B6AED; background: #eef0ff; color: #5B6AED; }
+  .community-button-danger { border: 1px solid #e5b6b6; background: #fff; color: #c44; }
+  .community-button-danger:hover { background: #fff4f4; border-color: #c44; }
+  .community-button:disabled, .community-button-secondary:disabled, .community-button-danger:disabled { opacity: .45; cursor: default; }
+  .community-notice { border: 1px solid #e4e6f3; background: #f8f8fd; padding: 9px 12px; margin-bottom: 12px; color: #6f7485; font-size: 11px; line-height: 1.5; }
+  .community-notice-link { color: #5B6AED; text-decoration: none; margin-left: 7px; white-space: nowrap; }
+  .community-notice-link:hover { text-decoration: underline; }
+  .community-panel { background: #fff; border: 1px solid #dddfe8; border-top: 2px solid #5B6AED; }
+  .community-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border-bottom: 1px solid #e7e7ec; }
+  .community-categories { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+  .community-category-button { border: 1px solid #d8dae5; background: #fff; color: #777; border-radius: 3px; padding: 5px 10px; font-size: 11px; cursor: pointer; }
+  .community-category-button:hover { color: #5B6AED; border-color: #adb4ed; }
+  .community-category-button.community-active { color: #fff; border-color: #5B6AED; background: #5B6AED; font-weight: 700; }
+  .community-table-wrap { overflow-x: auto; }
+  .community-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .community-table-head { background: #fafafd; }
+  .community-table-heading { height: 32px; border-bottom: 1px solid #dcdde5; color: #777; font-size: 11px; font-weight: 600; text-align: center; }
+  .community-table-row { cursor: pointer; }
+  .community-table-row:hover { background: #f8f8fd; }
+  .community-table-cell { height: 38px; padding: 6px 7px; border-bottom: 1px solid #ededf1; color: #555; font-size: 12px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .community-col-number { width: 70px; color: #999; }
+  .community-col-category { width: 76px; color: #5B6AED; }
+  .community-col-title { width: auto; text-align: left; color: #222; }
+  .community-col-author { width: 135px; }
+  .community-col-date { width: 88px; color: #999; }
+  .community-col-views, .community-col-recommends { width: 60px; color: #999; }
+  .community-post-title { color: inherit; font-weight: 500; }
+  .community-comment-count { color: #5B6AED; font-size: 11px; margin-left: 4px; font-weight: 700; }
+  .community-empty, .community-loading { padding: 70px 16px; color: #aaa; font-size: 13px; text-align: center; }
+  .community-list-footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 12px 10px; }
+  .community-pagination { display: flex; gap: 5px; grid-column: 2; }
+  .community-write-shortcut { grid-column: 3; justify-self: end; }
+  .community-search { display: flex; justify-content: center; gap: 5px; padding: 0 10px 14px; }
+  .community-search-select, .community-search-input, .community-field-input, .community-field-select, .community-field-textarea { border: 1px solid #d7d9e2; border-radius: 4px; background: #fff; color: #333; font-family: inherit; font-size: 12px; outline: none; }
+  .community-search-select { padding: 7px 8px; }
+  .community-search-input { width: min(360px, 55vw); padding: 7px 10px; }
+  .community-search-input:focus, .community-field-input:focus, .community-field-select:focus, .community-field-textarea:focus { border-color: #5B6AED; box-shadow: 0 0 0 2px rgba(91,106,237,.08); }
+  .community-view-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #e5e5eb; }
+  .community-view-title { color: #222; font-size: 15px; font-weight: 700; }
+  .community-form { padding: 16px; }
+  .community-field { margin-bottom: 13px; }
+  .community-field-label { display: block; color: #555; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .community-field-row { display: grid; grid-template-columns: 140px 1fr; gap: 8px; }
+  .community-field-input, .community-field-select { width: 100%; padding: 9px 10px; }
+  .community-field-textarea { width: 100%; min-height: 260px; resize: vertical; padding: 11px; line-height: 1.65; }
+  .community-field-help { margin-top: 5px; color: #999; font-size: 10px; line-height: 1.45; }
+  .community-form-error { display: none; margin-bottom: 12px; border: 1px solid #f0c7c7; background: #fff5f5; color: #bd3c3c; border-radius: 4px; padding: 8px 10px; font-size: 11px; line-height: 1.45; }
+  .community-form-error.community-show { display: block; }
+  .community-form-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 15px; }
+  .community-detail-head { padding: 14px 16px 12px; border-bottom: 1px solid #e5e5eb; }
+  .community-detail-category { color: #5B6AED; font-size: 11px; font-weight: 700; }
+  .community-detail-title { margin: 5px 0 9px; color: #222; font-size: 18px; line-height: 1.4; word-break: break-word; }
+  .community-detail-meta { display: flex; flex-wrap: wrap; gap: 6px 13px; color: #999; font-size: 11px; }
+  .community-detail-body { min-height: 230px; padding: 22px 18px; border-bottom: 1px solid #e5e5eb; color: #333; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .community-detail-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; padding: 13px; }
+  .community-comments { border-top: 8px solid #f2f2f6; }
+  .community-comments-head { padding: 11px 14px; border-bottom: 1px solid #dedfe7; color: #444; font-size: 13px; font-weight: 700; }
+  .community-comments-truncated { padding: 8px 14px; border-bottom: 1px solid #e4e5ec; background: #fff9e8; color: #8b7442; font-size: 10px; text-align: center; }
+  .community-comment { padding: 11px 14px; border-bottom: 1px solid #ededf1; }
+  .community-comment-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 6px; color: #999; font-size: 10px; }
+  .community-comment-author { color: #555; font-size: 11px; font-weight: 700; }
+  .community-comment-body { color: #333; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .community-comment-tools { margin-left: auto; display: flex; gap: 8px; }
+  .community-text-button { border: 0; background: none; color: #999; font-size: 10px; cursor: pointer; padding: 0; }
+  .community-text-button:hover { color: #5B6AED; text-decoration: underline; }
+  .community-comment-form { padding: 13px 14px 15px; background: #fafafd; }
+  .community-comment-textarea { width: 100%; min-height: 82px; resize: vertical; padding: 9px 10px; border: 1px solid #d7d9e2; border-radius: 4px; background: #fff; color: #333; font: 12px/1.55 inherit; outline: none; }
+  .community-comment-textarea:focus { border-color: #5B6AED; }
+  .community-comment-options { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 7px; }
+  .community-dialog-overlay { display: none; position: fixed; inset: 0; z-index: 700; align-items: center; justify-content: center; padding: 18px; background: rgba(0,0,0,.48); }
+  .community-dialog-overlay.community-show { display: flex; }
+  .community-dialog { width: min(390px, 100%); padding: 20px; border: 1px solid #dadce7; border-radius: 10px; background: #fff; box-shadow: 0 16px 50px rgba(0,0,0,.22); }
+  .community-dialog-title { margin-bottom: 8px; color: #222; font-size: 16px; }
+  .community-dialog-message { margin-bottom: 13px; color: #777; font-size: 12px; line-height: 1.5; }
+  .community-dialog-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 14px; }
+  html.dark .community-title, html.dark .community-view-title, html.dark .community-detail-title { color: #e3e3e3; }
+  html.dark .community-panel { background: #1e1e1e; border-color: #393a45; border-top-color: #737eea; }
+  html.dark .community-notice, html.dark .community-comment-form { background: #1a1a22; border-color: #343644; color: #858797; }
+  html.dark .community-toolbar, html.dark .community-view-head, html.dark .community-detail-head, html.dark .community-detail-body, html.dark .community-comments-head, html.dark .community-comment { border-color: #33343c; }
+  html.dark .community-category-button, html.dark .community-button-secondary, html.dark .community-button-danger { background: #222; border-color: #444653; color: #aaa; }
+  html.dark .community-category-button.community-active { background: #5B6AED; border-color: #5B6AED; color: #fff; }
+  html.dark .community-button-secondary.community-active { background: #292b43; border-color: #737eea; color: #9ca5ff; }
+  html.dark .community-table-head { background: #19191f; }
+  html.dark .community-table-row:hover { background: #252530; }
+  html.dark .community-table-cell { border-color: #303139; color: #aaa; }
+  html.dark .community-col-title, html.dark .community-detail-body, html.dark .community-comment-body { color: #d0d0d0; }
+  html.dark .community-search-select, html.dark .community-search-input, html.dark .community-field-input, html.dark .community-field-select, html.dark .community-field-textarea, html.dark .community-comment-textarea { background: #252525; border-color: #444653; color: #ddd; }
+  html.dark .community-field-label, html.dark .community-comment-author { color: #bbb; }
+  html.dark .community-anonymous-status { background: #222; border-color: #444653; color: #aaa; }
+  html.dark .community-comments { border-top-color: #141419; }
+  html.dark .community-comments-truncated { background: #2e291b; border-color: #49412b; color: #b9a66c; }
+  html.dark .community-form-error { background: #321f1f; border-color: #633; color: #f19a9a; }
+  html.dark .community-dialog { background: #1e1e1e; border-color: #444653; }
+  html.dark .community-dialog-title { color: #e3e3e3; }
+  html.dark .community-dialog-message { color: #999; }
+
   /* 캘린더 */
   #calendarContainer {
     flex: 1;
@@ -1712,6 +1820,33 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     .samguk-ranking-table .col-equip,
     .samguk-ranking-table .col-crew { display: none; }
     .samguk-rank-profile { width: 22px; height: 22px; margin-right: 4px; }
+    #communityContainer { padding: 10px 0; }
+    .community-shell { max-width: none; }
+    .community-heading { padding: 0 10px; flex-direction: column; gap: 8px; }
+    .community-title { font-size: 17px; }
+    .community-notice { margin: 0 10px 10px; }
+    .community-panel { border-left: 0; border-right: 0; }
+    .community-toolbar { align-items: flex-start; flex-direction: column; }
+    .community-table-heading { font-size: 10px; }
+    .community-table-cell { height: 42px; padding: 6px 4px; font-size: 11px; }
+    .community-col-number, .community-col-views, .community-col-recommends { display: none; }
+    .community-col-category { width: 51px; font-size: 10px; }
+    .community-col-author { width: 82px; }
+    .community-col-date { width: 52px; font-size: 10px; }
+    .community-comment-count { font-size: 10px; }
+    .community-list-footer { grid-template-columns: 1fr auto; }
+    .community-pagination { grid-column: 1; justify-self: start; }
+    .community-write-shortcut { grid-column: 2; }
+    .community-search { padding-left: 8px; padding-right: 8px; }
+    .community-search-input { min-width: 0; width: 100%; }
+    .community-field-row { grid-template-columns: 1fr; }
+    .community-form { padding: 13px 10px; }
+    .community-field-textarea { min-height: 220px; }
+    .community-detail-head { padding: 13px 11px 11px; }
+    .community-detail-title { font-size: 16px; }
+    .community-detail-body { padding: 18px 12px; min-height: 200px; }
+    .community-comment { padding: 10px; }
+    .community-comment-form { padding: 11px 10px 13px; }
   }
   @media (max-width: 360px) {
     .samguk-cards { grid-template-columns: 1fr; }
@@ -1743,7 +1878,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       다크모드
       <button class="dark-toggle" id="darkToggle"></button>
     </div>
-    <div class="auto-refresh">
+    <div class="auto-refresh" id="communityNoticeAutoRefreshControl">
       자동갱신
       <select id="intervalSelect">
         <option value="0">끄기</option>
@@ -1753,7 +1888,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </select>
     </div>
     <span id="lastUpdate"></span>
-    <button id="refreshBtn" onclick="loadAll()">새로고침</button>
+    <button id="refreshBtn" onclick="communityRefreshCurrentView()">새로고침</button>
     <button onclick="openFeedback()" style="background:#a29bfe;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">건의</button>
   </div>
 </header>
@@ -1763,6 +1898,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
   <button class="tab-btn" data-tab="samguk" onclick="switchTab('samguk')">삼국지</button>
+  <button class="tab-btn" data-tab="community" onclick="switchTab('community')">커뮤니티</button>
   <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
   <button class="dark-toggle mobile-dark-toggle" id="darkToggleMobile"></button>
 </div>
@@ -1849,6 +1985,108 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
 </div>
 
+<div id="communityContainer" style="display:none;">
+  <div class="community-shell">
+    <div class="community-heading">
+      <div>
+        <h2 class="community-title">숲공지 커뮤니티</h2>
+        <p class="community-subtitle">SOOP 방송과 삼국지 이야기를 나누는 익명 게시판입니다.</p>
+      </div>
+      <span class="community-anonymous-status">로그인 없이 자동 익명</span>
+    </div>
+
+    <div class="community-notice">비속어·도배·개인정보 노출·사칭은 차단 또는 숨김 처리됩니다. 완전한 익명성을 보장하지 않으며, 부정 이용 방지를 위한 가명 처리 식별값을 사용합니다.<a class="community-notice-link" href="/terms.html" target="_blank" rel="noopener">이용약관</a><a class="community-notice-link" href="/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a></div>
+
+    <section class="community-panel" id="communityListView">
+      <div class="community-toolbar">
+        <div class="community-categories" id="communityCategories">
+          <button class="community-category-button community-active" type="button" data-community-category="all" onclick="communitySetCategory('all')">전체</button>
+          <button class="community-category-button" type="button" data-community-category="free" onclick="communitySetCategory('free')">자유</button>
+          <button class="community-category-button" type="button" data-community-category="samguk" onclick="communitySetCategory('samguk')">삼국지</button>
+          <button class="community-category-button" type="button" data-community-category="question" onclick="communitySetCategory('question')">질문</button>
+        </div>
+        <select class="community-search-select" id="communitySortSelect" aria-label="정렬" onchange="communitySetSort(this.value)">
+          <option value="latest">최신순</option>
+          <option value="popular">추천순</option>
+        </select>
+      </div>
+      <div class="community-table-wrap">
+        <table class="community-table">
+          <thead class="community-table-head">
+            <tr>
+              <th class="community-table-heading community-col-number">번호</th>
+              <th class="community-table-heading community-col-category">말머리</th>
+              <th class="community-table-heading community-col-title">제목</th>
+              <th class="community-table-heading community-col-author">작성자</th>
+              <th class="community-table-heading community-col-date">작성일</th>
+              <th class="community-table-heading community-col-views">조회</th>
+              <th class="community-table-heading community-col-recommends">추천</th>
+            </tr>
+          </thead>
+          <tbody id="communityPostRows"><tr><td class="community-loading" colspan="7">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="community-list-footer">
+        <div class="community-pagination">
+          <button class="community-button-secondary" id="communityPrevButton" type="button" onclick="communityPreviousPage()" disabled>이전</button>
+          <button class="community-button-secondary" id="communityNextButton" type="button" onclick="communityNextPage()" disabled>다음</button>
+        </div>
+        <button class="community-button community-write-shortcut" type="button" onclick="communityOpenWrite()">글쓰기</button>
+      </div>
+      <form class="community-search" id="communitySearchForm" onsubmit="communitySubmitSearch(event)">
+        <input class="community-search-input" id="communitySearchInput" type="search" maxlength="50" autocomplete="off" placeholder="검색어를 입력하세요">
+        <button class="community-button-secondary" type="submit">검색</button>
+      </form>
+    </section>
+
+    <section class="community-panel" id="communityWriteView" style="display:none;">
+      <div class="community-view-head">
+        <strong class="community-view-title">새 글 쓰기</strong>
+        <button class="community-button-secondary" type="button" onclick="communityShowList()">목록</button>
+      </div>
+      <form class="community-form" id="communityWriteForm" onsubmit="communitySubmitPost(event)">
+        <div class="community-form-error" id="communityWriteError" role="alert"></div>
+        <div class="community-field-row">
+          <div class="community-field">
+            <label class="community-field-label" for="communityWriteCategory">말머리</label>
+            <select class="community-field-select" id="communityWriteCategory" required>
+              <option value="free">자유</option>
+              <option value="samguk">삼국지</option>
+              <option value="question">질문</option>
+            </select>
+          </div>
+          <div class="community-field">
+            <label class="community-field-label" for="communityWriteTitle">제목</label>
+            <input class="community-field-input" id="communityWriteTitle" type="text" minlength="2" maxlength="120" required placeholder="제목을 입력하세요">
+          </div>
+        </div>
+        <div class="community-field">
+          <label class="community-field-label" for="communityWriteBody">내용</label>
+          <textarea class="community-field-textarea" id="communityWriteBody" minlength="2" maxlength="10000" required placeholder="내용을 입력하세요"></textarea>
+        </div>
+        <div class="community-field" id="communityWritePasswordField">
+          <label class="community-field-label" for="communityWritePassword">삭제 비밀번호</label>
+          <input class="community-field-input" id="communityWritePassword" type="password" minlength="4" maxlength="64" autocomplete="new-password" placeholder="4자 이상" required>
+          <p class="community-field-help">비회원 글을 나중에 삭제할 때 필요합니다. 서버에는 원문 비밀번호가 저장되지 않습니다.</p>
+        </div>
+        <div class="community-form-actions">
+          <button class="community-button-secondary" type="button" onclick="communityShowList()">취소</button>
+          <button class="community-button" id="communityWriteSubmit" type="submit">등록</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="community-panel" id="communityDetailView" style="display:none;">
+      <div class="community-view-head">
+        <button class="community-button-secondary" type="button" onclick="communityShowList()">목록</button>
+        <button class="community-button" type="button" onclick="communityOpenWrite()">글쓰기</button>
+      </div>
+      <div id="communityDetailContent"><div class="community-loading">글을 불러오는 중...</div></div>
+    </section>
+
+  </div>
+</div>
+
 <div id="updatesContainer" style="display:none;">
   <div id="updatesList" class="updates-list"></div>
 </div>
@@ -1856,6 +2094,19 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div><!-- app-wrap -->
 
 <div class="toast" id="toast"></div>
+
+<div class="community-dialog-overlay" id="communityPasswordDialog" role="dialog" aria-modal="true" aria-labelledby="communityPasswordDialogTitle" onclick="communityHandlePasswordDialogOverlay(event)">
+  <form class="community-dialog" id="communityPasswordDialogForm" onsubmit="communitySubmitPasswordDialog(event)">
+    <h3 class="community-dialog-title" id="communityPasswordDialogTitle">삭제 비밀번호</h3>
+    <p class="community-dialog-message" id="communityPasswordDialogMessage">작성할 때 입력한 삭제 비밀번호를 입력하세요.</p>
+    <input class="community-field-input" id="communityPasswordDialogInput" type="password" minlength="4" maxlength="64" autocomplete="off" required aria-label="삭제 비밀번호">
+    <div class="community-form-error" id="communityPasswordDialogError" role="alert"></div>
+    <div class="community-dialog-actions">
+      <button class="community-button-secondary" type="button" onclick="communityCancelPasswordDialog()">취소</button>
+      <button class="community-button-danger" type="submit">삭제</button>
+    </div>
+  </form>
+</div>
 
 <!-- 쇼츠 스타일 페이지 네비게이션 -->
 <div class="scroll-nav" id="scrollNav" style="display:none;">
@@ -2744,6 +2995,8 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (currentTab !== 'notices') return;
+
   if (e.key === 'ArrowRight' || e.key === 'j' || e.key === 'PageDown') {
     e.preventDefault();
     goPage(1);
@@ -2871,17 +3124,30 @@ function setupAutoRefresh() {
   sel.addEventListener("change", () => {
     if (autoTimer) clearInterval(autoTimer);
     const sec = parseInt(sel.value);
-    if (sec > 0) autoTimer = setInterval(loadAll, sec * 1000);
+    if (sec > 0) autoTimer = setInterval(() => {
+      if (currentTab !== 'community') loadAll();
+    }, sec * 1000);
   });
-  autoTimer = setInterval(loadAll, 60000);
+  autoTimer = setInterval(() => {
+    if (currentTab !== 'community') loadAll();
+  }, 60000);
 }
 
 // ===================== 탭 전환 =====================
 let currentTab = 'calendar';
 
-function switchTab(tab) {
-  gtag('event', 'tab_click', { tab_name: tab });
+function switchTab(tab, options) {
+  const tabOptions = options || {};
+  if (!tabOptions.communityRoute) {
+    if (tab === 'community' && !location.hash.startsWith('#community')) {
+      communitySetRouteHash('#community');
+    } else if (tab !== 'community' && location.hash.startsWith('#community')) {
+      communitySetRouteHash('', true);
+    }
+    gtag('event', 'tab_click', { tab_name: tab });
+  }
   currentTab = tab;
+  communityUpdateHeaderControls(tab);
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
   document.getElementById('filterBar').style.display = 'none';
@@ -2890,12 +3156,14 @@ function switchTab(tab) {
   document.getElementById('calendarContainer').style.display = 'none';
   document.getElementById('weeklyContainer').style.display = 'none';
   document.getElementById('samgukContainer').style.display = 'none';
+  document.getElementById('communityContainer').style.display = 'none';
   document.getElementById('updatesContainer').style.display = 'none';
 
   if (tab === 'notices') {
     document.getElementById('filterBar').style.display = '';
     document.getElementById('scroller').style.display = '';
-    if (prevData) renderPages(prevData);
+    if (prevData.length > 0) renderPages(prevData);
+    else loadAll();
   } else if (tab === 'calendar') {
     document.getElementById('calendarContainer').style.display = '';
     loadCalendar();
@@ -2905,6 +3173,12 @@ function switchTab(tab) {
   } else if (tab === 'samguk') {
     document.getElementById('samgukContainer').style.display = '';
     switchSamgukTab(currentSamgukTab);
+  } else if (tab === 'community') {
+    document.getElementById('communityContainer').style.display = '';
+    communityInitialize();
+    if (!tabOptions.communityRoute && location.hash === '#community') {
+      communityShowList({ communityRoute: true });
+    }
   } else if (tab === 'updates') {
     document.getElementById('updatesContainer').style.display = '';
     loadUpdates();
@@ -3612,6 +3886,648 @@ async function sendFeedback() {
   }
 }
 
+// ===================== 커뮤니티 =====================
+const communityState = {
+  initialized: false,
+  category: 'all',
+  sort: 'latest',
+  query: '',
+  cursor: null,
+  cursorHistory: [],
+  nextCursor: null,
+  currentPostId: null,
+  posts: [],
+  listRequestSequence: 0,
+  detailRequestSequence: 0,
+  listLoading: false,
+  lastLoadedAt: 0,
+  passwordDialogResolve: null,
+  passwordDialogPreviousFocus: null,
+};
+
+const communityCategoryLabels = {
+  free: '자유',
+  samguk: '삼국지',
+  question: '질문',
+};
+
+function communitySetRouteHash(hash, replace) {
+  if (location.hash === hash) return;
+  const nextUrl = location.pathname + location.search + hash;
+  history[replace ? 'replaceState' : 'pushState'](null, '', nextUrl);
+}
+
+function communityApplyHashRoute() {
+  const match = location.hash.match(/^#community(?:\/post\/(\d+))?$/);
+  if (!match) {
+    if (location.hash.startsWith('#community')) {
+      communitySetRouteHash('#community', true);
+      switchTab('community', { communityRoute: true });
+      communityShowList({ communityRoute: true });
+      return true;
+    }
+    if (currentTab === 'community') switchTab('calendar', { communityRoute: true });
+    return false;
+  }
+
+  switchTab('community', { communityRoute: true });
+  if (match[1]) communityOpenPost(match[1], { communityRoute: true });
+  else communityShowList({ communityRoute: true });
+  return true;
+}
+
+function communityUpdateHeaderControls(tab) {
+  const noticeAutoRefresh = document.getElementById('communityNoticeAutoRefreshControl');
+  const lastUpdate = document.getElementById('lastUpdate');
+  const noticesVisible = tab !== 'community';
+  if (noticeAutoRefresh) noticeAutoRefresh.style.display = noticesVisible ? '' : 'none';
+  if (lastUpdate) lastUpdate.style.display = noticesVisible ? '' : 'none';
+}
+
+async function communityRefreshCurrentView() {
+  if (currentTab !== 'community') return loadAll();
+  const button = document.getElementById('refreshBtn');
+  communitySetButtonBusy(button, true, '...');
+  try {
+    const detailVisible = document.getElementById('communityDetailView').style.display !== 'none';
+    const postId = communitySafeId(communityState.currentPostId);
+    if (detailVisible && postId) await communityOpenPost(postId, { communityRoute: true });
+    else await communityLoadPosts();
+  } finally {
+    communitySetButtonBusy(button, false);
+  }
+}
+
+function communityScrollToTop() {
+  const container = document.getElementById('communityContainer');
+  if (container) container.scrollTop = 0;
+}
+
+function communitySafeId(value) {
+  const id = String(value == null ? '' : value);
+  return /^\d+$/.test(id) ? id : '';
+}
+
+function communityCategoryLabel(value) {
+  return communityCategoryLabels[value] || '자유';
+}
+
+function communityFormatCount(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number.toLocaleString('ko-KR') : '0';
+}
+
+function communityFormatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return String(date.getMonth() + 1).padStart(2, '0') + '.' + String(date.getDate()).padStart(2, '0');
+  }
+  return String(date.getFullYear()).slice(2) + '.' + String(date.getMonth() + 1).padStart(2, '0') + '.' + String(date.getDate()).padStart(2, '0');
+}
+
+function communityAuthorLabel(author) {
+  return escapeHtml(author && author.label ? author.label : '익명');
+}
+
+function communityErrorText(error, fallback) {
+  if (error && error.message && error.message !== 'Failed to fetch') return error.message;
+  return fallback || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
+}
+
+function communitySetError(elementId, message) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  element.textContent = message || '';
+  element.classList.toggle('community-show', Boolean(message));
+}
+
+function communitySetButtonBusy(button, busy, busyText) {
+  if (!button) return;
+  if (busy) {
+    button.dataset.communityOriginalText = button.textContent;
+    button.textContent = busyText || '처리 중...';
+    button.disabled = true;
+  } else {
+    button.textContent = button.dataset.communityOriginalText || button.textContent;
+    button.disabled = false;
+    delete button.dataset.communityOriginalText;
+  }
+}
+
+async function communityRequest(path, options) {
+  const requestOptions = Object.assign({
+    credentials: 'include',
+    headers: { 'Accept': 'application/json' },
+  }, options || {});
+  if (requestOptions.body && typeof requestOptions.body !== 'string') {
+    requestOptions.headers = Object.assign({}, requestOptions.headers, { 'Content-Type': 'application/json' });
+    requestOptions.body = JSON.stringify(requestOptions.body);
+  }
+
+  const response = await fetch(API_BASE + '/api/community' + path, requestOptions);
+  let data = null;
+  try {
+    data = await response.json();
+  } catch (error) {
+    data = null;
+  }
+  if (!response.ok) {
+    const requestError = new Error(data && data.error ? data.error : '요청을 처리하지 못했습니다.');
+    requestError.status = response.status;
+    requestError.code = data && data.code ? data.code : '';
+    throw requestError;
+  }
+  return data || {};
+}
+
+function communityShowView(viewName) {
+  ['List', 'Write', 'Detail'].forEach(function(name) {
+    document.getElementById('community' + name + 'View').style.display = name.toLowerCase() === viewName ? '' : 'none';
+  });
+  const container = document.getElementById('communityContainer');
+  if (container) container.scrollTop = 0;
+}
+
+function communityInitialize() {
+  if (communityState.initialized) {
+    if (!communityState.listLoading && Date.now() - communityState.lastLoadedAt > 30000) communityLoadPosts();
+    return;
+  }
+  communityState.initialized = true;
+  const rows = document.getElementById('communityPostRows');
+  rows.addEventListener('click', communityHandlePostRow);
+  rows.addEventListener('keydown', communityHandlePostRowKeydown);
+  communityLoadPosts();
+}
+
+function communityResetPagination() {
+  communityState.cursor = null;
+  communityState.cursorHistory = [];
+  communityState.nextCursor = null;
+}
+
+function communitySetCategory(category) {
+  if (!Object.prototype.hasOwnProperty.call(communityCategoryLabels, category) && category !== 'all') return;
+  communityState.category = category;
+  document.querySelectorAll('.community-category-button').forEach(function(button) {
+    button.classList.toggle('community-active', button.dataset.communityCategory === category);
+  });
+  communityResetPagination();
+  communityScrollToTop();
+  communityLoadPosts();
+}
+
+function communitySetSort(sort) {
+  if (sort !== 'latest' && sort !== 'popular') return;
+  communityState.sort = sort;
+  communityResetPagination();
+  communityScrollToTop();
+  communityLoadPosts();
+}
+
+function communitySubmitSearch(event) {
+  event.preventDefault();
+  const searchInput = document.getElementById('communitySearchInput');
+  const query = searchInput.value.trim();
+  if (query.length === 1) {
+    showToast('검색어는 2자 이상 입력해주세요.');
+    searchInput.focus();
+    return;
+  }
+  communityState.query = query;
+  communityResetPagination();
+  communityScrollToTop();
+  communityLoadPosts();
+}
+
+function communityPreviousPage() {
+  if (communityState.cursorHistory.length === 0) return;
+  communityState.cursor = communityState.cursorHistory.pop() || null;
+  communityState.nextCursor = null;
+  communityScrollToTop();
+  communityLoadPosts();
+}
+
+function communityNextPage() {
+  if (!communityState.nextCursor) return;
+  communityState.cursorHistory.push(communityState.cursor);
+  communityState.cursor = communityState.nextCursor;
+  communityState.nextCursor = null;
+  communityScrollToTop();
+  communityLoadPosts();
+}
+
+async function communityLoadPosts() {
+  const requestSequence = ++communityState.listRequestSequence;
+  communityState.listLoading = true;
+  const rows = document.getElementById('communityPostRows');
+  const previousButton = document.getElementById('communityPrevButton');
+  const nextButton = document.getElementById('communityNextButton');
+  rows.innerHTML = '<tr><td class="community-loading" colspan="7">불러오는 중...</td></tr>';
+  previousButton.disabled = true;
+  nextButton.disabled = true;
+
+  const params = new URLSearchParams({
+    category: communityState.category,
+    sort: communityState.sort,
+    q: communityState.query,
+    limit: '30',
+  });
+  if (communityState.cursor) params.set('cursor', communityState.cursor);
+
+  try {
+    const data = await communityRequest('/posts?' + params.toString());
+    if (requestSequence !== communityState.listRequestSequence) return;
+    communityState.posts = Array.isArray(data.items) ? data.items : [];
+    communityState.nextCursor = data.nextCursor || null;
+    communityState.lastLoadedAt = Date.now();
+    communityRenderPosts();
+    previousButton.disabled = communityState.cursorHistory.length === 0;
+    nextButton.disabled = !communityState.nextCursor;
+  } catch (error) {
+    if (requestSequence !== communityState.listRequestSequence) return;
+    rows.innerHTML = '<tr><td class="community-empty" colspan="7">게시글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</td></tr>';
+    previousButton.disabled = communityState.cursorHistory.length === 0;
+    showToast(communityErrorText(error, '커뮤니티를 불러오지 못했습니다.'));
+  } finally {
+    if (requestSequence === communityState.listRequestSequence) communityState.listLoading = false;
+  }
+}
+
+function communityRenderPosts() {
+  const rows = document.getElementById('communityPostRows');
+  if (communityState.posts.length === 0) {
+    rows.innerHTML = '<tr><td class="community-empty" colspan="7">등록된 글이 없습니다. 첫 글을 작성해보세요.</td></tr>';
+    return;
+  }
+
+  rows.innerHTML = communityState.posts.map(function(post) {
+    const id = communitySafeId(post.id);
+    if (!id) return '';
+    const comments = Number(post.commentCount || 0);
+    return '<tr class="community-table-row" tabindex="0" data-community-post-id="' + id + '">'
+      + '<td class="community-table-cell community-col-number">' + (post.isPinned ? '공지' : id) + '</td>'
+      + '<td class="community-table-cell community-col-category">' + escapeHtml(communityCategoryLabel(post.category)) + '</td>'
+      + '<td class="community-table-cell community-col-title"><span class="community-post-title">' + escapeHtml(post.title || '') + '</span>'
+      + (comments > 0 ? '<span class="community-comment-count">[' + communityFormatCount(comments) + ']</span>' : '') + '</td>'
+      + '<td class="community-table-cell community-col-author">' + communityAuthorLabel(post.author) + '</td>'
+      + '<td class="community-table-cell community-col-date">' + escapeHtml(communityFormatDate(post.createdAt)) + '</td>'
+      + '<td class="community-table-cell community-col-views">' + communityFormatCount(post.viewCount) + '</td>'
+      + '<td class="community-table-cell community-col-recommends">' + communityFormatCount(post.recommendCount) + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function communityUpdatePostSummary(post) {
+  const id = communitySafeId(post && post.id);
+  if (!id) return;
+  const index = communityState.posts.findIndex(function(item) {
+    return communitySafeId(item.id) === id;
+  });
+  if (index < 0) return;
+  communityState.posts[index] = Object.assign({}, communityState.posts[index], post);
+  if (!communityState.listLoading) communityRenderPosts();
+}
+
+function communityHandlePostRow(event) {
+  const row = event.target.closest('.community-table-row');
+  if (!row) return;
+  communityOpenPost(row.dataset.communityPostId);
+}
+
+function communityHandlePostRowKeydown(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('.community-table-row');
+  if (!row) return;
+  event.preventDefault();
+  communityOpenPost(row.dataset.communityPostId);
+}
+
+function communityShowList(options) {
+  const viewOptions = options || {};
+  if (!viewOptions.communityRoute) communitySetRouteHash('#community', Boolean(viewOptions.replaceRoute));
+  communityState.detailRequestSequence += 1;
+  communityState.currentPostId = null;
+  communityShowView('list');
+}
+
+function communityOpenWrite() {
+  communitySetRouteHash('#community');
+  communityState.detailRequestSequence += 1;
+  if (communityState.category !== 'all') {
+    document.getElementById('communityWriteCategory').value = communityState.category;
+  }
+  communitySetError('communityWriteError', '');
+  communityShowView('write');
+  setTimeout(function() { document.getElementById('communityWriteTitle').focus(); }, 0);
+}
+
+async function communitySubmitPost(event) {
+  event.preventDefault();
+  const title = document.getElementById('communityWriteTitle').value.trim();
+  const body = document.getElementById('communityWriteBody').value.trim();
+  const deletePassword = document.getElementById('communityWritePassword').value;
+  const category = document.getElementById('communityWriteCategory').value;
+  const submitButton = document.getElementById('communityWriteSubmit');
+  communitySetError('communityWriteError', '');
+  if (deletePassword.length < 4) {
+    communitySetError('communityWriteError', '삭제 비밀번호는 4자 이상 입력해주세요.');
+    return;
+  }
+
+  communitySetButtonBusy(submitButton, true, '등록 중...');
+  try {
+    const data = await communityRequest('/posts', {
+      method: 'POST',
+      body: { category: category, title: title, body: body, deletePassword: deletePassword },
+    });
+    document.getElementById('communityWriteForm').reset();
+    communityResetPagination();
+    communityLoadPosts();
+    showToast('글이 등록되었습니다.');
+    if (data.post && communitySafeId(data.post.id)) communityOpenPost(data.post.id);
+    else communityShowList();
+  } catch (error) {
+    communitySetError('communityWriteError', communityErrorText(error, '글을 등록하지 못했습니다.'));
+  } finally {
+    communitySetButtonBusy(submitButton, false);
+  }
+}
+
+async function communityOpenPost(postId, options) {
+  const id = communitySafeId(postId);
+  if (!id) return;
+  const viewOptions = options || {};
+  if (!viewOptions.communityRoute) communitySetRouteHash('#community/post/' + id, Boolean(viewOptions.replaceRoute));
+  communityState.currentPostId = id;
+  const requestSequence = ++communityState.detailRequestSequence;
+  communityShowView('detail');
+  document.getElementById('communityDetailContent').innerHTML = '<div class="community-loading">글을 불러오는 중...</div>';
+  try {
+    const data = await communityRequest('/posts/' + encodeURIComponent(id));
+    if (requestSequence !== communityState.detailRequestSequence || communityState.currentPostId !== id) return;
+    communityRenderDetail(data);
+  } catch (error) {
+    if (requestSequence !== communityState.detailRequestSequence || communityState.currentPostId !== id) return;
+    document.getElementById('communityDetailContent').innerHTML = '<div class="community-empty">글을 불러오지 못했습니다.</div>';
+    showToast(communityErrorText(error, '글을 불러오지 못했습니다.'));
+  }
+}
+
+function communityRenderDetail(data) {
+  const post = data && data.post ? data.post : null;
+  if (!post || !communitySafeId(post.id)) {
+    document.getElementById('communityDetailContent').innerHTML = '<div class="community-empty">글을 찾을 수 없습니다.</div>';
+    return;
+  }
+  const postId = communitySafeId(post.id);
+  const comments = Array.isArray(data.comments) ? data.comments : [];
+  communityUpdatePostSummary(post);
+  const recommendationClass = post.myReaction ? ' community-active' : '';
+  const deleteAction = '<button class="community-button-danger" type="button" onclick="communityDeletePost(\'' + postId + '\')">삭제</button>';
+  const commentHtml = comments.length
+    ? comments.map(communityRenderComment).join('')
+    : '<div class="community-empty">첫 댓글을 남겨보세요.</div>';
+  const commentsTruncatedHtml = data.commentsTruncated
+    ? '<div class="community-comments-truncated">이전 댓글은 현재 표시되지 않습니다.</div>'
+    : '';
+
+  document.getElementById('communityDetailContent').innerHTML = ''
+    + '<article>'
+    + '<header class="community-detail-head">'
+    + '<div class="community-detail-category">' + escapeHtml(communityCategoryLabel(post.category)) + '</div>'
+    + '<h3 class="community-detail-title">' + escapeHtml(post.title || '') + '</h3>'
+    + '<div class="community-detail-meta"><span>' + communityAuthorLabel(post.author) + '</span><span>' + escapeHtml(communityFormatDate(post.createdAt)) + '</span><span>조회 ' + communityFormatCount(post.viewCount) + '</span><span>추천 <b id="communityDetailRecommendCount">' + communityFormatCount(post.recommendCount) + '</b></span></div>'
+    + '</header>'
+    + '<div class="community-detail-body">' + escapeHtml(post.body || '') + '</div>'
+    + '<div class="community-detail-actions">'
+    + '<button class="community-button-secondary' + recommendationClass + '" id="communityRecommendButton" type="button" onclick="communityToggleRecommendation(\'' + postId + '\')">추천</button>'
+    + '<button class="community-button-secondary" type="button" onclick="communityReport(\'post\',\'' + postId + '\')">신고</button>'
+    + deleteAction
+    + '</div>'
+    + '</article>'
+    + '<section class="community-comments">'
+    + '<div class="community-comments-head">댓글 <span id="communityDetailCommentCount">' + communityFormatCount(post.commentCount == null ? comments.length : post.commentCount) + '</span></div>'
+    + commentsTruncatedHtml
+    + '<div id="communityCommentList">' + commentHtml + '</div>'
+    + '<form class="community-comment-form" id="communityCommentForm" onsubmit="communitySubmitComment(event)">'
+    + '<div class="community-form-error" id="communityCommentError" role="alert"></div>'
+    + '<textarea class="community-comment-textarea" id="communityCommentBody" minlength="2" maxlength="2000" required placeholder="댓글을 입력하세요"></textarea>'
+    + '<div class="community-comment-options">'
+    + '<input class="community-field-input" id="communityCommentPassword" type="password" minlength="4" maxlength="64" autocomplete="new-password" required placeholder="삭제 비밀번호 (4자 이상)" style="max-width:220px;">'
+    + '<button class="community-button" id="communityCommentSubmit" type="submit">댓글 등록</button>'
+    + '</div>'
+    + '<p class="community-field-help">이 글 안에서 같은 방문자는 동일한 익명 이름으로 표시됩니다.</p>'
+    + '</form>'
+    + '</section>';
+}
+
+function communityRenderComment(comment) {
+  const id = communitySafeId(comment && comment.id);
+  if (!id) return '';
+  const deleteAction = '<button class="community-text-button" type="button" onclick="communityDeleteComment(\'' + id + '\')">삭제</button>';
+  return '<article class="community-comment">'
+    + '<div class="community-comment-meta">'
+    + '<span class="community-comment-author">' + communityAuthorLabel(comment.author) + '</span>'
+    + '<span>' + escapeHtml(communityFormatDate(comment.createdAt)) + '</span>'
+    + '<span class="community-comment-tools">'
+    + '<button class="community-text-button" type="button" onclick="communityReport(\'comment\',\'' + id + '\')">신고</button>'
+    + deleteAction
+    + '</span></div>'
+    + '<div class="community-comment-body">' + escapeHtml(comment.body || '') + '</div>'
+    + '</article>';
+}
+
+async function communitySubmitComment(event) {
+  event.preventDefault();
+  const postId = communitySafeId(communityState.currentPostId);
+  if (!postId) return;
+  const bodyInput = document.getElementById('communityCommentBody');
+  const passwordInput = document.getElementById('communityCommentPassword');
+  const submitButton = document.getElementById('communityCommentSubmit');
+  const body = bodyInput.value.trim();
+  const deletePassword = passwordInput.value;
+  communitySetError('communityCommentError', '');
+  if (deletePassword.length < 4) {
+    communitySetError('communityCommentError', '삭제 비밀번호는 4자 이상 입력해주세요.');
+    return;
+  }
+
+  communitySetButtonBusy(submitButton, true, '등록 중...');
+  try {
+    await communityRequest('/posts/' + encodeURIComponent(postId) + '/comments', {
+      method: 'POST',
+      body: { body: body, deletePassword: deletePassword },
+    });
+    bodyInput.value = '';
+    passwordInput.value = '';
+    showToast('댓글이 등록되었습니다.');
+    communityOpenPost(postId);
+  } catch (error) {
+    communitySetError('communityCommentError', communityErrorText(error, '댓글을 등록하지 못했습니다.'));
+  } finally {
+    communitySetButtonBusy(submitButton, false);
+  }
+}
+
+async function communityToggleRecommendation(postId) {
+  const id = communitySafeId(postId);
+  const button = document.getElementById('communityRecommendButton');
+  const requestSequence = communityState.detailRequestSequence;
+  if (!id || !button || !button.isConnected || communityState.currentPostId !== id) return;
+  communitySetButtonBusy(button, true, '처리 중...');
+  try {
+    const data = await communityRequest('/posts/' + encodeURIComponent(id) + '/reactions', {
+      method: 'POST',
+      body: { type: 'recommend' },
+    });
+    const countElement = document.getElementById('communityDetailRecommendCount');
+    const stillCurrent = communityState.currentPostId === id
+      && communityState.detailRequestSequence === requestSequence
+      && button.isConnected
+      && countElement
+      && document.getElementById('communityRecommendButton') === button;
+    if (!stillCurrent) return;
+    button.classList.toggle('community-active', Boolean(data.active));
+    countElement.textContent = communityFormatCount(data.recommendCount);
+    const summary = communityState.posts.find(function(post) { return communitySafeId(post.id) === id; });
+    if (summary) {
+      summary.recommendCount = Number(data.recommendCount || 0);
+      communityRenderPosts();
+    }
+  } catch (error) {
+    if (communityState.currentPostId === id && communityState.detailRequestSequence === requestSequence && button.isConnected) {
+      showToast(communityErrorText(error, '추천을 처리하지 못했습니다.'));
+    }
+  } finally {
+    if (button.isConnected && document.getElementById('communityRecommendButton') === button) {
+      communitySetButtonBusy(button, false);
+    }
+  }
+}
+
+function communityAskDeletePassword(message) {
+  if (communityState.passwordDialogResolve) communityCancelPasswordDialog();
+  communityState.passwordDialogPreviousFocus = document.activeElement;
+  document.getElementById('communityPasswordDialogMessage').textContent = message;
+  document.getElementById('communityPasswordDialogInput').value = '';
+  communitySetError('communityPasswordDialogError', '');
+  document.getElementById('communityPasswordDialog').classList.add('community-show');
+  return new Promise(function(resolve) {
+    communityState.passwordDialogResolve = resolve;
+    setTimeout(function() { document.getElementById('communityPasswordDialogInput').focus(); }, 0);
+  });
+}
+
+function communityResolvePasswordDialog(value) {
+  const resolve = communityState.passwordDialogResolve;
+  if (!resolve) return;
+  const previousFocus = communityState.passwordDialogPreviousFocus;
+  communityState.passwordDialogResolve = null;
+  communityState.passwordDialogPreviousFocus = null;
+  document.getElementById('communityPasswordDialog').classList.remove('community-show');
+  document.getElementById('communityPasswordDialogInput').value = '';
+  communitySetError('communityPasswordDialogError', '');
+  if (previousFocus && previousFocus.isConnected) previousFocus.focus();
+  resolve(value);
+}
+
+function communitySubmitPasswordDialog(event) {
+  event.preventDefault();
+  const input = document.getElementById('communityPasswordDialogInput');
+  if (input.value.length < 4) {
+    communitySetError('communityPasswordDialogError', '삭제 비밀번호는 4자 이상 입력해주세요.');
+    input.focus();
+    return;
+  }
+  communityResolvePasswordDialog(input.value);
+}
+
+function communityCancelPasswordDialog() {
+  communityResolvePasswordDialog(null);
+}
+
+function communityHandlePasswordDialogOverlay(event) {
+  if (event.target.id === 'communityPasswordDialog') communityCancelPasswordDialog();
+}
+
+function communityHandlePasswordDialogKeydown(event) {
+  if (event.key === 'Escape' && document.getElementById('communityPasswordDialog').classList.contains('community-show')) {
+    event.preventDefault();
+    communityCancelPasswordDialog();
+  }
+}
+
+async function communityDeletePost(postId) {
+  const id = communitySafeId(postId);
+  if (!id || !window.confirm('이 글을 삭제할까요? 삭제하면 복구할 수 없습니다.')) return;
+  const deletePassword = await communityAskDeletePassword('글 작성 시 입력한 삭제 비밀번호를 입력하세요.');
+  if (deletePassword === null) return;
+  try {
+    await communityRequest('/posts/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      body: { deletePassword: deletePassword },
+    });
+    showToast('글이 삭제되었습니다.');
+    communityResetPagination();
+    communityShowList({ replaceRoute: true });
+    communityLoadPosts();
+  } catch (error) {
+    showToast(communityErrorText(error, '글을 삭제하지 못했습니다.'));
+  }
+}
+
+async function communityDeleteComment(commentId) {
+  const id = communitySafeId(commentId);
+  if (!id || !window.confirm('이 댓글을 삭제할까요?')) return;
+  const deletePassword = await communityAskDeletePassword('댓글 작성 시 입력한 삭제 비밀번호를 입력하세요.');
+  if (deletePassword === null) return;
+  try {
+    await communityRequest('/comments/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      body: { deletePassword: deletePassword },
+    });
+    showToast('댓글이 삭제되었습니다.');
+    communityOpenPost(communityState.currentPostId);
+  } catch (error) {
+    showToast(communityErrorText(error, '댓글을 삭제하지 못했습니다.'));
+  }
+}
+
+document.addEventListener('keydown', communityHandlePasswordDialogKeydown);
+
+async function communityReport(targetType, targetId) {
+  if (targetType !== 'post' && targetType !== 'comment') return;
+  const id = communitySafeId(targetId);
+  if (!id) return;
+  const selected = window.prompt('신고 사유 번호를 입력하세요.\n1. 비속어·혐오 표현\n2. 도배·광고\n3. 개인정보 노출\n4. 기타');
+  if (selected === null) return;
+  const reasons = { '1': 'profanity', '2': 'spam', '3': 'personal_info', '4': 'other' };
+  const reason = reasons[selected.trim()];
+  if (!reason) { showToast('1~4 중 하나를 입력해주세요.'); return; }
+  let detail = '';
+  if (reason === 'other') {
+    const input = window.prompt('신고 내용을 간단히 입력해주세요.');
+    if (input === null) return;
+    detail = input.trim().slice(0, 500);
+  }
+  try {
+    await communityRequest('/reports', {
+      method: 'POST',
+      body: { targetType: targetType, targetId: id, reason: reason, detail: detail || undefined },
+    });
+    showToast('신고가 접수되었습니다.');
+  } catch (error) {
+    if (error.status === 409) showToast('이미 신고한 항목입니다.');
+    else showToast(communityErrorText(error, '신고를 접수하지 못했습니다.'));
+  }
+}
+
 // ===================== 업데이트 탭 =====================
 async function loadUpdates() {
   const container = document.getElementById('updatesList');
@@ -3706,8 +4622,12 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) scheduleLiveStatusCheck();
 });
 
-loadAll();
-switchTab('calendar');
+window.addEventListener('hashchange', communityApplyHashRoute);
+const communityInitialRouteApplied = communityApplyHashRoute();
+if (!communityInitialRouteApplied) {
+  switchTab('calendar', { communityRoute: true });
+  loadAll();
+}
 setupAutoRefresh();
 
 // Pull-to-refresh (모바일 맨 위에서 아래로 당기기)
