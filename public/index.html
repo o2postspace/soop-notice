@@ -3777,10 +3777,12 @@ function renderSamgukPowerRanking() {
 
   function combatCell(member) {
     const health = samgukNumber(member.maxHealth);
+    const attack = samgukNumber(member.attackPower);
     const damage = samgukNumber(member.basicAttackDamage);
     const samples = samgukNumber(member.basicAttackSampleCount);
     const lines = [];
     if (health !== null) lines.push('<b>최대 HP ' + formatScore(health) + '</b>');
+    if (attack !== null) lines.push('<b>공격력 ' + formatScore(attack) + '</b>');
     if (damage !== null) {
       lines.push('<b>평타 ' + formatScore(damage) + '</b>'
         + (samples !== null ? ' <span class="samguk-rank-coverage">n=' + formatScore(samples) + '</span>' : ''));

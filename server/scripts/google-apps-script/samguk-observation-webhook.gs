@@ -16,7 +16,7 @@ var SAMGUK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 var SAMGUK_REQUIRED_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore", "maxHealth",
-  "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions"
+  "attackPower", "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions"
 ];
 var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   level: 10000,
@@ -31,6 +31,7 @@ var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   intelligence: 1000000,
   powerScore: 1000000,
   maxHealth: 1000000,
+  attackPower: 1000000,
   basicAttackDamage: 1000000,
   basicAttackSampleCount: 10000
 };
@@ -117,7 +118,7 @@ function samgukAppendSnapshot_(snapshot) {
     level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
     helmet: "두갑강화", armor: "흉갑강화", shoes: "각갑강화", strength: "무력",
     agility: "기민", vitality: "기력", intelligence: "지모", powerScore: "무력점수",
-    maxHealth: "최대체력", basicAttackDamage: "평타피해대표값",
+    maxHealth: "최대체력", attackPower: "공격력", basicAttackDamage: "평타피해대표값",
     basicAttackSampleCount: "평타표본수", basicAttackTarget: "평타대상",
     combatConditions: "전투조건"
   };
@@ -168,7 +169,7 @@ function samgukAppendSnapshot_(snapshot) {
 }
 
 /**
- * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:AD 전체가 비어 있는 첫 행만 사용합니다.
+ * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:AE 전체가 비어 있는 첫 행만 사용합니다.
  */
 function samgukFindFirstEmptyObservationRow_(sheet, columnCount) {
   if (sheet.getMaxRows() < SAMGUK_MAX_OBSERVATION_ROW) {

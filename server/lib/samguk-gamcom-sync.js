@@ -31,7 +31,7 @@ const RAW_NUMERIC_FIELDS = Object.freeze({
 const SNAPSHOT_FIELDS = Object.freeze([
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore",
-  "maxHealth", "basicAttackDamage", "basicAttackSampleCount",
+  "basicAttackDamage", "basicAttackSampleCount",
   "basicAttackTarget", "combatConditions",
 ]);
 const REFERENCE_HEADERS = Object.freeze([

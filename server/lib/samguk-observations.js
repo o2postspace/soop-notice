@@ -16,6 +16,7 @@ const ALLOWED_FIELDS = Object.freeze([
   "intelligence",
   "powerScore",
   "maxHealth",
+  "attackPower",
   "basicAttackDamage",
   "basicAttackSampleCount",
   "basicAttackTarget",
@@ -45,6 +46,7 @@ const NUMERIC_FIELD_MAXIMUMS = Object.freeze({
   intelligence: 1_000_000,
   powerScore: 1_000_000,
   maxHealth: 1_000_000,
+  attackPower: 1_000_000,
   basicAttackDamage: 1_000_000,
   basicAttackSampleCount: 10_000,
 });

@@ -8,7 +8,7 @@
  * - 원문에 갱신시각이 없으므로 외부수집시각과 별도로 표시합니다.
  */
 
-var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.2";
+var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.3";
 var SAMGUK_GAMCOM_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 var SAMGUK_GAMCOM_REFERENCE_SHEET = "외부참고";
 var SAMGUK_GAMCOM_CURRENT_SHEET = "현재현황";
@@ -29,14 +29,14 @@ var SAMGUK_GAMCOM_REFERENCE_HEADERS = [
 var SAMGUK_GAMCOM_SNAPSHOT_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore",
-  "maxHealth", "basicAttackDamage", "basicAttackSampleCount",
+  "basicAttackDamage", "basicAttackSampleCount",
   "basicAttackTarget", "combatConditions"
 ];
 var SAMGUK_GAMCOM_FIELD_HEADERS = {
   level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
   helmet: "두갑강화", armor: "흉갑강화", shoes: "각갑강화", strength: "무력",
   agility: "기민", vitality: "기력", intelligence: "지모", powerScore: "무력점수",
-  maxHealth: "최대체력", basicAttackDamage: "평타피해대표값",
+  maxHealth: "최대체력", attackPower: "공격력", basicAttackDamage: "평타피해대표값",
   basicAttackSampleCount: "평타표본수", basicAttackTarget: "평타대상",
   combatConditions: "전투조건"
 };
@@ -477,7 +477,7 @@ function samgukGamcomInstallMonotonicFormulas_(sheet) {
   var sourceColumns = {
     "레벨": "F", "말강화": "H", "무기강화": "I", "두갑강화": "J",
     "흉갑강화": "K", "각갑강화": "L", "무력": "M", "기민": "N",
-    "기력": "O", "지모": "P", "무력점수": "Q"
+    "기력": "O", "지모": "P", "무력점수": "Q", "최대체력": "Y", "공격력": "AE"
   };
   if (columns["player_id"] === undefined) throw new Error("current_missing_header:player_id");
   Object.keys(sourceColumns).forEach(function(header) {

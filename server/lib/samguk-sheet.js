@@ -363,6 +363,7 @@ function enrichMembersWithPowerIndex(members) {
   const normalizedMembers = members.map(member => ({
     ...member,
     maxHealth: member.maxHealth ?? null,
+    attackPower: member.attackPower ?? null,
     basicAttackDamage: member.basicAttackDamage ?? null,
     basicAttackSampleCount: member.basicAttackSampleCount ?? null,
     basicAttackTarget: member.basicAttackTarget || null,
@@ -456,6 +457,7 @@ function parseMembersCsv(text) {
     intelligence: { aliases: ["지모"], required: true },
     powerScore: { aliases: ["무력점수", "powerScore"], required: false },
     maxHealth: { aliases: ["최대체력", "최대HP", "maxHealth"], required: false },
+    attackPower: { aliases: ["공격력", "attackPower"], required: false },
     basicAttackDamage: { aliases: ["평타피해대표값", "평타피해", "basicAttackDamage"], required: false },
     basicAttackSampleCount: { aliases: ["평타표본수", "basicAttackSampleCount"], required: false },
     basicAttackTarget: { aliases: ["평타대상", "basicAttackTarget"], required: false },
@@ -509,6 +511,7 @@ function parseMembersCsv(text) {
       intelligence: nullableNumber(cell(row, columns.intelligence), "지모", rowNumber, warnings),
       powerScore: nullableNumber(cell(row, columns.powerScore), "무력점수", rowNumber, warnings),
       maxHealth: nullableNumber(cell(row, columns.maxHealth), "최대체력", rowNumber, warnings, 1_000_000),
+      attackPower: nullableNumber(cell(row, columns.attackPower), "공격력", rowNumber, warnings, 1_000_000),
       basicAttackDamage: nullableNumber(
         cell(row, columns.basicAttackDamage), "평타피해대표값", rowNumber, warnings, 1_000_000,
       ),

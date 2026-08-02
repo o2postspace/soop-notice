@@ -142,6 +142,7 @@
       intelligence: cleanValue(pick(row, ['intelligence', 'stat_intelligence', '지모'])),
       powerScore: cleanValue(pick(row, ['powerScore', 'power_score', 'power', '무력점수', '무력 점수'])),
       maxHealth: cleanValue(pick(row, ['maxHealth', 'max_health', '최대체력', '최대HP'])),
+      attackPower: cleanValue(pick(row, ['attackPower', 'attack_power', '공격력'])),
       basicAttackDamage: cleanValue(pick(row, ['basicAttackDamage', 'basic_attack_damage', '평타피해대표값', '평타피해'])),
       basicAttackSampleCount: cleanValue(pick(row, ['basicAttackSampleCount', 'basic_attack_sample_count', '평타표본수'])),
       basicAttackTarget: cleanValue(pick(row, ['basicAttackTarget', 'basic_attack_target', '평타대상'])),
@@ -178,7 +179,7 @@
     const valueFields = [
       'level', 'horse', 'horseLevel', 'weapon', 'helmet', 'armor', 'shoes',
       'strength', 'agility', 'vitality', 'intelligence', 'powerScore',
-      'maxHealth', 'basicAttackDamage', 'basicAttackSampleCount', 'basicAttackTarget', 'combatConditions',
+      'maxHealth', 'attackPower', 'basicAttackDamage', 'basicAttackSampleCount', 'basicAttackTarget', 'combatConditions',
       'engravings', 'equipmentObservedAt', 'equipmentEvidence', 'equipmentSourceType', 'equipmentSourceCount',
       'powerIndex', 'powerRankScore', 'powerVersion', 'powerCoverage', 'powerStatus', 'powerRankable', 'powerSourcesVerified', 'powerPopulation', 'powerVerified', 'powerRange', 'powerComponents',
       'sourceType', 'sourceCount', 'verificationStatus', 'reviewStatus', 'observedAt', 'evidence',

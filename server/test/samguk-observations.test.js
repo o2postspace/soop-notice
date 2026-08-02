@@ -109,6 +109,7 @@ test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 �
     intelligence: 1_000_000,
     powerScore: 1_000_000,
     maxHealth: 1_000_000,
+    attackPower: 1_000_000,
     basicAttackDamage: 1_000_000,
     basicAttackSampleCount: 10_000,
   })) {
