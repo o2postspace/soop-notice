@@ -8,6 +8,7 @@ const {
   DEFAULT_SHEET_ID,
   buildCsvUrl,
   createSamgukSheetService,
+  enrichMembersWithPowerIndex,
   parseCsv,
   parseMembersCsv,
   parseTerritoriesCsv,
@@ -24,6 +25,14 @@ const TERRITORY_HEADERS = [
   "영토ID", "번호", "X", "Y", "소유국", "수도", "거점유형", "레벨", "최종확인", "근거", "검수상태",
 ];
 const RULE_HEADERS = ["분류", "항목", "내용", "근거", "기준일", "검수상태"];
+const EQUIPMENT_HEADERS = [
+  "닉네임", "SOOP_ID",
+  "무기각인1", "무기각인2", "무기각인3",
+  "두갑각인1", "두갑각인2", "두갑각인3",
+  "흉갑각인1", "흉갑각인2", "흉갑각인3",
+  "각갑각인1", "각갑각인2", "각갑각인3",
+  "최종확인", "최근근거", "출처종류", "교차검증수",
+];
 
 function csvCell(value) {
   const text = String(value ?? "");
@@ -66,10 +75,15 @@ function googleFetch(csvBySheet, state = {}) {
 const PAYLOAD_KEYS = [
   "members", "rules", "sheetUrl", "source", "stale", "territories", "updatedAt", "warnings",
 ].sort();
-const MEMBER_KEYS = [
+const RAW_MEMBER_KEYS = [
   "agility", "armor", "crew", "evidence", "helmet", "horse", "horseLevel", "intelligence", "job", "level",
   "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
   "sourceType", "strength", "verificationStatus", "vitality", "weapon",
+].sort();
+const MEMBER_KEYS = [
+  ...RAW_MEMBER_KEYS,
+  "engravings", "equipmentEvidence", "equipmentObservedAt", "equipmentSourceCount", "equipmentSourceType",
+  "powerComponents", "powerCoverage", "powerIndex", "powerPopulation", "powerRange", "powerRankable", "powerSourcesVerified", "powerStatus", "powerVerified", "powerVersion",
 ].sort();
 const TERRITORY_KEYS = [
   "capital", "evidence", "facility", "id", "level", "number", "observedAt", "owner", "reviewStatus",
@@ -87,7 +101,7 @@ test("CSV의 쉼표, escaped quote, 셀 내부 줄바꿈을 보존한다", () =>
 test("현재현황은 열 순서가 아니라 헤더명으로 계약 필드를 만든다", () => {
   const result = parseMembersCsv(sheetCsv().현재현황);
   assert.equal(result.members.length, 1);
-  assert.deepEqual(Object.keys(result.members[0]).sort(), MEMBER_KEYS);
+  assert.deepEqual(Object.keys(result.members[0]).sort(), RAW_MEMBER_KEYS);
   assert.equal(result.members[0].crew, "버,인협회");
   assert.equal(result.members[0].strength, 1234);
   assert.equal(result.members[0].evidence, "https://example.com/vod\n01:23");
@@ -105,6 +119,22 @@ test("현재현황은 열 순서가 아니라 헤더명으로 계약 필드를 �
     ]].reverse()],
   );
   assert.equal(parseMembersCsv(reordered).members[0].soopId, "bj_1");
+});
+
+test("말 80강·장비 15강 초과값은 전체 시트 대신 해당 셀만 제외한다", () => {
+  const rows = parseCsv(sheetCsv().현재현황);
+  rows[1][7] = "81";
+  rows[1][8] = "16";
+  rows[1][10] = "999";
+  const result = parseMembersCsv(makeCsv(rows[0], [rows[1]]));
+
+  assert.equal(result.members[0].horseLevel, null);
+  assert.equal(result.members[0].weapon, null);
+  assert.equal(result.members[0].armor, null);
+  assert.equal(result.members[0].helmet, 3);
+  assert.match(result.warnings.join(" "), /말강화/);
+  assert.match(result.warnings.join(" "), /무기강화/);
+  assert.match(result.warnings.join(" "), /흉갑강화/);
 });
 
 test("현재현황의 선택형 무력점수와 교차검증 메타데이터를 정규화한다", () => {
@@ -208,7 +238,7 @@ test("Google gviz CSV URL은 첫 행 헤더와 표준 쿼리 파라미터를 고
   assert.equal(url.searchParams.get("headers"), "1");
 });
 
-test("Google Sheet 세 탭을 읽어 정규 payload 계약으로 반환한다", async () => {
+test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 payload 계약으로 반환한다", async () => {
   const state = {};
   const service = createSamgukSheetService({
     fetchImpl: googleFetch(sheetCsv(), state),
@@ -229,11 +259,119 @@ test("Google Sheet 세 탭을 읽어 정규 payload 계약으로 반환한다", 
   assert.equal(payload.territories[0].owner, "위");
   assert.equal(payload.territories[0].capital, true);
   assert.equal(payload.rules[0].title, "영토 수");
-  assert.equal(state.urls.length, 3);
+  assert.equal(state.urls.length, 4);
   assert.ok(state.urls.every(url => new URL(url).hostname === "docs.google.com"));
   assert.ok(state.urls.every(url => new URL(url).pathname.includes(`/d/${DEFAULT_SHEET_ID}/`)));
   assert.ok(state.urls.every(url => new URL(url).searchParams.get("headers") === "1"));
   assert.ok(state.urls.every(url => !url.includes("vercel.app")));
+  assert.equal(payload.members[0].powerVersion, "v1.0");
+  assert.equal(payload.members[0].powerStatus, "insufficient");
+  assert.equal(payload.members[0].powerCoverage, 80);
+  assert.deepEqual(payload.members[0].engravings, []);
+  assert.match(payload.warnings.join(" "), /장비현황/);
+});
+
+test("선택형 장비현황 각인을 참가자에 합치고 파워 v1을 확정 계산한다", async () => {
+  const csv = sheetCsv();
+  const memberRows = parseCsv(csv.현재현황);
+  memberRows[0].push("출처종류", "교차검증수", "검증상태");
+  memberRows[1].push("시트/방송", "2", "방송교차검증");
+  csv.현재현황 = makeCsv(memberRows[0], [memberRows[1]]);
+  csv.장비현황 = makeCsv(EQUIPMENT_HEADERS, [[
+    "테스트", "test_bj",
+    "필살 13.5%", "없음", "없음",
+    "없음", "없음", "없음",
+    "강건", "없음", "없음",
+    "난격 3.4", "없음", "없음",
+    "2026-08-02 22:00:00", "방송 01:07:54", "방송/시트", "2",
+  ]]);
+  const service = createSamgukSheetService({
+    fetchImpl: googleFetch(csv),
+    expectedMemberCount: 1,
+    expectedTerritoryCount: 1,
+  });
+  const payload = await service.load();
+  const member = payload.members[0];
+
+  assert.equal(payload.source, "google-sheet");
+  assert.doesNotMatch(payload.warnings.join(" "), /미관측으로 처리/);
+  assert.equal(member.engravings.length, 12);
+  assert.equal(member.engravings[0].name, "필살");
+  assert.equal(member.equipmentSourceType, "sheet+broadcast");
+  assert.equal(member.equipmentSourceCount, 2);
+  assert.equal(member.powerCoverage, 100);
+  assert.equal(member.powerStatus, "confirmed");
+  assert.equal(member.powerRankable, true);
+  assert.equal(member.powerSourcesVerified, true);
+  assert.deepEqual(member.powerPopulation, { sample: 1, required: 1, coverage: 100, ready: true });
+  assert.equal(member.powerVerified, true);
+  assert.equal(member.powerComponents.engravings.filledSlots, 3);
+  assert.deepEqual(member.powerRange, { lower: member.powerIndex, upper: member.powerIndex });
+});
+
+test("수치가 완비돼도 단일 출처면 확정 대신 잠정 파워로 표시한다", async () => {
+  const csv = sheetCsv();
+  csv.장비현황 = makeCsv(EQUIPMENT_HEADERS, [[
+    "테스트", "test_bj",
+    "필살 13.5%", "없음", "없음",
+    "없음", "없음", "없음",
+    "강건", "없음", "없음",
+    "난격 3.4", "없음", "없음",
+    "2026-08-02 22:00:00", "방송 01:07:54", "시트", "1",
+  ]]);
+  const payload = await createSamgukSheetService({
+    fetchImpl: googleFetch(csv),
+    expectedMemberCount: 1,
+    expectedTerritoryCount: 1,
+  }).load();
+  const member = payload.members[0];
+
+  assert.equal(member.powerCoverage, 100);
+  assert.equal(member.powerRankable, true);
+  assert.equal(member.powerSourcesVerified, false);
+  assert.equal(member.powerVerified, false);
+  assert.equal(member.powerStatus, "provisional");
+});
+
+test("90명 로스터는 레벨·기량 비교표본 63명 전까지 확정하지 않는다", () => {
+  const members = Array.from({ length: 90 }, (_, index) => {
+    const comparable = index < 62;
+    return {
+      name: `참가자${index}`,
+      soopId: `sample_${index}`,
+      job: "천강",
+      level: comparable ? 10 : null,
+      strength: comparable ? 10 : null,
+      agility: comparable ? 10 : null,
+      vitality: comparable ? 10 : null,
+      intelligence: comparable ? 10 : null,
+      weapon: 0,
+      helmet: null,
+      armor: 0,
+      shoes: 0,
+      horseLevel: 0,
+      engravings: Array.from({ length: 9 }, () => ({ state: "empty" })),
+      sourceCount: 2,
+      sourceType: "sheet+broadcast",
+      verificationStatus: "cross-verified",
+      observedAt: "2026-08-02T13:00:00.000Z",
+      equipmentSourceCount: 2,
+      equipmentSourceType: "sheet+broadcast",
+      equipmentObservedAt: "2026-08-02T13:00:00.000Z",
+    };
+  });
+  const powered = enrichMembersWithPowerIndex(members);
+
+  assert.deepEqual(powered[0].powerPopulation, {
+    sample: 62,
+    required: 63,
+    coverage: 68.8889,
+    ready: false,
+  });
+  assert.equal(powered[0].powerCoverage, 100);
+  assert.equal(powered[0].powerSourcesVerified, true);
+  assert.equal(powered[0].powerVerified, false);
+  assert.equal(powered[0].powerStatus, "provisional");
 });
 
 test("갱신 오류에는 마지막 정상값을 유지하고 cold 오류에는 기준값 seed를 쓴다", async () => {
@@ -314,18 +452,24 @@ test("삼국지 카드의 기량합계는 네 기량이 모두 있을 때만 사
   assert.match(html, /기량 4종 완비/);
 });
 
-test("무력랭킹은 전체 데이터셋에서 무력점수와 무력 스탯 스케일을 섞지 않는다", () => {
+test("파워랭킹은 v1 합산지표·coverage 기준을 사용하고 무력 fallback을 만들지 않는다", () => {
   const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
-  assert.match(html, /powerScoreCoverage === SAMGUK_MEMBERS\.length/);
-  assert.match(html, /const scoreField = hasPowerScore \? 'powerScore' : 'strength';/);
-  assert.match(html, /const scoreLabel = hasPowerScore \? '무력점수' : '무력 스탯';/);
-  assert.match(html, /samgukNumber\(member\[scoreField\]\)/);
-  assert.match(html, /무력 스탯과 점수 스케일은 섞지 않습니다/);
-  assert.match(html, /공개 Wiki에는 레벨·장비·말·각인을 한 숫자로 합치는 공식이 없어/);
-  assert.match(html, /Lv는 캐릭터 레벨의 정의와 효과가 공개 확인되기 전까지 점수에서 제외/);
-  assert.match(html, /공개항목/);
-  assert.doesNotMatch(html, /member\.powerScore\s*(?:\|\||\?\?)\s*member\.strength/);
+  assert.match(html, /data-samguktab="ranking"[^>]*>파워랭킹</);
+  assert.match(html, /레벨·기량 30%/);
+  assert.match(html, /장비 강화 35%/);
+  assert.match(html, /각인 20%/);
+  assert.match(html, /말 강화 15%/);
+  assert.match(html, /member\.powerRankable/);
+  assert.match(html, /member\.powerStatus === 'confirmed'/);
+  assert.match(html, /member\.powerStatus === 'provisional'/);
+  assert.match(html, /member\.powerIndex/);
+  assert.match(html, /coverage 85% 미만은 순위에서 제외/);
+  assert.match(html, /빈칸은 0점으로 바꾸지 않습니다/);
+  assert.match(html, /주문서 재고는 아직 사용하지 않은 자원이므로 제외/);
+  const rankingFunction = html.match(/function renderSamgukPowerRanking\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.doesNotMatch(rankingFunction, /member\.powerScore/);
+  assert.doesNotMatch(rankingFunction, /scoreField.*strength/);
 });
 
 test("참가자나 영토가 일부만 계산되면 정상 시트로 채택하지 않는다", async () => {

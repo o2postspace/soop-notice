@@ -45,7 +45,7 @@ test("설치용 generated seed는 현재 fallback의 참가자 90명과 영토 6
   assert.equal(check.status, 0, check.stderr);
 });
 
-test("setup은 12개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 설치한다", () => {
+test("setup은 13개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 설치한다", () => {
   const text = source(setupPath);
   assert.doesNotThrow(() => new Function(text));
   const orderMatch = text.match(/var SAMGUK_SETUP_SHEET_ORDER = (\[[\s\S]*?\]);/);
@@ -53,7 +53,7 @@ test("setup은 12개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   const order = vm.runInNewContext(orderMatch[1]);
   assert.deepEqual(Array.from(order), [
     "사용법", "게임정보", "기준정보", "참가자", "방송모니터링", "관측입력",
-    "현재현황", "무력랭킹", "영토입력", "영토현황", "OCR설정", "변경로그",
+    "현재현황", "장비현황", "무력랭킹", "영토입력", "영토현황", "OCR설정", "변경로그",
   ]);
   assert.match(text, /spreadsheet\.rename\("SOOPNOTICE 삼국지 운영원장"\)/);
   assert.match(text, /백업_" \+ timestamp \+ "_" \+ originalName/);
@@ -82,10 +82,14 @@ test("setup은 출력 관리자-only와 입력 warning-only 보호, 드롭다운
   assert.match(text, /indexOf\(SAMGUK_SETUP_PROTECTION_PREFIX\) === 0/);
   assert.match(text, /requireValueInRange/);
   assert.match(text, /requireNumberBetween/);
+  assert.match(text, /getRange\("H2:H5001"\), 80/);
+  assert.match(text, /getRange\("I2:L5001"\), 15/);
+  assert.doesNotMatch(text, /getRange\("H2:L5001"\), 999/);
   assert.match(text, /setFrozenRows/);
   assert.match(text, /setFrozenColumns/);
   assert.match(text, /createFilter\(\)/);
   assert.match(text, /\["B2:Q5001", "X2:X5001"\]/);
+  assert.match(text, /samgukProtectInputSheet_\(sheets\["장비현황"\], \["C2:R91"\]\)/);
   assert.match(text, /\["B2:O5001", "S2:S5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["게임정보"\], \["A2:F30"\]\)/);
 });

@@ -9,9 +9,9 @@
 
 ## 흐름
 
-`Google Sheet 기준값 + FMK 구조화 입력 + 방송 ROI OCR → samguk-observations.ndjson → 5분 승격 cron → Apps Script webhook → 관측입력 → 현재현황/무력랭킹 → /api/samguk`
+`Google Sheet 기준값 + FMK 구조화 입력 + 방송 ROI OCR → samguk-observations.ndjson → 5분 승격 cron → Apps Script webhook → 관측입력 → 현재현황 + 장비현황 → /api/samguk → 파워랭킹`
 
-무력랭킹은 `무력점수`가 한 명이라도 있으면 그 열만 사용한다. 아직 없으면 화면에 `무력 스탯`이라고 명시해 임시 정렬하며 두 스케일은 섞지 않는다.
+파워 v1은 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%를 합산한다. 100% 수집값은 확정, 85% 이상은 잠정 순위로 분리하고 그 미만은 순위에서 제외한다. 장비현황 빈칸은 미관측이며 미장착 슬롯은 `없음`, 일반 장수의 두갑 슬롯은 `해당없음`으로 명시한다.
 
 ## FMK 관측 입력
 
@@ -41,7 +41,7 @@ JSON
    - `google-apps-script/samguk-sheet-seed.generated.gs`
    - `google-apps-script/samguk-sheet-setup.gs`
    - `google-apps-script/samguk-observation-webhook.gs`
-2. 소유자 계정으로 `setupSamgukSheet()`를 실행한다. 12개 운영 탭, 90명, 60개 영토, 수식, 드롭다운, 필터와 보호가 멱등 적용되며 구형 탭은 `백업_...`으로 숨김 보존된다.
+2. 소유자 계정으로 `setupSamgukSheet()`를 실행한다. 13개 운영 탭, 90명, 60개 영토, 수식, 드롭다운, 필터와 보호가 멱등 적용되며 구형 탭은 `백업_...`으로 숨김 보존된다.
 3. 추가 관리자는 Script Property `SAMGUK_SHEET_ADMIN_EMAILS`에 쉼표로 구분해 등록한다. 보호만 다시 설치할 때는 `reapplySamgukSheetProtections()`를 실행한다.
 4. Script Property에 `SAMGUK_WEBHOOK_SECRET`과 필요하면 `SAMGUK_SPREADSHEET_ID`를 저장한다.
 5. 웹 앱 `/exec` URL과 같은 secret을 서버의 `SAMGUK_SHEET_WEBHOOK_URL`, `SAMGUK_SHEET_WEBHOOK_SECRET`에 저장한다. 평문 env 대신 `SAMGUK_SHEET_WEBHOOK_URL_PATH`, `SAMGUK_SHEET_WEBHOOK_SECRET_PATH`로 현재 사용자 소유의 0400/0600 일반 파일을 지정할 수 있으며 평문 env가 경로 설정보다 우선한다. Apps Script 응답 제한은 `SAMGUK_SHEET_WEBHOOK_TIMEOUT_MS`로 조정하며 기본 30초, 최대 60초다.
