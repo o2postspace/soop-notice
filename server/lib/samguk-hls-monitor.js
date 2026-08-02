@@ -283,12 +283,13 @@ function normalizeBatch(output, profileId) {
 function keepsOcrBurstAlive(batch) {
   if (batch.panelVisible !== true) return false;
   if (batch.profileId !== HUD_COMBAT_PROFILE_ID) return true;
-  // The combat HUD is visible during ordinary play. A max-HP-only result must
-  // still reach the change tracker, but it must not hold a 30-second OCR burst
-  // open as though a transient stats/equipment panel were on screen.
+  // The combat HUD is visible during ordinary play. Player/horse HP-only
+  // results must still reach the change tracker, but must not hold a 30-second
+  // OCR burst open as though a transient stats/equipment panel were on screen.
+  const passiveHudFields = new Set(["maxHealth", "horseMaxHealth"]);
   return !(
     batch.results.length > 0
-      && batch.results.every(result => result.field === "maxHealth")
+      && batch.results.every(result => passiveHudFields.has(result.field))
   );
 }
 
@@ -1098,7 +1099,9 @@ function createSamgukHlsMonitor(options = {}) {
         const burstVisible = keepsOcrBurstAlive(batch);
         if (profileId === HUD_COMBAT_PROFILE_ID) {
           if (burstVisible) activeHudProbes.delete(target.id);
-          else if (batch.results.some(result => result.field === "maxHealth")) {
+          else if (batch.results.some(result => (
+            result.field === "maxHealth" || result.field === "horseMaxHealth"
+          ))) {
             activeHudProbes.add(target.id);
           }
         }

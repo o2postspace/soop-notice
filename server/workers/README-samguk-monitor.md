@@ -71,9 +71,9 @@ heartbeat에는 `mode`, `totalTargetCount`, `enabledCount`, `disabledCount`, 정
 }
 ```
 
-허용 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`다. `powerScore`는 OCR 원본으로 받지 않고 검증된 값에서 계산한다. adapter 인자 template은 `{profileId}`, `{playerId}`, `{targetId}`, `{bjId}`, `{observedAt}`만 지원한다.
+허용 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `maxHealth`, `attackPower`, `healthStat`, `activeGeneral`, `defense`, `attackPowerBonusPct`, `damageReductionPct`, `criticalChancePct`, `criticalDamagePct`, `skillCooldownReductionPct`, `skillDamageBonusPct`, `moveSpeedBonusPct`, `horseMaxHealth`다. `powerScore`는 OCR 원본으로 받지 않고 검증된 값에서 계산한다. adapter 인자 template은 `{profileId}`, `{playerId}`, `{targetId}`, `{bjId}`, `{observedAt}`만 지원한다.
 
-현재 adapter가 실측 fixture로 추출하는 필드는 군마영 강화 단계, 장비 강화 4종과 기량 4종이다. 군마영은 `군마영` 제목, `장착·강화·합성` 탭 중 2개 이상, `강화하기` 버튼을 함께 확인하고 목표 단계 화살표가 아닌 현재 `N단계`만 `horseLevel`로 출력한다. OCR raw confidence는 구조 합의로 상향하지 않으며, 3-scale 값이 다르면 0.95 미만으로 제한한다. `level`과 말 이름 `horse`는 실제 방송 positive fixture를 확보하기 전까지 출력하지 않는다.
+현재 adapter는 군마영 강화 단계, 장비 강화 4종, 기량 4종, 플레이어/말 HUD 최대체력과 정보창 전투 스탯을 실측 fixture로 검증한다. 정보창에서는 체력·현재 장수·공격력·방어력과 공격력 증가, 피해 감소, 치명타 확률/피해, 절기 대기시간 감소/피해 증가, 이동속도 증가를 구조 기반으로 한 번에 읽는다. 군마영은 `군마영` 제목, `장착·강화·합성` 탭 중 2개 이상, `강화하기` 버튼을 함께 확인하고 목표 단계 화살표가 아닌 현재 `N단계`만 `horseLevel`로 출력한다. HUD의 말 최대체력은 플레이어 최대체력과 분리하며, 실측이 확인된 적토마 `1700=0강`, `1900=1강`만 말 이름·강화값으로 변환하고 다른 값은 외삽하지 않는다. OCR raw confidence는 구조 합의로 상향하지 않으며, 3-scale 값이 다르면 0.95 미만으로 제한한다. `level`은 실제 방송 positive fixture를 확보하기 전까지 출력하지 않는다.
 
 adapter 의존성은 `scripts/requirements-samguk-ocr.lock.txt`의 검증된 전체 pin으로 별도 venv에 설치한다. `requirements-samguk-ocr.txt`는 direct dependency 갱신용이다. detector·classifier·Korean recognizer ONNX 파일은 `--model-dir` 아래에 미리 두며 운영 중 다운로드하지 않는다. whole-frame에서 알려진 panel 구조를 찾고, 장비 tooltip은 발견된 종류 label 기준 상대 위치를 다시 읽으므로 고정 ROI를 사용하지 않는다. RapidOCR 로그와 원문 이미지는 stdout·stderr·queue에 기록하지 않는다.
 

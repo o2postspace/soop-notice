@@ -1064,13 +1064,16 @@ test("같은 segment의 인접 frame은 보류하고 다음 segment에서 같은
   assert.equal(new Set(appendCalls[0].map(item => item.evidenceHash)).size, 2);
 });
 
-test("generic gate가 HUD를 놓쳐도 분산 probe가 maxHealth를 두 segment로 확인한 뒤 종료한다", async () => {
+test("generic gate가 HUD를 놓쳐도 분산 probe가 플레이어·말 HP를 두 segment로 확인한 뒤 종료한다", async () => {
   let sdSequence = 700;
   let hdSequence = 700;
   const appendCalls = [];
   const fixture = monitorFixture({
     profileId: "hud-combat-v1",
-    baselines: [{ playerId: "P001", field: "maxHealth", value: 1200 }],
+    baselines: [
+      { playerId: "P001", field: "maxHealth", value: 1200 },
+      { playerId: "P001", field: "horseMaxHealth", value: 900 },
+    ],
     async fetchSegments(url) {
       const quality = url.slice("memory:".length);
       const sequence = quality === "SD" ? sdSequence++ : hdSequence++;
@@ -1086,7 +1089,10 @@ test("generic gate가 HUD를 놓쳐도 분산 probe가 maxHealth를 두 segment�
         version: 2,
         profileId: "hud-combat-v1",
         panelVisible: true,
-        results: [{ field: "maxHealth", value: 1239, confidence: 0.99 }],
+        results: [
+          { field: "maxHealth", value: 1239, confidence: 0.99 },
+          { field: "horseMaxHealth", value: 950, confidence: 0.99 },
+        ],
       };
     },
     queuePath: "/tmp/test-hud-max-health-observations.ndjson",
@@ -1113,7 +1119,7 @@ test("generic gate가 HUD를 놓쳐도 분산 probe가 maxHealth를 두 segment�
   assert.equal(second.endBurst, true);
   assert.equal(second.ocr.consecutiveHiddenFrames, 2);
   assert.equal(appendCalls.length, 1);
-  assert.equal(appendCalls[0].length, 2);
+  assert.equal(appendCalls[0].length, 4);
   assert.equal(new Set(appendCalls[0].map(item => item.sourceId)).size, 2);
   assert.equal(new Set(appendCalls[0].map(item => item.evidenceHash)).size, 2);
   const immediateNormal = await fixture.monitor.executeTask({ lane: "normal", target: target() });

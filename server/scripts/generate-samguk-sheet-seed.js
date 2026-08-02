@@ -9,7 +9,11 @@ const OUTPUT_PATH = path.join(__dirname, "google-apps-script/samguk-sheet-seed.g
 const MEMBER_FIELDS = [
   "name", "soopId", "nation", "crew", "job", "level", "horse", "horseLevel",
   "weapon", "helmet", "armor", "shoes", "strength", "agility", "vitality",
-  "intelligence", "powerScore", "observedAt", "evidence",
+  "intelligence", "powerScore", "maxHealth", "attackPower", "basicAttackDamage",
+  "basicAttackSampleCount", "basicAttackTarget", "combatConditions", "healthStat",
+  "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
+  "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct",
+  "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth", "observedAt", "evidence",
 ];
 const TERRITORY_FIELDS = [
   "id", "number", "x", "y", "owner", "capital", "facility", "level",

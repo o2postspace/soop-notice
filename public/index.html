@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>숲공지 - SOOP 스트리머 공지사항 대시보드 | soopnotice</title>
 <link rel="icon" href="/logo.png" type="image/png">
-<link rel="stylesheet" href="/samguk.css?v=20260802b">
+<link rel="stylesheet" href="/samguk.css?v=20260803c">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-9J4PTFHT9S"></script>
 <script>
@@ -3486,7 +3486,7 @@ function hasSamgukValue(value) {
 
 function samgukValue(value, suffix) {
   if (value === null || value === undefined || value === '') {
-    return '<span class="samguk-empty-value">—</span>';
+    return '—';
   }
   return escapeHtml(String(value)) + (suffix || '');
 }
@@ -3776,21 +3776,47 @@ function renderSamgukPowerRanking() {
   }
 
   function combatCell(member) {
-    const health = samgukNumber(member.maxHealth);
-    const attack = samgukNumber(member.attackPower);
-    const damage = samgukNumber(member.basicAttackDamage);
+    const metric = function(label, value, suffix) {
+      const number = samgukNumber(value);
+      return number === null ? '' : label + ' ' + samgukTextValue(formatScore(number), suffix || '');
+    };
+    const primary = [
+      metric('최대HP', member.maxHealth),
+      metric('공격력', member.attackPower),
+    ].filter(Boolean);
+    const damage = metric('평타', member.basicAttackDamage);
     const samples = samgukNumber(member.basicAttackSampleCount);
-    const lines = [];
-    if (health !== null) lines.push('<b>최대 HP ' + formatScore(health) + '</b>');
-    if (attack !== null) lines.push('<b>공격력 ' + formatScore(attack) + '</b>');
-    if (damage !== null) {
-      lines.push('<b>평타 ' + formatScore(damage) + '</b>'
-        + (samples !== null ? ' <span class="samguk-rank-coverage">n=' + formatScore(samples) + '</span>' : ''));
-    }
-    const context = [member.basicAttackTarget, member.combatConditions].filter(hasSamgukValue).join(' · ');
-    if (context) lines.push('<span class="samguk-rank-coverage">' + escapeHtml(context) + '</span>');
-    if (!lines.length) lines.push('<span class="samguk-rank-coverage">수집 중</span>');
-    lines.push('<span class="samguk-rank-coverage">파워 v1 미반영</span>');
+    if (damage) primary.push(damage + (samples !== null ? ' (n=' + formatScore(samples) + ')' : ''));
+
+    const character = [
+      hasSamgukValue(member.activeGeneral) ? '장수 ' + samgukTextValue(member.activeGeneral) : '',
+      metric('체력', member.healthStat),
+      metric('방어', member.defense),
+      metric('말HP', member.horseMaxHealth),
+    ].filter(Boolean);
+    const context = [member.basicAttackTarget, member.combatConditions].filter(hasSamgukValue).map(function(value) {
+      return samgukTextValue(value);
+    }).join(' · ');
+    if (context) character.push(context);
+
+    const rates = [
+      metric('공증', member.attackPowerBonusPct, '%'),
+      metric('피감', member.damageReductionPct, '%'),
+      metric('치확', member.criticalChancePct, '%'),
+      metric('치피', member.criticalDamagePct, '%'),
+    ].filter(Boolean);
+    const skillRates = [
+      metric('쿨감', member.skillCooldownReductionPct, '%'),
+      metric('절기증', member.skillDamageBonusPct, '%'),
+      metric('이속', member.moveSpeedBonusPct, '%'),
+    ].filter(Boolean);
+    const groups = [primary, character, rates, skillRates].filter(function(group) { return group.length; });
+    if (!groups.length) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1 미반영</span>';
+    const lines = groups.map(function(group, index) {
+      const value = escapeHtml(group.join(' · '));
+      return index === 0 ? '<b>' + value + '</b>' : '<span class="samguk-rank-coverage">' + value + '</span>';
+    });
+    lines[lines.length - 1] += ' <span class="samguk-rank-coverage">· 파워 v1 미반영</span>';
     return lines.join('<br>');
   }
 
@@ -5100,7 +5126,7 @@ document.addEventListener('click', function(e) {
   if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
 });
 </script>
-<script src="/samguk.js?v=20260803a"></script>
+<script src="/samguk.js?v=20260803b"></script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

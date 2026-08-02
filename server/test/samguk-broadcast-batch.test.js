@@ -76,17 +76,19 @@ test("top-level과 result extra key, 중복·미허용 field를 frame 전체 오
   }))));
 });
 
-test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 12개다", () => {
+test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 24개다", () => {
   const complete = parseBroadcastBatchOutput(JSON.stringify(batch({
     results: BATCH_FIELDS.map((field, index) => ({
       field,
-      value: field === "horse" ? "백룡마" : index,
+      value: field === "horse" ? "백룡마" : field === "activeGeneral" ? "조조" : index,
       confidence: 0.99,
     })),
   })));
-  assert.equal(MAX_BATCH_RESULTS, 12);
-  assert.equal(complete.results.length, 12);
+  assert.equal(MAX_BATCH_RESULTS, 24);
+  assert.equal(complete.results.length, 24);
   assert.ok(BATCH_FIELDS.includes("maxHealth"));
+  assert.ok(BATCH_FIELDS.includes("attackPower"));
+  assert.ok(BATCH_FIELDS.includes("horseMaxHealth"));
 
   const hidden = parseBroadcastBatchOutput(JSON.stringify(batch({ panelVisible: false, results: [] })));
   assert.deepEqual(Array.from(hidden.results), []);
@@ -115,9 +117,16 @@ test("confidence와 기존 observation 값 타입·범위를 동일하게 검증
   }))));
 
   const normalized = parseBroadcastBatchOutput(JSON.stringify(batch({
-    results: [{ field: "strength", value: "1,234", confidence: 0.99 }],
+    results: [
+      { field: "strength", value: "1,234", confidence: 0.99 },
+      { field: "attackPower", value: "110.5", confidence: 0.99 },
+      { field: "healthStat", value: "176.9", confidence: 0.99 },
+      { field: "defense", value: "88.25", confidence: 0.99 },
+      { field: "criticalChancePct", value: "12.5", confidence: 0.99 },
+    ],
   })));
   assert.equal(normalized.results[0].value, 1234);
+  assert.deepEqual(normalized.results.slice(1).map(result => result.value), [110.5, 176.9, 88.25, 12.5]);
 });
 
 test("flatten은 저신뢰 결과를 제외하고 같은 worker frame 근거로 observation 배열을 만든다", () => {

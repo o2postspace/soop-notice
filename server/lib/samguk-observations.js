@@ -21,6 +21,17 @@ const ALLOWED_FIELDS = Object.freeze([
   "basicAttackSampleCount",
   "basicAttackTarget",
   "combatConditions",
+  "healthStat",
+  "activeGeneral",
+  "defense",
+  "attackPowerBonusPct",
+  "damageReductionPct",
+  "criticalChancePct",
+  "criticalDamagePct",
+  "skillCooldownReductionPct",
+  "skillDamageBonusPct",
+  "moveSpeedBonusPct",
+  "horseMaxHealth",
 ]);
 const SOURCE_TYPES = Object.freeze(["sheet", "gamcom", "fmkorea", "broadcast"]);
 const MIN_BROADCAST_CONFIDENCE = 0.95;
@@ -35,11 +46,11 @@ const QUEUE_LOCK_RECORD_MAX_BYTES = 1_024;
 const MAX_BATCH_SIZE = 1_000;
 const NUMERIC_FIELD_MAXIMUMS = Object.freeze({
   level: 10_000,
-  horseLevel: 999,
-  weapon: 999,
-  helmet: 999,
-  armor: 999,
-  shoes: 999,
+  horseLevel: 80,
+  weapon: 15,
+  helmet: 15,
+  armor: 15,
+  shoes: 15,
   strength: 1_000_000,
   agility: 1_000_000,
   vitality: 1_000_000,
@@ -49,12 +60,53 @@ const NUMERIC_FIELD_MAXIMUMS = Object.freeze({
   attackPower: 1_000_000,
   basicAttackDamage: 1_000_000,
   basicAttackSampleCount: 10_000,
+  healthStat: 1_000_000,
+  defense: 1_000_000,
+  attackPowerBonusPct: 1_000,
+  damageReductionPct: 1_000,
+  criticalChancePct: 1_000,
+  criticalDamagePct: 1_000,
+  skillCooldownReductionPct: 1_000,
+  skillDamageBonusPct: 1_000,
+  moveSpeedBonusPct: 1_000,
+  horseMaxHealth: 1_000_000,
 });
-const DECIMAL_NUMERIC_FIELDS = new Set(["powerScore", "basicAttackDamage"]);
+const DECIMAL_NUMERIC_FIELDS = new Set([
+  "powerScore",
+  "attackPower",
+  "basicAttackDamage",
+  "healthStat",
+  "defense",
+  "attackPowerBonusPct",
+  "damageReductionPct",
+  "criticalChancePct",
+  "criticalDamagePct",
+  "skillCooldownReductionPct",
+  "skillDamageBonusPct",
+  "moveSpeedBonusPct",
+]);
+const MONOTONIC_NUMERIC_FIELDS = new Set([
+  "level",
+  "horseLevel",
+  "weapon",
+  "helmet",
+  "armor",
+  "shoes",
+  "strength",
+  "agility",
+  "vitality",
+  "intelligence",
+  "powerScore",
+  "maxHealth",
+  "attackPower",
+  "basicAttackDamage",
+  "basicAttackSampleCount",
+]);
 const TEXT_FIELD_MAX_LENGTHS = Object.freeze({
   horse: 80,
   basicAttackTarget: 120,
   combatConditions: 240,
+  activeGeneral: 80,
 });
 const PLAYER_ID_PATTERN = /^P\d{3}$/;
 const OBSERVATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -434,6 +486,16 @@ function chooseLatestConsensus(candidates) {
   return null;
 }
 
+function chooseMaximumConsensus(candidates) {
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((left, right) => (
+    right.value - left.value
+      || Date.parse(right.observedAt) - Date.parse(left.observedAt)
+      || Number(left.verification === "sheet-baseline") - Number(right.verification === "sheet-baseline")
+      || valueKey(left.value).localeCompare(valueKey(right.value))
+  ))[0];
+}
+
 function resolveLatestAccepted(inputs, {
   baselines = [],
   windowMs = DEFAULT_CONSENSUS_WINDOW_MS,
@@ -452,7 +514,9 @@ function resolveLatestAccepted(inputs, {
   }
   const latest = [];
   for (const group of groups.values()) {
-    const candidate = chooseLatestConsensus(group);
+    const candidate = MONOTONIC_NUMERIC_FIELDS.has(group[0].field)
+      ? chooseMaximumConsensus(group)
+      : chooseLatestConsensus(group);
     if (candidate) latest.push(candidate);
   }
   return latest.sort((left, right) => (
@@ -1221,6 +1285,8 @@ module.exports = {
   DEFAULT_QUEUE_MAX_BYTES,
   DEFAULT_QUEUE_LOCK_STALE_MS,
   DEFAULT_QUEUE_LOCK_TIMEOUT_MS,
+  DECIMAL_NUMERIC_FIELDS,
+  MONOTONIC_NUMERIC_FIELDS,
   MIN_BROADCAST_CONFIDENCE,
   MAX_OBSERVATION_FUTURE_SKEW_MS,
   NUMERIC_FIELD_MAXIMUMS,

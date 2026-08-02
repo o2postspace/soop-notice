@@ -6,7 +6,7 @@
  * 단일 sheet 기준값으로 추가합니다. 공개 시트는 독립 교차검증 출처로 세지 않습니다.
  */
 
-var SAMGUK_PUBLIC_SCHEMA_VERSION = "2026.08.03.1";
+var SAMGUK_PUBLIC_SCHEMA_VERSION = "2026.08.03.2";
 var SAMGUK_PUBLIC_DEFAULT_MASTER_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 var SAMGUK_PUBLIC_API_URL = "https://api.soopnotice.com/api/samguk";
 var SAMGUK_PUBLIC_SITE_URL = "https://soopnotice.com";
@@ -27,13 +27,18 @@ var SAMGUK_PUBLIC_HEADERS = {
     "순위", "player_id", "국가", "닉네임", "세력/길드", "장수/직업", "파워점수",
     "수집률", "상태", "레벨", "무력", "기민", "기력", "지모", "무기강화",
     "두갑강화", "흉갑강화", "각갑강화", "말", "말강화", "최대체력", "공격력",
-    "최종확인", "SOOP 방송"
+    "최종확인", "SOOP 방송", "체력", "현재장수", "방어력", "공격력증가(%)",
+    "피해감소(%)", "치명타확률(%)", "치명타피해(%)", "스킬쿨타임감소(%)",
+    "스킬피해증가(%)", "이동속도증가(%)", "말최대체력"
   ],
   "스탯·장비": [
     "player_id", "국가", "닉네임", "SOOP_ID", "세력/길드", "장수/직업", "레벨",
     "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화", "무력",
     "기민", "기력", "지모", "최대체력", "공격력", "평타피해", "파워점수",
-    "수집률", "출처", "출처수", "검증상태", "최종확인", "근거"
+    "수집률", "출처", "출처수", "검증상태", "최종확인", "근거", "체력",
+    "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
+    "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)",
+    "말최대체력"
   ],
   "수정제안": [
     "proposal_id", "제출시각", "player_id", "닉네임", "field_key", "현재값", "제안값",
@@ -66,7 +71,17 @@ var SAMGUK_PUBLIC_FIELD_CONFIG = {
   vitality: { label: "기력", currentHeader: "기력", observationHeader: "기력", maximum: 1000000, integer: true },
   intelligence: { label: "지모", currentHeader: "지모", observationHeader: "지모", maximum: 1000000, integer: true },
   maxHealth: { label: "최대체력", currentHeader: "최대체력", observationHeader: "최대체력", maximum: 1000000, integer: true },
-  attackPower: { label: "공격력", currentHeader: "공격력", observationHeader: "공격력", maximum: 1000000, integer: true }
+  attackPower: { label: "공격력", currentHeader: "공격력", observationHeader: "공격력", maximum: 1000000, integer: false },
+  healthStat: { label: "체력", currentHeader: "체력", observationHeader: "체력", maximum: 1000000, integer: false, higherOnly: false },
+  defense: { label: "방어력", currentHeader: "방어력", observationHeader: "방어력", maximum: 1000000, integer: false, higherOnly: false },
+  attackPowerBonusPct: { label: "공격력증가(%)", currentHeader: "공격력증가(%)", observationHeader: "공격력증가(%)", maximum: 1000, integer: false, higherOnly: false },
+  damageReductionPct: { label: "피해감소(%)", currentHeader: "피해감소(%)", observationHeader: "피해감소(%)", maximum: 1000, integer: false, higherOnly: false },
+  criticalChancePct: { label: "치명타확률(%)", currentHeader: "치명타확률(%)", observationHeader: "치명타확률(%)", maximum: 1000, integer: false, higherOnly: false },
+  criticalDamagePct: { label: "치명타피해(%)", currentHeader: "치명타피해(%)", observationHeader: "치명타피해(%)", maximum: 1000, integer: false, higherOnly: false },
+  skillCooldownReductionPct: { label: "스킬쿨타임감소(%)", currentHeader: "스킬쿨타임감소(%)", observationHeader: "스킬쿨타임감소(%)", maximum: 1000, integer: false, higherOnly: false },
+  skillDamageBonusPct: { label: "스킬피해증가(%)", currentHeader: "스킬피해증가(%)", observationHeader: "스킬피해증가(%)", maximum: 1000, integer: false, higherOnly: false },
+  moveSpeedBonusPct: { label: "이동속도증가(%)", currentHeader: "이동속도증가(%)", observationHeader: "이동속도증가(%)", maximum: 1000, integer: false, higherOnly: false },
+  horseMaxHealth: { label: "말최대체력", currentHeader: "말최대체력", observationHeader: "말최대체력", maximum: 1000000, integer: true, higherOnly: false }
 };
 
 var SAMGUK_PUBLIC_SOURCE_TYPES = [
@@ -316,11 +331,11 @@ function samgukPublicSeedGuide_(sheet, publicUrl) {
     ["사이트", SAMGUK_PUBLIC_SITE_URL],
     ["공개 시트", publicUrl],
     ["자동 갱신", "15분마다 SOOPNOTICE 공개 API의 정상 90명 자료로 갱신됩니다."],
-    ["파워점수", "사이트 파워 v1.1 하한점수 × " + SAMGUK_PUBLIC_POWER_SCALE + " 표시값입니다. 최대체력·공격력·평타피해는 아직 파워 산식에 포함하지 않습니다."],
+    ["파워점수", "사이트 파워 v1.1 하한점수 × " + SAMGUK_PUBLIC_POWER_SCALE + " 표시값입니다. 최대체력·공격력·평타피해와 정보창 동적 수치는 아직 파워 산식에 포함하지 않습니다."],
     ["보기 권한", "링크가 있는 모든 사용자는 볼 수 있습니다."],
     ["수정 권한", "Google Drive에서 편집 권한을 요청하면 소유자가 계정별로 승인합니다."],
     ["수정 방법", "승인된 편집자는 수정제안 탭의 입력 칸만 작성합니다. 한 행에는 한 선수의 한 항목만 적습니다."],
-    ["반영 조건", "운영자가 승인한 HTTPS 근거가 있는 상승값만 운영원장에 단일 시트 기준값으로 반영합니다."],
+    ["반영 조건", "운영자가 승인한 HTTPS 근거만 반영합니다. 강화·공격력은 상승값, 동적 정보창 수치는 최신 관측값을 사용합니다."],
     ["교차검증", "이 공개 시트는 운영원장의 표시용 사본이므로 독립 출처나 교차검증 1회로 중복 계산하지 않습니다."],
     ["오류 정정", "잘못 승인된 값은 삭제하지 않고 철회한 뒤 이전 최고값으로 되돌립니다."],
     ["제보 안내", "player_id와 field_key는 드롭다운에서 고르고, 관측시각·원문 URL·설명을 함께 적어 주세요."],
@@ -367,7 +382,7 @@ function samgukPublicConfigureProposalSheet_(sheet, codeSheet) {
   );
   sheet.getRange("E2:E" + SAMGUK_PUBLIC_MAX_PROPOSAL_ROW).setDataValidation(
     SpreadsheetApp.newDataValidation()
-      .requireValueInRange(codeSheet.getRange("F2:F13"), true)
+      .requireValueInRange(codeSheet.getRange(2, 6, Object.keys(SAMGUK_PUBLIC_FIELD_CONFIG).length, 1), true)
       .setAllowInvalid(false)
       .setHelpText("수정할 항목을 선택하세요.")
       .build()
@@ -632,6 +647,17 @@ function samgukPublicNormalizeMember_(raw, rosterMember) {
     maxHealth: number("maxHealth", 1000000),
     attackPower: number("attackPower", 1000000),
     basicAttackDamage: number("basicAttackDamage", 1000000),
+    healthStat: number("healthStat", 1000000),
+    activeGeneral: text("activeGeneral", 80),
+    defense: number("defense", 1000000),
+    attackPowerBonusPct: number("attackPowerBonusPct", 1000),
+    damageReductionPct: number("damageReductionPct", 1000),
+    criticalChancePct: number("criticalChancePct", 1000),
+    criticalDamagePct: number("criticalDamagePct", 1000),
+    skillCooldownReductionPct: number("skillCooldownReductionPct", 1000),
+    skillDamageBonusPct: number("skillDamageBonusPct", 1000),
+    moveSpeedBonusPct: number("moveSpeedBonusPct", 1000),
+    horseMaxHealth: number("horseMaxHealth", 1000000),
     powerRankScore: rankScore,
     powerIndex: number("powerIndex", 100),
     powerCoverage: number("powerCoverage", 100),
@@ -671,7 +697,12 @@ function samgukPublicBuildRankingRows_(members) {
       samgukPublicBlank_(member.weapon), samgukPublicBlank_(member.helmet), samgukPublicBlank_(member.armor),
       samgukPublicBlank_(member.shoes), member.horse, samgukPublicBlank_(member.horseLevel),
       samgukPublicBlank_(member.maxHealth), samgukPublicBlank_(member.attackPower),
-      samgukPublicDateOrText_(member.observedAt), "https://play.sooplive.com/" + member.soopId
+      samgukPublicDateOrText_(member.observedAt), "https://play.sooplive.com/" + member.soopId,
+      samgukPublicBlank_(member.healthStat), member.activeGeneral, samgukPublicBlank_(member.defense),
+      samgukPublicBlank_(member.attackPowerBonusPct), samgukPublicBlank_(member.damageReductionPct),
+      samgukPublicBlank_(member.criticalChancePct), samgukPublicBlank_(member.criticalDamagePct),
+      samgukPublicBlank_(member.skillCooldownReductionPct), samgukPublicBlank_(member.skillDamageBonusPct),
+      samgukPublicBlank_(member.moveSpeedBonusPct), samgukPublicBlank_(member.horseMaxHealth)
     ].map(samgukPublicSafeCell_);
   });
 }
@@ -691,7 +722,12 @@ function samgukPublicBuildDetailRows_(members) {
       samgukPublicBlank_(member.maxHealth), samgukPublicBlank_(member.attackPower),
       samgukPublicBlank_(member.basicAttackDamage), samgukPublicBlank_(displayScore),
       samgukPublicBlank_(member.powerCoverage), member.sourceType, samgukPublicBlank_(member.sourceCount),
-      member.reviewStatus, samgukPublicDateOrText_(member.observedAt), member.evidence
+      member.reviewStatus, samgukPublicDateOrText_(member.observedAt), member.evidence,
+      samgukPublicBlank_(member.healthStat), member.activeGeneral, samgukPublicBlank_(member.defense),
+      samgukPublicBlank_(member.attackPowerBonusPct), samgukPublicBlank_(member.damageReductionPct),
+      samgukPublicBlank_(member.criticalChancePct), samgukPublicBlank_(member.criticalDamagePct),
+      samgukPublicBlank_(member.skillCooldownReductionPct), samgukPublicBlank_(member.skillDamageBonusPct),
+      samgukPublicBlank_(member.moveSpeedBonusPct), samgukPublicBlank_(member.horseMaxHealth)
     ].map(samgukPublicSafeCell_);
   });
 }
@@ -940,8 +976,11 @@ function samgukPublicApproveProposal_(spreadsheet, values, proposalRow) {
     }, false);
   }
   var currentValue = samgukPublicReadCurrentValue_(playerId, fieldKey);
-  if (currentValue !== null && numericValue <= currentValue && !masterObservation) {
+  if (config.higherOnly !== false && currentValue !== null && numericValue <= currentValue && !masterObservation) {
     throw new Error("proposal_must_be_higher_than_current");
+  }
+  if (config.higherOnly === false && currentValue !== null && numericValue === currentValue && !masterObservation) {
+    throw new Error("proposal_must_differ_from_current");
   }
   var masterResult = samgukPublicAppendMasterObservation_({
     observationId: observationId,
@@ -1016,9 +1055,16 @@ function samgukPublicAppendMasterObservation_(proposal) {
   // 공개 제보는 해당 숫자 한 필드만 새 기준으로 기록합니다. 다른 단조 증가값을
   // 복사하지 않아 나중에 이 행을 철회하면 이전 최고값으로 되돌릴 수 있습니다.
   record[SAMGUK_PUBLIC_FIELD_CONFIG[proposal.fieldKey].observationHeader] = proposal.proposedValue;
-  // 최신 스냅샷을 선택하는 비단조 보조 항목은 현재값을 보존합니다.
-  ["말", "평타피해대표값", "평타표본수", "평타대상", "전투조건"].forEach(function(header) {
-    if (Object.prototype.hasOwnProperty.call(proposal.currentValues, header)) record[header] = proposal.currentValues[header];
+  // 제안 대상 외의 선택 스냅샷 항목은 현재값을 보존합니다.
+  [
+    "말", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "체력", "현재장수",
+    "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)", "치명타피해(%)",
+    "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력"
+  ].forEach(function(header) {
+    if (header !== SAMGUK_PUBLIC_FIELD_CONFIG[proposal.fieldKey].observationHeader
+        && Object.prototype.hasOwnProperty.call(proposal.currentValues, header)) {
+      record[header] = proposal.currentValues[header];
+    }
   });
 
   var values = headers.map(function(header) {

@@ -8,6 +8,7 @@ const {
   SamgukBroadcastChangeTrackerError,
   createBroadcastChangeTracker,
 } = require("../lib/samguk-broadcast-change-tracker");
+const { BATCH_FIELDS } = require("../lib/samguk-broadcast-batch");
 
 const BASE_TIME = Date.parse("2026-08-02T10:00:00.000Z");
 
@@ -374,7 +375,7 @@ test("observeBatch는 중복 key와 섞인 frame 근거를 상태 변경 없이 
   assert.equal(tracker.getState("P001", "agility"), null);
 });
 
-test("observeBatch는 최대 12건과 key capacity를 batch 전체에 선적용한다", () => {
+test("observeBatch는 최대 24건과 key capacity를 batch 전체에 선적용한다", () => {
   const tracker = createBroadcastChangeTracker({
     maxKeys: 2,
     baselines: [{ playerId: "P001", field: "strength", value: 10 }],
@@ -394,27 +395,23 @@ test("observeBatch는 최대 12건과 key capacity를 batch 전체에 선적용�
     onConfirmed() { emptyCallbackCalls += 1; },
   }), []);
   assert.equal(emptyCallbackCalls, 0);
-  const fields = [
-    "level", "horse", "horseLevel", "weapon", "helmet", "armor",
-    "shoes", "strength", "agility", "vitality", "intelligence", "maxHealth",
-  ];
-  const tooMany = fields.map(field => observation({
+  const maximumBatch = BATCH_FIELDS.map(field => observation({
     field,
-    value: field === "horse" ? "백룡마" : 1,
+    value: field === "horse" ? "백룡마" : field === "activeGeneral" ? "조조" : 1,
     sourceId: "screen:too-many",
     evidenceHash: "2".repeat(64),
   }));
-  const twelveTracker = createBroadcastChangeTracker();
-  assert.deepEqual(twelveTracker.observeBatch(tooMany, { now: BASE_TIME }), []);
-  assert.equal(twelveTracker.size, 12);
-  tooMany.push(observation({
+  const maximumTracker = createBroadcastChangeTracker();
+  assert.deepEqual(maximumTracker.observeBatch(maximumBatch, { now: BASE_TIME }), []);
+  assert.equal(maximumTracker.size, 24);
+  maximumBatch.push(observation({
     playerId: "P002",
     field: "level",
     value: 1,
     sourceId: "screen:too-many",
     evidenceHash: "2".repeat(64),
   }));
-  rejectsWith("invalid_batch", () => twelveTracker.observeBatch(tooMany, { now: BASE_TIME }));
+  rejectsWith("invalid_batch", () => maximumTracker.observeBatch(maximumBatch, { now: BASE_TIME }));
 });
 
 test("sourceId 또는 evidenceHash가 같은 frame은 두 번째 근거로 세지 않는다", () => {
@@ -542,8 +539,8 @@ test("TTL cleanup은 만료 후보와 stable 없는 key만 제거한다", () => 
   assert.equal(tracker.getState("P001", "level").stableValue, 1);
 });
 
-test("최대 key 상한은 90*12이고 초과 시 기존 상태를 보존한다", () => {
-  assert.equal(MAX_TRACKED_KEYS, 1080);
+test("최대 key 상한은 90*24이고 초과 시 기존 상태를 보존한다", () => {
+  assert.equal(MAX_TRACKED_KEYS, 2160);
   const tracker = createBroadcastChangeTracker({ maxKeys: 2 });
   tracker.setStable({ playerId: "P001", field: "level", value: 1 }, { now: BASE_TIME });
   tracker.setStable({ playerId: "P001", field: "strength", value: 10 }, { now: BASE_TIME });

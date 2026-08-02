@@ -143,6 +143,15 @@ function nullableNumber(value, label, rowNumber, warnings, maximum = Infinity) {
   return parsed;
 }
 
+function nullablePercentagePoint(value, label, rowNumber, warnings, maximum = 1_000) {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw === "-" || raw === "—" || /^#(?:N\/A|VALUE!|REF!|DIV\/0!)/i.test(raw)) {
+    return null;
+  }
+  const compact = raw.endsWith("%") ? raw.slice(0, -1).trim() : raw;
+  return nullableNumber(compact, label, rowNumber, warnings, maximum);
+}
+
 function normalizeNation(value, { allowUnclaimed = false } = {}) {
   const raw = String(value || "").trim();
   if (["위", "위나라", "魏"].includes(raw)) return "위";
@@ -368,6 +377,17 @@ function enrichMembersWithPowerIndex(members) {
     basicAttackSampleCount: member.basicAttackSampleCount ?? null,
     basicAttackTarget: member.basicAttackTarget || null,
     combatConditions: member.combatConditions || null,
+    healthStat: member.healthStat ?? null,
+    activeGeneral: member.activeGeneral || null,
+    defense: member.defense ?? null,
+    attackPowerBonusPct: member.attackPowerBonusPct ?? null,
+    damageReductionPct: member.damageReductionPct ?? null,
+    criticalChancePct: member.criticalChancePct ?? null,
+    criticalDamagePct: member.criticalDamagePct ?? null,
+    skillCooldownReductionPct: member.skillCooldownReductionPct ?? null,
+    skillDamageBonusPct: member.skillDamageBonusPct ?? null,
+    moveSpeedBonusPct: member.moveSpeedBonusPct ?? null,
+    horseMaxHealth: member.horseMaxHealth ?? null,
     engravings: Array.isArray(member.engravings) ? member.engravings : [],
     equipmentObservedAt: member.equipmentObservedAt || null,
     equipmentEvidence: member.equipmentEvidence || null,
@@ -462,6 +482,17 @@ function parseMembersCsv(text) {
     basicAttackSampleCount: { aliases: ["평타표본수", "basicAttackSampleCount"], required: false },
     basicAttackTarget: { aliases: ["평타대상", "basicAttackTarget"], required: false },
     combatConditions: { aliases: ["전투조건", "combatConditions"], required: false },
+    healthStat: { aliases: ["체력", "체력스탯", "healthStat"], required: false },
+    activeGeneral: { aliases: ["현재장수", "activeGeneral"], required: false },
+    defense: { aliases: ["방어력", "defense"], required: false },
+    attackPowerBonusPct: { aliases: ["공격력증가(%)", "공격력증가율", "attackPowerBonusPct"], required: false },
+    damageReductionPct: { aliases: ["피해감소(%)", "피해감소율", "damageReductionPct"], required: false },
+    criticalChancePct: { aliases: ["치명타확률(%)", "치명타확률", "criticalChancePct"], required: false },
+    criticalDamagePct: { aliases: ["치명타피해(%)", "치명타피해", "criticalDamagePct"], required: false },
+    skillCooldownReductionPct: { aliases: ["스킬쿨타임감소(%)", "스킬쿨타임감소율", "skillCooldownReductionPct"], required: false },
+    skillDamageBonusPct: { aliases: ["스킬피해증가(%)", "스킬피해증가율", "skillDamageBonusPct"], required: false },
+    moveSpeedBonusPct: { aliases: ["이동속도증가(%)", "이동속도증가율", "moveSpeedBonusPct"], required: false },
+    horseMaxHealth: { aliases: ["말최대체력", "말체력", "horseMaxHealth"], required: false },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["최근근거", "근거", "근거(URL/타임코드)"], required: true },
     reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
@@ -520,6 +551,33 @@ function parseMembersCsv(text) {
       ),
       basicAttackTarget: cell(row, columns.basicAttackTarget) || null,
       combatConditions: cell(row, columns.combatConditions) || null,
+      healthStat: nullableNumber(cell(row, columns.healthStat), "체력", rowNumber, warnings, 1_000_000),
+      activeGeneral: cell(row, columns.activeGeneral) || null,
+      defense: nullableNumber(cell(row, columns.defense), "방어력", rowNumber, warnings, 1_000_000),
+      attackPowerBonusPct: nullablePercentagePoint(
+        cell(row, columns.attackPowerBonusPct), "공격력증가(%)", rowNumber, warnings,
+      ),
+      damageReductionPct: nullablePercentagePoint(
+        cell(row, columns.damageReductionPct), "피해감소(%)", rowNumber, warnings,
+      ),
+      criticalChancePct: nullablePercentagePoint(
+        cell(row, columns.criticalChancePct), "치명타확률(%)", rowNumber, warnings,
+      ),
+      criticalDamagePct: nullablePercentagePoint(
+        cell(row, columns.criticalDamagePct), "치명타피해(%)", rowNumber, warnings,
+      ),
+      skillCooldownReductionPct: nullablePercentagePoint(
+        cell(row, columns.skillCooldownReductionPct), "스킬쿨타임감소(%)", rowNumber, warnings,
+      ),
+      skillDamageBonusPct: nullablePercentagePoint(
+        cell(row, columns.skillDamageBonusPct), "스킬피해증가(%)", rowNumber, warnings,
+      ),
+      moveSpeedBonusPct: nullablePercentagePoint(
+        cell(row, columns.moveSpeedBonusPct), "이동속도증가(%)", rowNumber, warnings,
+      ),
+      horseMaxHealth: nullableNumber(
+        cell(row, columns.horseMaxHealth), "말최대체력", rowNumber, warnings, 1_000_000,
+      ),
       sourceType: normalizeSourceType(cell(row, columns.sourceType)),
       sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
       verificationStatus: normalizeVerificationStatus(cell(row, columns.verificationStatus)),

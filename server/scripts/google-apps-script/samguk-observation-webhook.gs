@@ -16,15 +16,18 @@ var SAMGUK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 var SAMGUK_REQUIRED_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore", "maxHealth",
-  "attackPower", "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions"
+  "attackPower", "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions",
+  "healthStat", "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
+  "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
+  "moveSpeedBonusPct", "horseMaxHealth"
 ];
 var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   level: 10000,
-  horseLevel: 999,
-  weapon: 999,
-  helmet: 999,
-  armor: 999,
-  shoes: 999,
+  horseLevel: 80,
+  weapon: 15,
+  helmet: 15,
+  armor: 15,
+  shoes: 15,
   strength: 1000000,
   agility: 1000000,
   vitality: 1000000,
@@ -33,8 +36,24 @@ var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   maxHealth: 1000000,
   attackPower: 1000000,
   basicAttackDamage: 1000000,
-  basicAttackSampleCount: 10000
+  basicAttackSampleCount: 10000,
+  healthStat: 1000000,
+  defense: 1000000,
+  attackPowerBonusPct: 1000,
+  damageReductionPct: 1000,
+  criticalChancePct: 1000,
+  criticalDamagePct: 1000,
+  skillCooldownReductionPct: 1000,
+  skillDamageBonusPct: 1000,
+  moveSpeedBonusPct: 1000,
+  horseMaxHealth: 1000000
 };
+var SAMGUK_DECIMAL_NUMERIC_FIELDS = [
+  "powerScore", "attackPower", "basicAttackDamage", "healthStat", "defense",
+  "attackPowerBonusPct", "damageReductionPct",
+  "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
+  "moveSpeedBonusPct"
+];
 
 function doGet() {
   return samgukJsonResponse_({ ok: true, service: "samguk-observation-webhook", version: 1 });
@@ -120,7 +139,11 @@ function samgukAppendSnapshot_(snapshot) {
     agility: "기민", vitality: "기력", intelligence: "지모", powerScore: "무력점수",
     maxHealth: "최대체력", attackPower: "공격력", basicAttackDamage: "평타피해대표값",
     basicAttackSampleCount: "평타표본수", basicAttackTarget: "평타대상",
-    combatConditions: "전투조건"
+    combatConditions: "전투조건", healthStat: "체력", activeGeneral: "현재장수",
+    defense: "방어력", attackPowerBonusPct: "공격력증가(%)", damageReductionPct: "피해감소(%)",
+    criticalChancePct: "치명타확률(%)", criticalDamagePct: "치명타피해(%)",
+    skillCooldownReductionPct: "스킬쿨타임감소(%)", skillDamageBonusPct: "스킬피해증가(%)",
+    moveSpeedBonusPct: "이동속도증가(%)", horseMaxHealth: "말최대체력"
   };
   var record = {
     observation_id: snapshot.observationId,
@@ -147,7 +170,8 @@ function samgukAppendSnapshot_(snapshot) {
       values[index] = samgukSafeCellValue_(record[header]);
     }
   });
-  var requiredHeaders = ["observation_id", "player_id", "확인시각", "근거종류", "검증상태"];
+  var requiredHeaders = ["observation_id", "player_id", "확인시각", "근거종류", "검증상태"]
+    .concat(SAMGUK_REQUIRED_FIELDS.map(function(key) { return fieldHeaders[key]; }));
   requiredHeaders.forEach(function(header) {
     if (headers.indexOf(header) < 0) throw new Error("missing_header:" + header);
   });
@@ -169,7 +193,7 @@ function samgukAppendSnapshot_(snapshot) {
 }
 
 /**
- * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:AE 전체가 비어 있는 첫 행만 사용합니다.
+ * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:AP 전체가 비어 있는 첫 행만 사용합니다.
  */
 function samgukFindFirstEmptyObservationRow_(sheet, columnCount) {
   if (sheet.getMaxRows() < SAMGUK_MAX_OBSERVATION_ROW) {
@@ -222,12 +246,14 @@ function samgukValidateSnapshot_(snapshot) {
     if (!Object.prototype.hasOwnProperty.call(snapshot.fields, key)) throw new Error("incomplete_snapshot:" + key);
     var value = snapshot.fields[key];
     if (value === null) return;
-    if (["horse", "basicAttackTarget", "combatConditions"].indexOf(key) >= 0) {
-      var maximumLength = key === "horse" ? 80 : key === "basicAttackTarget" ? 120 : 240;
+    if (["horse", "basicAttackTarget", "combatConditions", "activeGeneral"].indexOf(key) >= 0) {
+      var maximumLength = ["horse", "activeGeneral"].indexOf(key) >= 0
+        ? 80
+        : key === "basicAttackTarget" ? 120 : 240;
       if (typeof value !== "string" || value.length > maximumLength) throw new Error("invalid_field:" + key);
     } else if (typeof value !== "number" || !isFinite(value) || value < 0
         || value > SAMGUK_NUMERIC_FIELD_MAXIMUMS[key]
-        || (["powerScore", "basicAttackDamage"].indexOf(key) < 0 && !Number.isInteger(value))) {
+        || (SAMGUK_DECIMAL_NUMERIC_FIELDS.indexOf(key) < 0 && !Number.isInteger(value))) {
       throw new Error("invalid_field:" + key);
     }
   });

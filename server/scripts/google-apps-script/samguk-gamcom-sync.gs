@@ -8,18 +8,21 @@
  * - 원문에 갱신시각이 없으므로 외부수집시각과 별도로 표시합니다.
  */
 
-var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.3";
+var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.4";
 var SAMGUK_GAMCOM_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 var SAMGUK_GAMCOM_REFERENCE_SHEET = "외부참고";
 var SAMGUK_GAMCOM_CURRENT_SHEET = "현재현황";
 var SAMGUK_GAMCOM_OBSERVATION_SHEET = "관측입력";
 var SAMGUK_GAMCOM_PARTICIPANT_SHEET = "참가자";
+var SAMGUK_GAMCOM_TERRITORY_CURRENT_SHEET = "영토현황";
+var SAMGUK_GAMCOM_TERRITORY_INPUT_SHEET = "영토입력";
 var SAMGUK_GAMCOM_MAX_OBSERVATION_ROW = 5001;
 var SAMGUK_GAMCOM_URLS = {
   "위나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84",
   "촉나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89",
   "오나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%98%A4"
 };
+var SAMGUK_GAMCOM_TERRITORY_URL = "https://gamcom-3kingdom.vercel.app/api/castles?fresh=1";
 var SAMGUK_GAMCOM_REFERENCE_HEADERS = [
   "player_id", "SOOP_ID", "국가", "세력/길드", "닉네임", "장수/직업",
   "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
@@ -29,16 +32,22 @@ var SAMGUK_GAMCOM_REFERENCE_HEADERS = [
 var SAMGUK_GAMCOM_SNAPSHOT_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore",
-  "basicAttackDamage", "basicAttackSampleCount",
-  "basicAttackTarget", "combatConditions"
+  "maxHealth", "attackPower", "basicAttackDamage", "basicAttackSampleCount",
+  "basicAttackTarget", "combatConditions", "healthStat", "activeGeneral", "defense",
+  "attackPowerBonusPct", "damageReductionPct", "criticalChancePct", "criticalDamagePct",
+  "skillCooldownReductionPct", "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth"
 ];
 var SAMGUK_GAMCOM_FIELD_HEADERS = {
   level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
   helmet: "두갑강화", armor: "흉갑강화", shoes: "각갑강화", strength: "무력",
   agility: "기민", vitality: "기력", intelligence: "지모", powerScore: "무력점수",
-  maxHealth: "최대체력", attackPower: "공격력", basicAttackDamage: "평타피해대표값",
-  basicAttackSampleCount: "평타표본수", basicAttackTarget: "평타대상",
-  combatConditions: "전투조건"
+    maxHealth: "최대체력", attackPower: "공격력", basicAttackDamage: "평타피해대표값",
+    basicAttackSampleCount: "평타표본수", basicAttackTarget: "평타대상",
+    combatConditions: "전투조건", healthStat: "체력", activeGeneral: "현재장수",
+    defense: "방어력", attackPowerBonusPct: "공격력증가(%)", damageReductionPct: "피해감소(%)",
+    criticalChancePct: "치명타확률(%)", criticalDamagePct: "치명타피해(%)",
+    skillCooldownReductionPct: "스킬쿨타임감소(%)", skillDamageBonusPct: "스킬피해증가(%)",
+    moveSpeedBonusPct: "이동속도증가(%)", horseMaxHealth: "말최대체력"
 };
 var SAMGUK_GAMCOM_NUMERIC_FIELDS = [
   "horseLevel", "weapon", "helmet", "armor", "shoes",
@@ -60,19 +69,27 @@ function syncSamgukGamcom() {
     var currentSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_CURRENT_SHEET);
     var observationSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_OBSERVATION_SHEET);
     var participantSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_PARTICIPANT_SHEET);
-    if (!currentSheet || !observationSheet || !participantSheet) throw new Error("required_sheet_missing");
+    var territoryCurrentSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_TERRITORY_CURRENT_SHEET);
+    var territoryInputSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_TERRITORY_INPUT_SHEET);
+    if (!currentSheet || !observationSheet || !participantSheet || !territoryCurrentSheet || !territoryInputSheet) {
+      throw new Error("required_sheet_missing");
+    }
 
     var collectedAt = new Date();
     var external = samgukGamcomFetchAll_();
+    var currentTerritories = samgukGamcomReadCurrentTerritories_(territoryCurrentSheet);
+    var externalTerritories = samgukGamcomFetchTerritories_(currentTerritories);
     var current = samgukGamcomReadCurrent_(currentSheet);
     var merged = samgukGamcomMerge_(current, external, collectedAt);
     var referenceValues = samgukGamcomReferenceValues_(merged, collectedAt);
     var snapshotRows = samgukGamcomSnapshotRows_(spreadsheet, observationSheet, merged, collectedAt);
+    var territoryResult = samgukGamcomTerritoryRows_(territoryInputSheet, currentTerritories, externalTerritories, collectedAt);
 
     samgukGamcomInstallSourceValidation_(spreadsheet, observationSheet);
     var participantFilled = samgukGamcomFillParticipantText_(participantSheet, merged);
     samgukGamcomWriteReference_(spreadsheet, referenceValues);
     var appended = samgukGamcomAppendRows_(observationSheet, snapshotRows);
+    var territoryAppended = samgukGamcomAppendTerritoryRows_(territoryInputSheet, territoryResult.rows);
     SpreadsheetApp.flush();
 
     var properties = PropertiesService.getScriptProperties();
@@ -83,7 +100,11 @@ function syncSamgukGamcom() {
       changedCells: merged.changedCount,
       appended: appended,
       participantFilled: participantFilled,
-      retainedConflicts: merged.conflictCount
+      retainedConflicts: merged.conflictCount,
+      territories: externalTerritories.length,
+      territoryChanged: territoryResult.rows.length,
+      territoryAppended: territoryAppended,
+      territorySourceUpdatedAt: null
     }));
     var summary = {
       ok: true,
@@ -92,6 +113,10 @@ function syncSamgukGamcom() {
       appended: appended,
       participantFilled: participantFilled,
       retainedConflicts: merged.conflictCount,
+      territories: externalTerritories.length,
+      territoryChanged: territoryResult.rows.length,
+      territoryAppended: territoryAppended,
+      territorySourceUpdatedAt: null,
       collectedAt: collectedAt.toISOString()
     };
     properties.deleteProperty("SAMGUK_GAMCOM_LAST_ERROR");
@@ -165,6 +190,226 @@ function samgukGamcomFetchAll_() {
     names[row.nickname] = true;
   });
   return all;
+}
+
+function samgukGamcomFetchTerritories_(currentTerritories) {
+  var response = UrlFetchApp.fetch(SAMGUK_GAMCOM_TERRITORY_URL, {
+    method: "get",
+    followRedirects: false,
+    muteHttpExceptions: true,
+    headers: { Accept: "application/json", "User-Agent": "SOOPNOTICE-data-sync/1.0" }
+  });
+  if (response.getResponseCode() !== 200) {
+    throw new Error("gamcom_territory_http_" + response.getResponseCode());
+  }
+  var headers = response.getAllHeaders();
+  var contentType = String(headers["Content-Type"] || headers["content-type"] || "").toLowerCase();
+  if (contentType.indexOf("application/json") < 0) throw new Error("gamcom_territory_invalid_content_type");
+  var payload = response.getContentText("UTF-8");
+  if (payload.length < 2 || payload.length > 524288) throw new Error("gamcom_territory_invalid_response_size");
+  return samgukGamcomParseTerritories_(payload, currentTerritories);
+}
+
+function samgukGamcomReadCurrentTerritories_(sheet) {
+  var lastColumn = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+  var columns = samgukGamcomHeaderMap_(headers);
+  ["영토ID", "번호", "X", "Y", "소유국", "수도", "시설", "레벨"].forEach(function(header) {
+    if (columns[header] === undefined) throw new Error("territory_current_missing_header:" + header);
+  });
+  var values = sheet.getRange(2, 1, 60, lastColumn).getValues();
+  var territories = values.map(function(row, index) {
+    var number = samgukGamcomRequiredInteger_(row[columns["번호"]], 1, 60, "territory_number");
+    var territory = {
+      id: samgukGamcomTerritoryId_(row[columns["영토ID"]], number),
+      number: number,
+      x: samgukGamcomRequiredInteger_(row[columns["X"]], 0, 1180, "territory_x"),
+      y: samgukGamcomRequiredInteger_(row[columns["Y"]], 0, 720, "territory_y"),
+      owner: samgukGamcomTerritoryOwner_(row[columns["소유국"]]),
+      capital: samgukGamcomTerritoryBoolean_(row[columns["수도"]], number),
+      facility: String(row[columns["시설"]] || "없음").normalize("NFKC").trim(),
+      level: samgukGamcomRequiredInteger_(row[columns["레벨"]], 0, 999, "territory_level")
+    };
+    if (!territory.owner || ["없음", "병영", "성채", "장원"].indexOf(territory.facility) < 0) {
+      throw new Error("territory_current_invalid_state:" + (index + 2));
+    }
+    if (territory.owner === "미점령" && (territory.capital || territory.facility !== "없음")) {
+      throw new Error("territory_current_invalid_unclaimed:" + number);
+    }
+    return territory;
+  });
+  return samgukGamcomValidateTerritorySet_(territories, "territory_current");
+}
+
+function samgukGamcomParseTerritories_(payload, currentTerritories) {
+  var parsed;
+  try {
+    parsed = JSON.parse(payload);
+  } catch (_error) {
+    throw new Error("gamcom_territory_invalid_json");
+  }
+  var forces = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.forces : null;
+  if (!forces || typeof forces !== "object" || Array.isArray(forces)) {
+    throw new Error("gamcom_territory_forces_missing");
+  }
+  var groups = {
+    "위": { start: 1, end: 20 },
+    "촉": { start: 21, end: 40 },
+    "오": { start: 41, end: 60 }
+  };
+  var keys = Object.keys(forces);
+  if (keys.length !== 3 || Object.keys(groups).some(function(group) { return keys.indexOf(group) < 0; })) {
+    throw new Error("gamcom_territory_invalid_groups");
+  }
+  var territories = [];
+  Object.keys(groups).forEach(function(group) {
+    var bounds = groups[group];
+    var rows = forces[group];
+    if (!Array.isArray(rows) || rows.length !== 20) {
+      throw new Error("gamcom_territory_group_" + group + "_" + (Array.isArray(rows) ? rows.length : 0) + "_of_20");
+    }
+    rows.forEach(function(raw, index) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        throw new Error("gamcom_territory_invalid_row:" + group + ":" + index);
+      }
+      var number = Number(raw.name);
+      samgukGamcomRequiredInteger_(number, bounds.start, bounds.end, "gamcom_territory_number");
+      var localNumber = number - bounds.start + 1;
+      var expectedId = group + "-" + ("00" + localNumber).slice(-3);
+      var id = samgukGamcomTerritoryId_(raw.castleKey, number);
+      if (id !== expectedId) throw new Error("gamcom_territory_id_mismatch:" + number);
+      if (typeof raw.isCapital !== "boolean") throw new Error("gamcom_territory_invalid_capital:" + number);
+      var owner = samgukGamcomTerritoryOwner_(raw.owner);
+      var facility = String(raw.facilityType || "").normalize("NFKC").trim();
+      if (!owner) throw new Error("gamcom_territory_invalid_owner:" + number);
+      if (["없음", "병영", "성채", "장원"].indexOf(facility) < 0) {
+        throw new Error("gamcom_territory_invalid_facility:" + number);
+      }
+      if (owner === "미점령" && (raw.isCapital || facility !== "없음")) {
+        throw new Error("gamcom_territory_invalid_unclaimed:" + number);
+      }
+      territories.push({
+        id: id,
+        number: number,
+        x: samgukGamcomRequiredInteger_(raw.x, 0, 1180, "gamcom_territory_x"),
+        y: samgukGamcomRequiredInteger_(raw.y, 0, 720, "gamcom_territory_y"),
+        owner: owner,
+        capital: raw.isCapital,
+        facility: facility,
+        level: samgukGamcomRequiredInteger_(raw.level, 0, 999, "gamcom_territory_level")
+      });
+    });
+  });
+  var normalized = samgukGamcomValidateTerritorySet_(territories, "gamcom_territory");
+  if (!Array.isArray(currentTerritories) || currentTerritories.length !== 60) {
+    throw new Error("territory_current_0_of_60");
+  }
+  normalized.forEach(function(territory, index) {
+    var current = currentTerritories[index];
+    if (!current || territory.id !== current.id || territory.number !== current.number
+        || territory.x !== current.x || territory.y !== current.y) {
+      throw new Error("gamcom_territory_immutable_mismatch:" + territory.number);
+    }
+  });
+  return normalized;
+}
+
+function samgukGamcomValidateTerritorySet_(territories, label) {
+  if (!Array.isArray(territories) || territories.length !== 60) {
+    throw new Error(label + "_" + (Array.isArray(territories) ? territories.length : 0) + "_of_60");
+  }
+  var ids = {};
+  var numbers = {};
+  var coordinates = {};
+  territories.forEach(function(territory) {
+    var coordinate = territory.x + "," + territory.y;
+    if (ids[territory.id] || numbers[territory.number] || coordinates[coordinate]) {
+      throw new Error(label + "_duplicate_identity");
+    }
+    ids[territory.id] = true;
+    numbers[territory.number] = true;
+    coordinates[coordinate] = true;
+  });
+  for (var number = 1; number <= 60; number += 1) {
+    if (!numbers[number]) throw new Error(label + "_missing_number:" + number);
+  }
+  ["위", "촉", "오"].forEach(function(owner) {
+    var capitalCount = territories.filter(function(territory) {
+      return territory.owner === owner && territory.capital;
+    }).length;
+    if (capitalCount !== 1) throw new Error(label + "_capital_count:" + owner + ":" + capitalCount);
+    var manorCount = territories.filter(function(territory) {
+      return territory.owner === owner && territory.facility === "장원";
+    }).length;
+    if (manorCount > 10) throw new Error(label + "_manor_limit:" + owner + ":" + manorCount);
+  });
+  return territories.sort(function(left, right) { return left.number - right.number; });
+}
+
+function samgukGamcomTerritoryRows_(sheet, currentTerritories, externalTerritories, collectedAt) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  var required = [
+    "territory_observation_id", "영토ID", "확인시각", "근거종류", "근거(URL/타임코드)",
+    "번호", "X", "Y", "소유국", "수도", "시설", "레벨", "특수지", "점령상태",
+    "점령률", "검증상태", "교차검증수", "증거해시", "메모", "입력시각"
+  ];
+  required.forEach(function(header) {
+    if (headers.indexOf(header) < 0) throw new Error("territory_input_missing_header:" + header);
+  });
+  var snapshotMaterial = JSON.stringify(externalTerritories.map(function(territory) {
+    return {
+      id: territory.id, number: territory.number, x: territory.x, y: territory.y,
+      owner: territory.owner, capital: territory.capital, facility: territory.facility, level: territory.level
+    };
+  }));
+  var snapshotHash = samgukGamcomSha256_(snapshotMaterial);
+  var currentById = {};
+  currentTerritories.forEach(function(territory) { currentById[territory.id] = territory; });
+  var labels = { owner: "소유국", capital: "수도", facility: "시설", level: "레벨" };
+  var rows = externalTerritories.map(function(territory) {
+    var previous = currentById[territory.id];
+    if (!previous || previous.number !== territory.number || previous.x !== territory.x || previous.y !== territory.y) {
+      throw new Error("gamcom_territory_immutable_mismatch:" + territory.number);
+    }
+    var changedFields = ["owner", "capital", "facility", "level"].filter(function(field) {
+      return previous[field] !== territory[field];
+    });
+    if (!changedFields.length) return null;
+    var transitionHash = samgukGamcomSha256_(JSON.stringify({
+      snapshotHash: snapshotHash,
+      observedAt: collectedAt.toISOString(),
+      id: territory.id,
+      previous: changedFields.reduce(function(result, field) { result[field] = previous[field]; return result; }, {}),
+      next: changedFields.reduce(function(result, field) { result[field] = territory[field]; return result; }, {})
+    }));
+    var record = {
+      territory_observation_id: "TERR-GAMCOM-" + transitionHash.slice(0, 24).toUpperCase(),
+      "영토ID": territory.id,
+      "확인시각": collectedAt,
+      "근거종류": "Gamcom",
+      "근거(URL/타임코드)": SAMGUK_GAMCOM_TERRITORY_URL,
+      "번호": territory.number,
+      "X": territory.x,
+      "Y": territory.y,
+      "소유국": territory.owner,
+      "수도": territory.capital ? "Y" : "N",
+      "시설": territory.facility,
+      "레벨": territory.level,
+      "특수지": territory.number === 27 ? "Y" : "N",
+      "점령상태": territory.owner === "미점령" ? "미점령" : "점령",
+      "점령률": "",
+      "검증상태": "기준값",
+      "교차검증수": 1,
+      "증거해시": snapshotHash,
+      "메모": "Gamcom 60칸 전체 응답에서 " + changedFields.map(function(field) { return labels[field]; }).join(", ")
+        + " 변경 감지; 원문 갱신시각 미제공",
+      "입력시각": collectedAt
+    };
+    return headers.map(function(header) {
+      return Object.prototype.hasOwnProperty.call(record, header) ? samgukGamcomSafeCell_(record[header]) : "";
+    });
+  }).filter(function(row) { return row !== null; });
+  return { rows: rows, snapshotHash: snapshotHash, observedAt: collectedAt, sourceUpdatedAt: null };
 }
 
 function samgukGamcomParseFaction_(payload, expectedNation) {
@@ -570,6 +815,57 @@ function samgukGamcomAppendRows_(sheet, rows) {
   return pending.length;
 }
 
+function samgukGamcomAppendTerritoryRows_(sheet, rows) {
+  if (rows.length === 0) return 0;
+  var width = sheet.getLastColumn();
+  var existing = sheet.getRange(2, 1, SAMGUK_GAMCOM_MAX_OBSERVATION_ROW - 1, width).getDisplayValues();
+  var existingIds = {};
+  existing.forEach(function(row) {
+    var id = String(row[0] || "").trim();
+    if (id) existingIds[id] = true;
+  });
+  var pendingIds = {};
+  var pending = rows.filter(function(row) {
+    var id = String(row[0] || "").trim();
+    if (!id || row.length !== width) throw new Error("territory_invalid_pending_row");
+    if (pendingIds[id]) throw new Error("territory_duplicate_pending_id:" + id);
+    pendingIds[id] = true;
+    return !existingIds[id];
+  });
+  if (!pending.length) return 0;
+
+  var runStart = -1;
+  var runLength = 0;
+  for (var index = 0; index < existing.length; index += 1) {
+    var empty = existing[index].every(function(value) { return String(value || "").trim() === ""; });
+    if (empty) {
+      if (runLength === 0) runStart = index + 2;
+      runLength += 1;
+      if (runLength >= pending.length) break;
+    } else {
+      runStart = -1;
+      runLength = 0;
+    }
+  }
+  if (runStart < 0 || runLength < pending.length) throw new Error("territory_input_no_contiguous_space");
+  var target = sheet.getRange(runStart, 1, pending.length, width);
+  var before = target.getDisplayValues();
+  if (before.some(function(row) {
+    return row.some(function(value) { return String(value || "").trim() !== ""; });
+  })) {
+    throw new Error("territory_target_row_conflict");
+  }
+  target.setValues(pending);
+  SpreadsheetApp.flush();
+  var written = sheet.getRange(runStart, 1, pending.length, 2).getDisplayValues();
+  written.forEach(function(row, index) {
+    if (row[0] !== String(pending[index][0]) || row[1] !== String(pending[index][1])) {
+      throw new Error("territory_write_verification_failed");
+    }
+  });
+  return pending.length;
+}
+
 function samgukGamcomHeaderMap_(headers) {
   var result = {};
   headers.forEach(function(header, index) { result[String(header || "").trim()] = index; });
@@ -582,6 +878,41 @@ function samgukGamcomNation_(value) {
   if (["촉", "촉나라", "蜀"].indexOf(raw) >= 0) return "촉나라";
   if (["오", "오나라", "吳"].indexOf(raw) >= 0) return "오나라";
   return null;
+}
+
+function samgukGamcomTerritoryOwner_(value) {
+  var raw = String(value || "").normalize("NFKC").trim();
+  if (["위", "위나라", "魏"].indexOf(raw) >= 0) return "위";
+  if (["촉", "촉나라", "蜀"].indexOf(raw) >= 0) return "촉";
+  if (["오", "오나라", "吳"].indexOf(raw) >= 0) return "오";
+  if (["미점령", "없음"].indexOf(raw) >= 0) return "미점령";
+  return null;
+}
+
+function samgukGamcomTerritoryId_(value, number) {
+  if (typeof value !== "string" || value.length < 5 || value.length > 24
+      || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new Error("gamcom_territory_invalid_id:" + number);
+  }
+  var normalized = value.normalize("NFKC").trim();
+  if (!normalized) throw new Error("gamcom_territory_invalid_id:" + number);
+  return normalized;
+}
+
+function samgukGamcomTerritoryBoolean_(value, number) {
+  if (typeof value === "boolean") return value;
+  var raw = String(value || "").normalize("NFKC").trim().toLowerCase();
+  if (["y", "yes", "true", "1", "예", "수도", "o", "○"].indexOf(raw) >= 0) return true;
+  if (["n", "no", "false", "0", "아니오", "없음", "x", "×"].indexOf(raw) >= 0) return false;
+  throw new Error("territory_current_invalid_capital:" + number);
+}
+
+function samgukGamcomRequiredInteger_(value, minimum, maximum, label) {
+  if (typeof value !== "number" || !isFinite(value) || Math.floor(value) !== value
+      || value < minimum || value > maximum) {
+    throw new Error(label + "_invalid");
+  }
+  return value;
 }
 
 function samgukGamcomText_(value, label, nullable) {

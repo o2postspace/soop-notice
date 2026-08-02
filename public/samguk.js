@@ -78,7 +78,9 @@
   }
 
   function cleanValue(value) {
-    return hasValue(value) ? value : null;
+    if (!hasValue(value)) return null;
+    if (typeof value === 'string' && /<\/?[a-z][^>]*>/i.test(value)) return null;
+    return value;
   }
 
   function pick(row, names) {
@@ -147,6 +149,17 @@
       basicAttackSampleCount: cleanValue(pick(row, ['basicAttackSampleCount', 'basic_attack_sample_count', '평타표본수'])),
       basicAttackTarget: cleanValue(pick(row, ['basicAttackTarget', 'basic_attack_target', '평타대상'])),
       combatConditions: cleanValue(pick(row, ['combatConditions', 'combat_conditions', '전투조건'])),
+      healthStat: cleanValue(pick(row, ['healthStat', 'health_stat', '체력'])),
+      activeGeneral: cleanValue(pick(row, ['activeGeneral', 'active_general', 'currentGeneral', 'current_general', '현재장수', '현재 장수'])),
+      defense: cleanValue(pick(row, ['defense', '방어력'])),
+      attackPowerBonusPct: cleanValue(pick(row, ['attackPowerBonusPct', 'attack_power_bonus_pct', '공격력증가(%)', '공격력 증가량'])),
+      damageReductionPct: cleanValue(pick(row, ['damageReductionPct', 'damage_reduction_pct', '피해감소(%)', '받는 피해 감소'])),
+      criticalChancePct: cleanValue(pick(row, ['criticalChancePct', 'critical_chance_pct', '치명타확률(%)', '치명타 확률'])),
+      criticalDamagePct: cleanValue(pick(row, ['criticalDamagePct', 'critical_damage_pct', '치명타피해(%)', '치명타 데미지'])),
+      skillCooldownReductionPct: cleanValue(pick(row, ['skillCooldownReductionPct', 'skill_cooldown_reduction_pct', '스킬쿨타임감소(%)', '절기 대기시간 감소'])),
+      skillDamageBonusPct: cleanValue(pick(row, ['skillDamageBonusPct', 'skill_damage_bonus_pct', '스킬피해증가(%)', '절기 피해량 증가량'])),
+      moveSpeedBonusPct: cleanValue(pick(row, ['moveSpeedBonusPct', 'move_speed_bonus_pct', '이동속도증가(%)', '이동속도 증가량'])),
+      horseMaxHealth: cleanValue(pick(row, ['horseMaxHealth', 'horse_max_health', '말최대체력', '말 최대체력'])),
       engravings: Array.isArray(engravings) ? engravings : [],
       equipmentObservedAt: pick(row, ['equipmentObservedAt', 'equipment_observed_at', '장비최종확인']),
       equipmentEvidence: pick(row, ['equipmentEvidence', 'equipment_evidence', '장비최근근거']),
@@ -180,6 +193,9 @@
       'level', 'horse', 'horseLevel', 'weapon', 'helmet', 'armor', 'shoes',
       'strength', 'agility', 'vitality', 'intelligence', 'powerScore',
       'maxHealth', 'attackPower', 'basicAttackDamage', 'basicAttackSampleCount', 'basicAttackTarget', 'combatConditions',
+      'healthStat', 'activeGeneral', 'defense', 'attackPowerBonusPct', 'damageReductionPct',
+      'criticalChancePct', 'criticalDamagePct', 'skillCooldownReductionPct', 'skillDamageBonusPct',
+      'moveSpeedBonusPct', 'horseMaxHealth',
       'engravings', 'equipmentObservedAt', 'equipmentEvidence', 'equipmentSourceType', 'equipmentSourceCount',
       'powerIndex', 'powerRankScore', 'powerVersion', 'powerCoverage', 'powerStatus', 'powerRankable', 'powerSourcesVerified', 'powerPopulation', 'powerVerified', 'powerRange', 'powerComponents',
       'sourceType', 'sourceCount', 'verificationStatus', 'reviewStatus', 'observedAt', 'evidence',
@@ -372,28 +388,70 @@
     const blocked = BLOCKED_COORDS.map(function (position) {
       const x = 310 + 54 * position[1];
       const y = 115 + 54 * position[0];
-      return '<g opacity="0.25"><path d="M' + (x - 9) + ' ' + (y - 9) + ' L' + (x + 9) + ' ' + (y + 9)
-        + ' M' + (x + 9) + ' ' + (y - 9) + ' L' + (x - 9) + ' ' + (y + 9)
-        + '" stroke="#777" stroke-width="4" stroke-linecap="round"/></g>';
+      return '<g class="samguk-map-blocked" aria-hidden="true"><rect x="' + (x - 25) + '" y="' + (y - 25)
+        + '" width="50" height="50" rx="3"></rect><path d="M' + (x - 8) + ' ' + (y - 8) + ' L' + (x + 8) + ' ' + (y + 8)
+        + ' M' + (x + 8) + ' ' + (y - 8) + ' L' + (x - 8) + ' ' + (y + 8) + '"></path></g>';
     }).join('');
+    const facilityLabels = { '병영': '병', '성채': '성', '장원': '장' };
     const nodes = territories.map(function (territory) {
       const x = Number.isFinite(territory.x) ? territory.x : 310 + ((territory.number - 1) % 10) * 54;
       const y = Number.isFinite(territory.y) ? territory.y : 115 + Math.floor((territory.number - 1) / 10) * 54;
       const classNames = ['samguk-map-node'];
       if (territory.number === 27) classNames.push('is-special');
-      const label = territory.capital ? '★' : territory.number;
+      if (territory.capital) classNames.push('is-capital');
+      const facilityLabel = facilityLabels[territory.facility] || '';
       const tooltip = territory.number + '번 · ' + territory.owner
         + (territory.capital ? ' · 수도' : '')
         + (territory.facility && territory.facility !== '없음' ? ' · ' + territory.facility : '')
         + (territory.number === 27 ? ' · 공격력 5% 특수 영토' : '');
       return '<g class="' + classNames.join(' ') + '" tabindex="0" role="img" aria-label="' + safeText(tooltip) + '">'
         + '<title>' + safeText(tooltip) + '</title>'
-        + '<circle cx="' + x + '" cy="' + y + '" r="19" fill="' + OWNER_COLORS[territory.owner] + '"></circle>'
-        + '<text class="' + (territory.capital ? 'samguk-map-capital' : '') + '" x="' + x + '" y="' + y + '">' + label + '</text>'
+        + '<rect x="' + (x - 25) + '" y="' + (y - 25) + '" width="50" height="50" rx="3" fill="' + OWNER_COLORS[territory.owner] + '"></rect>'
+        + '<text class="samguk-map-number" x="' + x + '" y="' + (y - 1) + '">' + territory.number + '</text>'
+        + (territory.capital ? '<text class="samguk-map-marker is-capital" x="' + (x + 17) + '" y="' + (y - 15) + '">수</text>' : '')
+        + (facilityLabel ? '<text class="samguk-map-marker is-facility" x="' + (x - 17) + '" y="' + (y + 18) + '">' + facilityLabel + '</text>' : '')
+        + (territory.number === 27 ? '<text class="samguk-map-marker is-bonus" x="' + (x + 13) + '" y="' + (y + 18) + '">+5</text>' : '')
         + '</g>';
     }).join('');
     return '<svg class="samguk-territory-svg" viewBox="275 75 625 525" role="img" aria-label="삼국지 ' + territories.length + '개 영토 현황">'
       + blocked + nodes + '</svg>';
+  }
+
+  function renderTerritoryHistory(territories) {
+    const groups = new Map();
+    territories.forEach(function (territory) {
+      const date = parseDate(territory.observedAt);
+      if (!date) return;
+      const key = date.toISOString();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(territory);
+    });
+    const entries = Array.from(groups.entries()).sort(function (left, right) {
+      return Date.parse(right[0]) - Date.parse(left[0]);
+    }).slice(0, 8);
+    const body = entries.map(function (entry) {
+      const rows = entry[1].slice().sort(function (left, right) { return left.number - right.number; });
+      const visible = rows.slice(0, 18).map(function (territory) {
+        const markers = [territory.capital ? '수도' : '', territory.facility !== '없음' ? territory.facility : '']
+          .filter(Boolean).join('·');
+        return '<span class="samguk-territory-history-chip" style="--owner-color:' + OWNER_COLORS[territory.owner] + '">'
+          + '<b>' + territory.number + '</b> ' + safeText(territory.owner)
+          + (markers ? '<small>' + safeText(markers) + '</small>' : '') + '</span>';
+      }).join('');
+      const sourceTypes = Array.from(new Set(rows.map(function (territory) {
+        return territory.sourceType || '시트';
+      }))).join(' + ');
+      return '<li class="samguk-territory-history-item"><time>' + safeText(formatTime(entry[0])) + '</time>'
+        + '<span class="samguk-territory-history-source">' + safeText(sourceTypes) + ' · ' + rows.length + '칸</span>'
+        + '<div class="samguk-territory-history-chips">' + visible
+        + (rows.length > 18 ? '<span class="samguk-territory-history-more">외 ' + (rows.length - 18) + '칸</span>' : '')
+        + '</div></li>';
+    }).join('');
+    return '<aside class="samguk-territory-history-panel"><div class="samguk-territory-history-head">'
+      + '<h3>최근 영토 갱신</h3><small>현재 스냅샷의 확인시각 기준</small></div>'
+      + (body ? '<ol class="samguk-territory-history-list">' + body + '</ol>'
+        : '<div class="samguk-territory-history-empty">확인시각이 있는 영토가 아직 없습니다.</div>')
+      + '</aside>';
   }
 
   window.renderSamgukTerritory = function renderSamgukTerritory() {
@@ -424,10 +482,10 @@
       + '<div class="samguk-territory-kpi is-wu"><span class="samguk-territory-kpi-label">吳 오</span><b class="samguk-territory-kpi-value">' + counts['오'] + '</b></div>'
       + '<div class="samguk-territory-kpi is-empty"><span class="samguk-territory-kpi-label">미점령</span><b class="samguk-territory-kpi-value">' + counts['미점령'] + '</b></div>'
       + '</div>'
-      + '<section class="samguk-map-panel"><div class="samguk-map-head"><h3 class="samguk-map-title">' + territories.length + '개 영토 현황</h3>'
+      + '<div class="samguk-territory-workspace"><section class="samguk-map-panel"><div class="samguk-map-head"><h3 class="samguk-map-title">' + territories.length + '개 영토 현황</h3>'
       + '<div class="samguk-map-legend"><span><i style="background:#4169a8"></i>위</span><span><i style="background:#3f8b58"></i>촉</span>'
-      + '<span><i style="background:#b94d4d"></i>오</span><span><i style="background:#a7abb3"></i>미점령</span><span>★ 수도</span><span>금색 테두리 27번 특수지</span></div></div>'
-      + renderTerritorySvg(territories) + '</section>'
+      + '<span><i style="background:#b94d4d"></i>오</span><span><i style="background:#a7abb3"></i>미점령</span><span>수 수도 · 병/성/장 시설</span><span>금색 테두리 27번 특수지</span></div></div>'
+      + renderTerritorySvg(territories) + '</section>' + renderTerritoryHistory(territories) + '</div>'
       + '<section class="samguk-territory-table-panel"><div class="samguk-ranking-header">점령 영토 ' + occupied.length + '개</div>'
       + '<div class="samguk-territory-table-wrap"><table class="samguk-territory-table"><thead><tr><th>영토</th><th>소유국</th><th>수도</th><th>시설</th><th>레벨</th><th>검증 기준</th><th>기준 시각</th></tr></thead><tbody>'
       + (rows || '<tr><td colspan="7">아직 점령된 영토가 없습니다.</td></tr>')

@@ -11,7 +11,7 @@
  * 백업_YYYYMMDD_HHmmss_탭이름으로 보존하고 공통 열을 새 탭으로 이관합니다.
  */
 
-var SAMGUK_SETUP_VERSION = "2026.08.03.3";
+var SAMGUK_SETUP_VERSION = "2026.08.03.5";
 var SAMGUK_SETUP_MAX_INPUT_ROW = 5001;
 var SAMGUK_SETUP_PROTECTION_PREFIX = "[SOOPNOTICE_SETUP]";
 var SAMGUK_SETUP_SHEET_ORDER = [
@@ -40,7 +40,9 @@ var SAMGUK_SETUP_HEADERS = {
     "레벨", "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
     "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
     "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모", "최대체력",
-    "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각", "공격력"
+    "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각", "공격력",
+    "체력", "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
+    "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력"
   ],
   "현재현황": [
     "player_id", "국가", "세력/길드", "닉네임", "SOOP_ID", "장수/직업", "레벨", "말",
@@ -48,7 +50,9 @@ var SAMGUK_SETUP_HEADERS = {
     "무력", "기민", "기력", "지모", "무력점수", "최종확인", "최근근거", "출처종류",
     "교차검증수", "검증상태", "신선도", "기량합계", "랭킹점수", "공동순위",
     "정렬순번", "선택원본행", "최대체력", "평타피해대표값", "평타표본수",
-    "평타대상", "전투조건", "공격력"
+    "평타대상", "전투조건", "공격력", "체력", "현재장수", "방어력",
+    "공격력증가(%)", "피해감소(%)", "치명타확률(%)", "치명타피해(%)",
+    "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력"
   ],
   "장비현황": [
     "닉네임", "SOOP_ID", "무기각인1", "무기각인2", "무기각인3",
@@ -91,14 +95,14 @@ var SAMGUK_SETUP_SPECS = {
   "기준정보": { rows: 20, freezeRows: 1, freezeColumns: 0, tabColor: "#8497B0" },
   "참가자": { rows: 91, freezeRows: 1, freezeColumns: 1, filter: "A1:J91", tabColor: "#70AD47" },
   "방송모니터링": { rows: 91, freezeRows: 1, freezeColumns: 1, filter: "A1:P91", tabColor: "#00B0F0" },
-  "관측입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:AE5001", tabColor: "#FFC000" },
-  "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:AJ91", tabColor: "#4472C4" },
+  "관측입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:AP5001", tabColor: "#FFC000" },
+  "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:AU91", tabColor: "#4472C4" },
   "장비현황": { rows: 91, freezeRows: 1, freezeColumns: 2, filter: "A1:R91", tabColor: "#BF9000" },
   "무력랭킹": { rows: 91, freezeRows: 1, freezeColumns: 0, filter: "A1:T91", tabColor: "#C00000" },
   "외부참고": { rows: 91, freezeRows: 1, freezeColumns: 3, filter: "A1:X91", tabColor: "#5B9BD5" },
   "영토입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:T5001", tabColor: "#ED7D31" },
   "영토현황": { rows: 61, freezeRows: 1, freezeColumns: 4, filter: "A1:Q61", tabColor: "#548235" },
-  "OCR설정": { rows: 20, freezeRows: 1, freezeColumns: 0, filter: "A1:K20", tabColor: "#7030A0" },
+  "OCR설정": { rows: 30, freezeRows: 1, freezeColumns: 0, filter: "A1:K30", tabColor: "#7030A0" },
   "변경로그": { rows: 501, freezeRows: 1, freezeColumns: 0, filter: "A1:K501", tabColor: "#A5A5A5" }
 };
 
@@ -413,7 +417,7 @@ function samgukSeedReference_(spreadsheet, sheet) {
     sheet.getRange(1, column, values.length, 1).setValues(values);
   });
   var settings = [
-    ["레벨 임시 상한", 10000], ["강화 임시 상한", 999], ["능력치 임시 상한", 1000000],
+    ["레벨 상한", 10000], ["말강화 상한", 80], ["장비강화 상한", 15], ["능력치 상한", 1000000],
     ["OCR 신뢰도 상한", 100], ["현황 최신 기준(시간)", 1], ["재확인 기준(시간)", 6]
   ];
   sheet.getRange(2, 13, settings.length, 2).setValues(settings);
@@ -429,12 +433,18 @@ function samgukSeedOcr_(sheet) {
     ["helmet", "두갑강화"], ["armor", "흉갑강화"], ["shoes", "각갑강화"],
     ["strength", "무력"], ["agility", "기민"], ["vitality", "기력"],
     ["intelligence", "지모"], ["powerScore", "무력점수"], ["maxHealth", "최대체력"],
-    ["basicAttackDamage", "평타피해대표값"]
+    ["basicAttackDamage", "평타피해대표값"], ["attackPower", "공격력"],
+    ["healthStat", "체력"], ["activeGeneral", "현재장수"], ["defense", "방어력"],
+    ["attackPowerBonusPct", "공격력증가(%)"], ["damageReductionPct", "피해감소(%)"],
+    ["criticalChancePct", "치명타확률(%)"], ["criticalDamagePct", "치명타피해(%)"],
+    ["skillCooldownReductionPct", "스킬쿨타임감소(%)"],
+    ["skillDamageBonusPct", "스킬피해증가(%)"],
+    ["moveSpeedBonusPct", "이동속도증가(%)"], ["horseMaxHealth", "말최대체력"]
   ];
   var rows = fields.map(function(field) {
     return ["default", field[1], "", "", "", "", "1920x1080", 1, "N", "", "OCR key: " + field[0]];
   });
-  samgukSeedRowsByCompositeKey_(sheet, rows, [1, 2], 20);
+  samgukSeedRowsByCompositeKey_(sheet, rows, [1, 2], 30);
 }
 
 function samgukSeedOperationalSheets_(sheets) {
@@ -465,8 +475,16 @@ function samgukSeedOperationalSheets_(sheets) {
       samgukBlankIfNull_(member.agility), samgukBlankIfNull_(member.vitality),
       samgukBlankIfNull_(member.intelligence), samgukBlankIfNull_(member.powerScore),
       1, "기준값", "", "INIT-" + seedDate, "초기 1회 수집", "",
-      "공개 현황의 설치 기준 스냅샷.", "", "", "", "", "",
-      samgukDateOrBlank_(member.observedAt), samgukBlankIfNull_(member.attackPower)
+      "공개 현황의 설치 기준 스냅샷.", samgukBlankIfNull_(member.maxHealth),
+      samgukBlankIfNull_(member.basicAttackDamage), samgukBlankIfNull_(member.basicAttackSampleCount),
+      samgukBlankIfNull_(member.basicAttackTarget), samgukBlankIfNull_(member.combatConditions),
+      samgukDateOrBlank_(member.observedAt), samgukBlankIfNull_(member.attackPower),
+      samgukBlankIfNull_(member.healthStat), samgukBlankIfNull_(member.activeGeneral),
+      samgukBlankIfNull_(member.defense), samgukBlankIfNull_(member.attackPowerBonusPct),
+      samgukBlankIfNull_(member.damageReductionPct), samgukBlankIfNull_(member.criticalChancePct),
+      samgukBlankIfNull_(member.criticalDamagePct), samgukBlankIfNull_(member.skillCooldownReductionPct),
+      samgukBlankIfNull_(member.skillDamageBonusPct), samgukBlankIfNull_(member.moveSpeedBonusPct),
+      samgukBlankIfNull_(member.horseMaxHealth)
     ]);
     equipmentRows.push([
       member.name, member.soopId, "", "", "", "", "", "", "", "", "", "", "", "",
@@ -609,15 +627,17 @@ function samgukInstallCurrentFormulas_(sheet) {
     7: "F", 8: "G", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
     15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 20: "C", 21: "E",
     22: "D", 23: "R", 24: "S", 31: "Y", 32: "Z", 33: "AA", 34: "AB", 35: "AC",
-    36: "AE"
+    36: "AE", 37: "AF", 38: "AG", 39: "AH", 40: "AI", 41: "AJ",
+    42: "AK", 43: "AL", 44: "AM", 45: "AN", 46: "AO", 47: "AP"
   };
   var monotonicColumns = {
     7: "F", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
-    15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 31: "Y", 36: "AE"
+    15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 31: "Y", 32: "Z",
+    33: "AA", 36: "AE"
   };
   var rows = [];
   for (var row = 2; row <= 91; row += 1) {
-    var values = new Array(36).fill("");
+    var values = new Array(47).fill("");
     values[0] = "=IF(참가자!A" + row + "=\"\",\"\",참가자!A" + row + ")";
     for (var column = 2; column <= 6; column += 1) {
       var letter = String.fromCharCode(64 + column);
@@ -638,7 +658,7 @@ function samgukInstallCurrentFormulas_(sheet) {
     values[28] = "=IF(OR(AA" + row + "=\"\",AA" + row + "<=0),\"\",RANK.EQ(AA" + row + ",$AA$2:$AA$91,0)+COUNTIF($AA$2:AA" + row + ",AA" + row + ")-1)";
     rows.push(values);
   }
-  sheet.getRange(2, 1, 90, 36).setValues(rows);
+  sheet.getRange(2, 1, 90, 47).setValues(rows);
 }
 
 function samgukInstallRankingFormulas_(sheet) {
@@ -698,9 +718,15 @@ function samgukConfigureAllSheets_(sheets) {
 
   sheets["관측입력"].getRange("C2:C5001").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["관측입력"].getRange("AD2:AD5001").setNumberFormat("yyyy-mm-dd hh:mm:ss");
+  sheets["관측입력"].getRange("AF2:AF5001").setNumberFormat("0.##");
+  sheets["관측입력"].getRange("AH2:AH5001").setNumberFormat("0.##");
+  sheets["관측입력"].getRange("AI2:AO5001").setNumberFormat("0.##");
   sheets["영토입력"].getRange("C2:C5001").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["영토입력"].getRange("T2:T5001").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["현재현황"].getRange("T2:T91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
+  sheets["현재현황"].getRange("AK2:AK91").setNumberFormat("0.##");
+  sheets["현재현황"].getRange("AM2:AM91").setNumberFormat("0.##");
+  sheets["현재현황"].getRange("AN2:AT91").setNumberFormat("0.##");
   sheets["장비현황"].getRange("O2:O91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["무력랭킹"].getRange("P2:P91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["외부참고"].getRange("S2:U91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
@@ -737,6 +763,10 @@ function samgukApplyValidations_(sheets) {
   samgukNumberValidation_(sheets["관측입력"].getRange("Y2:Z5001"), 1000000);
   samgukNumberValidation_(sheets["관측입력"].getRange("AA2:AA5001"), 10000);
   samgukNumberValidation_(sheets["관측입력"].getRange("AE2:AE5001"), 1000000);
+  samgukNumberValidation_(sheets["관측입력"].getRange("AF2:AF5001"), 1000000);
+  samgukNumberValidation_(sheets["관측입력"].getRange("AH2:AH5001"), 1000000);
+  samgukNumberValidation_(sheets["관측입력"].getRange("AI2:AO5001"), 1000);
+  samgukNumberValidation_(sheets["관측입력"].getRange("AP2:AP5001"), 1000000);
 
   samgukListValidation_(sheets["영토입력"].getRange("B2:B5001"), sheets["영토현황"].getRange("A2:A61"));
   samgukListValidation_(sheets["영토입력"].getRange("D2:D5001"), reference.getRange("E2:E16"));
@@ -751,8 +781,8 @@ function samgukApplyValidations_(sheets) {
   samgukNumberValidation_(sheets["영토입력"].getRange("L2:L5001"), 999);
   samgukNumberValidation_(sheets["영토입력"].getRange("O2:O5001"), 100);
   samgukNumberValidation_(sheets["영토입력"].getRange("Q2:Q5001"), 10);
-  samgukListValidation_(sheets["OCR설정"].getRange("I2:I20"), reference.getRange("R2:R3"));
-  samgukNumberValidation_(sheets["OCR설정"].getRange("C2:F20"), 10000);
+  samgukListValidation_(sheets["OCR설정"].getRange("I2:I30"), reference.getRange("R2:R3"));
+  samgukNumberValidation_(sheets["OCR설정"].getRange("C2:F30"), 10000);
 }
 
 function samgukListValidation_(targetRange, sourceRange) {
@@ -783,10 +813,10 @@ function samgukApplyAllProtections_(sheets) {
 
   samgukProtectInputSheet_(sheets["참가자"], ["B2:J91"]);
   samgukProtectInputSheet_(sheets["방송모니터링"], ["G2:P91"]);
-  samgukProtectInputSheet_(sheets["관측입력"], ["B2:Q5001", "X2:AC5001", "AE2:AE5001"]);
+  samgukProtectInputSheet_(sheets["관측입력"], ["B2:Q5001", "X2:AC5001", "AE2:AP5001"]);
   samgukProtectInputSheet_(sheets["장비현황"], ["C2:R91"]);
   samgukProtectInputSheet_(sheets["영토입력"], ["B2:O5001", "S2:S5001"]);
-  samgukProtectInputSheet_(sheets["OCR설정"], ["C2:K20"]);
+  samgukProtectInputSheet_(sheets["OCR설정"], ["C2:K30"]);
 }
 
 function samgukProtectInputSheet_(sheet, editableA1Ranges) {

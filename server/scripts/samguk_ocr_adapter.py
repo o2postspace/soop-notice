@@ -44,12 +44,22 @@ MAX_PIXELS = 4096 * 2160
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PROFILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 INTEGER_RE = re.compile(r"^(\d{1,3}(?:,\d{3})*|\d{1,9})(?:\([+-]?\d+(?:\.\d+)?\))?$")
+DECIMAL_RE = re.compile(r"^\+?(\d{1,3}(?:,\d{3})*|\d{1,9})(?:\.(\d{1,4}))?$")
+PERCENT_RE = re.compile(r"^([+-]?\d{1,6}(?:\.\d{1,4})?)%$")
 ENHANCEMENT_RE = re.compile(r"(?:\(\s*)?\+\s*(\d{1,2})(?:\s*\))?|(?<!\d)(\d{1,2})\s*강")
 ENHANCEMENT_PAREN_RE = re.compile(r"\((\d{1,2})\)$")
 HORSE_STAGE_RE = re.compile(r"(?<!\d)(\d{1,2})단계")
 HEALTH_RATIO_RE = re.compile(
     r"^\(?\s*(\d{1,3}(?:,\d{3})*|\d{1,7})\s*/\s*"
     r"(\d{1,3}(?:,\d{3})*|\d{1,7})\s*\)?$",
+)
+HORSE_HEALTH_RATIO_RE = re.compile(
+    r"^\(?\s*(\d{1,3}(?:,\d{3})*|\d{1,7})\s*/\s*"
+    r"(\d{1,3}(?:,\d{3})*|\d{1,7})\s*HP\s*\)?$",
+    re.IGNORECASE,
+)
+COMBINED_GEAR_TITLE_RE = re.compile(
+    r"^(무기|두갑|두건|투구|흉갑|갑옷|각갑|신발)\(\+(\d{1,2})\)$",
 )
 
 MODEL_NAMES = (
@@ -78,6 +88,41 @@ GEAR_FIELDS = {
     "각갑": "shoes",
     "신발": "shoes",
 }
+INFO_LABEL_FIELDS = {
+    "현재영군": "activeGeneral",
+    "공격력": "attackPower",
+    "방어력": "defense",
+    "공격력증가량": "attackPowerBonusPct",
+    "받는피해감소": "damageReductionPct",
+    "치명타확률": "criticalChancePct",
+    "치명타대미지": "criticalDamagePct",
+    "치명타데미지": "criticalDamagePct",
+    "크리티컬확률": "criticalChancePct",
+    "크리티컬대미지": "criticalDamagePct",
+    "크리티컬데미지": "criticalDamagePct",
+    "절기대기시간감소": "skillCooldownReductionPct",
+    "쿨타임감소율": "skillCooldownReductionPct",
+    "절기피해량증가량": "skillDamageBonusPct",
+    "절기피해량증가": "skillDamageBonusPct",
+    "이동속도증가량": "moveSpeedBonusPct",
+    "이동속도증가율": "moveSpeedBonusPct",
+}
+INFO_FIELD_ROWS = (
+    ("healthStat", 0, "number"),
+    ("activeGeneral", 1, "text"),
+    ("attackPower", 3, "number"),
+    ("defense", 4, "number"),
+    ("attackPowerBonusPct", 5, "percent"),
+    ("damageReductionPct", 6, "percent"),
+    ("criticalChancePct", 7, "percent"),
+    ("criticalDamagePct", 8, "percent"),
+    ("skillCooldownReductionPct", 9, "percent"),
+    ("skillDamageBonusPct", 10, "percent"),
+    ("moveSpeedBonusPct", 11, "percent"),
+)
+INFO_FIELD_ROW_INDEX = {field: row for field, row, _kind in INFO_FIELD_ROWS}
+FLEXIBLE_INFO_FIELDS = ("skillDamageBonusPct", "moveSpeedBonusPct")
+RED_HARE_HEALTH_LEVELS = {1700: 0, 1900: 1}
 ENHANCEMENT_MARKERS = (
     "장비강화", "강화성공확률", "단계하락확률", "강화비용", "강화하기",
 )
@@ -365,6 +410,270 @@ def _numeric_value(text: str) -> Optional[int]:
     return int(match.group(1).replace(",", "")) if match else None
 
 
+def _decimal_value(text: str) -> Optional[int | float]:
+    match = DECIMAL_RE.fullmatch(compact_text(text))
+    if not match:
+        return None
+    integer_part = match.group(1).replace(",", "")
+    value = float(f"{integer_part}.{match.group(2)}") if match.group(2) else int(integer_part)
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def _percentage_value(text: str) -> Optional[int | float]:
+    match = PERCENT_RE.fullmatch(compact_text(text))
+    if not match:
+        return None
+    value = float(match.group(1))
+    return int(value) if value.is_integer() else value
+
+
+def _active_general_value(text: str) -> Optional[str]:
+    value = " ".join(unicodedata.normalize("NFKC", text).split())
+    parenthesized = re.search(r"\(([^()]{1,40})\)", value)
+    if parenthesized:
+        # 직업/칭호 부분의 작은 글자는 오독이 잦지만 괄호 안 장수명은
+        # 선명하다. 오독된 접두어를 원장에 저장하지 않는다.
+        value = parenthesized.group(1).strip()
+    compact = compact_text(value)
+    if not value or len(value) > 80 or compact in INFO_LABEL_FIELDS:
+        return None
+    if _decimal_value(compact) is not None or _percentage_value(compact) is not None:
+        return None
+    if not re.search(r"[A-Za-z가-힣]", value):
+        return None
+    return value
+
+
+def _active_general_consensus(
+    image: Any,
+    token: Token,
+    fallback_value: str,
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> tuple[str, float]:
+    """괄호 안 장수명만 잘라 3배율이 합의할 때 raw confidence를 교체한다."""
+    source = " ".join(unicodedata.normalize("NFKC", token.text).split())
+    parenthesized = re.search(r"\(([^()]{1,40})\)", source)
+    if not parenthesized or not source:
+        return fallback_value, token.confidence
+
+    height, width = image.shape[:2]
+    # detector bbox 안의 문자 폭이 대체로 균일하므로 OCR 문자열에서 괄호가
+    # 시작하는 비율로 접두어를 버린다. 고정 화면 ROI는 사용하지 않는다.
+    start_ratio = parenthesized.start() / len(source)
+    x0 = max(0, int(math.floor(token.x0 + token.width * start_ratio)))
+    x1 = min(width, int(math.ceil(token.x1)))
+    y0 = max(0, int(math.floor(token.y0)))
+    y1 = min(height, int(math.ceil(token.y1)))
+    if x1 <= x0 or y1 <= y0:
+        return fallback_value, token.confidence
+
+    crop = image[y0:y1, x0:x1]
+    votes: list[tuple[str, float]] = []
+    for scale in (1, 2, 4):
+        text, score = line_reader(crop, scale)
+        value = _active_general_value(text)
+        if value is None or not 0 <= score <= 1:
+            return fallback_value, token.confidence
+        value = value.strip("() ")
+        if not re.fullmatch(r"[A-Za-z가-힣·]{1,20}", value):
+            return fallback_value, token.confidence
+        votes.append((value, score))
+    names = {value for value, _score in votes}
+    if len(votes) != 3 or len(names) != 1:
+        return fallback_value, token.confidence
+    value = votes[0][0]
+    return value, max(token.confidence, min(score for _value, score in votes))
+
+
+def _information_panel(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> tuple[bool, list[dict[str, Any]]]:
+    """구조가 고정된 캐릭터 정보창의 우측 값 열을 읽는다.
+
+    공격력/방어력처럼 작은 회색 라벨은 OCR이 자주 깨진다. 그래서 ``소속``과
+    바로 아래 ``체력`` 행으로 간격을 정하고, 최소 두 개의 정확한 보조 라벨과
+    네 개의 백분율 값이 같은 열에 있을 때만 행 기반 추출을 허용한다.
+    """
+    candidates: list[tuple[tuple[int, int, float], list[dict[str, Any]]]] = []
+    affiliations = [token for token, text in normalized if text == "소속"]
+    health_labels = [token for token, text in normalized if text == "체력"]
+
+    for affiliation in affiliations:
+        for health_label in health_labels:
+            step = health_label.cy - affiliation.cy
+            label_height = max(affiliation.height, health_label.height)
+            # 저해상도 frame에서는 두 detector bbox가 조금 겹쳐 중심 간격이
+            # bbox 높이보다 작다. 이후 라벨/숫자열 검증이 있으므로 이를 허용한다.
+            if not (0.80 * label_height <= step <= 4.0 * label_height):
+                continue
+            if abs(health_label.cx - affiliation.cx) > 2.0 * label_height:
+                continue
+
+            row_tolerance = max(0.46 * step, 0.60 * health_label.height)
+            health_values: list[tuple[float, Token, int | float]] = []
+            for token, _text in normalized:
+                value = _decimal_value(token.text)
+                if value is None or token is health_label:
+                    continue
+                if abs(token.cy - health_label.cy) > row_tolerance:
+                    continue
+                if token.x0 < health_label.x1 + step:
+                    continue
+                if token.cx - health_label.cx > 18.0 * step:
+                    continue
+                # 정보창 값은 우측 정렬이다. 같은 행에서는 가장 오른쪽 값을
+                # 우선하되 confidence도 작은 tie-break로만 사용한다.
+                health_values.append((token.x1 + token.confidence * 0.01, token, value))
+            if not health_values:
+                continue
+            _, health_value_token, health_value = max(health_values, key=lambda item: item[0])
+            value_right = health_value_token.x1
+            value_x_min = health_label.x1 + step
+            structural_confidence = min(affiliation.confidence, health_label.confidence)
+
+            anchor_fields: set[str] = set()
+            anchor_steps: list[float] = []
+            flexible_labels: dict[str, list[Token]] = {
+                field: [] for field in FLEXIBLE_INFO_FIELDS
+            }
+            for token, text in normalized:
+                field = INFO_LABEL_FIELDS.get(text)
+                if field is None or token.cx >= health_value_token.x0 - 0.25 * step:
+                    continue
+                if field in flexible_labels:
+                    # 구버전 정보창은 마지막 두 행(이동속도/절기피해)의 순서가
+                    # 반대다. 고정 행 anchor들의 간격을 구한 뒤 배치한다.
+                    delta_y = token.cy - health_label.cy
+                    if 7.5 * step <= delta_y <= 14.5 * step:
+                        flexible_labels[field].append(token)
+                    continue
+                expected_row = INFO_FIELD_ROW_INDEX[field]
+                if expected_row < 1:
+                    continue
+                observed_step = (token.cy - health_label.cy) / expected_row
+                if not (0.75 * step <= observed_step <= 1.35 * step):
+                    continue
+                anchor_fields.add(field)
+                anchor_steps.append(observed_step)
+            possible_anchor_count = len(anchor_fields) + sum(bool(items) for items in flexible_labels.values())
+            if possible_anchor_count < 2:
+                continue
+
+            # 첫 두 행보다 아래 통계 행의 간격이 2~3px 더 넓은 화면이 있다.
+            # 정확히 읽힌 라벨들의 기대 행 번호로 전체 기울기를 다시 잡는다.
+            if anchor_steps:
+                anchor_steps.sort()
+                middle = len(anchor_steps) // 2
+                refined_step = anchor_steps[middle] if len(anchor_steps) % 2 else (
+                    anchor_steps[middle - 1] + anchor_steps[middle]
+                ) / 2
+            else:
+                refined_step = step
+            row_tolerance = min(
+                0.48 * refined_step,
+                max(0.40 * refined_step, 0.55 * health_label.height),
+            )
+
+            field_rows = dict(INFO_FIELD_ROW_INDEX)
+            flexible_positions: dict[str, tuple[Token, float, float]] = {}
+            for field, items in flexible_labels.items():
+                if not items:
+                    continue
+                token = min(
+                    items,
+                    key=lambda item: min(
+                        abs(item.cy - (health_label.cy + row * refined_step)) for row in (10, 11)
+                    ),
+                )
+                distance_10 = abs(token.cy - (health_label.cy + 10 * refined_step))
+                distance_11 = abs(token.cy - (health_label.cy + 11 * refined_step))
+                if min(distance_10, distance_11) <= 0.75 * refined_step:
+                    flexible_positions[field] = (token, distance_10, distance_11)
+
+            skill_position = flexible_positions.get("skillDamageBonusPct")
+            move_position = flexible_positions.get("moveSpeedBonusPct")
+            if skill_position and move_position:
+                default_cost = skill_position[1] + move_position[2]
+                swapped_cost = skill_position[2] + move_position[1]
+                if swapped_cost < default_cost:
+                    field_rows["skillDamageBonusPct"] = 11
+                    field_rows["moveSpeedBonusPct"] = 10
+                anchor_fields.update(FLEXIBLE_INFO_FIELDS)
+            elif skill_position:
+                skill_row = 10 if skill_position[1] <= skill_position[2] else 11
+                field_rows["skillDamageBonusPct"] = skill_row
+                field_rows["moveSpeedBonusPct"] = 21 - skill_row
+                anchor_fields.add("skillDamageBonusPct")
+            elif move_position:
+                move_row = 10 if move_position[1] <= move_position[2] else 11
+                field_rows["moveSpeedBonusPct"] = move_row
+                field_rows["skillDamageBonusPct"] = 21 - move_row
+                anchor_fields.add("moveSpeedBonusPct")
+
+            values: dict[str, tuple[Any, float]] = {
+                "healthStat": (health_value, health_value_token.confidence),
+            }
+            for field, row, kind in INFO_FIELD_ROWS[1:]:
+                row = field_rows[field]
+                target_y = health_label.cy + row * refined_step
+                row_candidates: list[tuple[float, Token, Any]] = []
+                for token, _text in normalized:
+                    if token.x0 < value_x_min:
+                        continue
+                    y_distance = abs(token.cy - target_y)
+                    if y_distance > row_tolerance:
+                        continue
+                    right_distance = abs(token.x1 - value_right)
+                    if right_distance > 3.0 * refined_step:
+                        continue
+                    if kind == "number":
+                        parsed = _decimal_value(token.text)
+                    elif kind == "percent":
+                        parsed = _percentage_value(token.text)
+                    else:
+                        parsed = _active_general_value(token.text)
+                    if parsed is None:
+                        continue
+                    distance = y_distance + right_distance * 0.20 - token.confidence * 0.01
+                    row_candidates.append((distance, token, parsed))
+                if row_candidates:
+                    _, value_token, value = min(row_candidates, key=lambda item: item[0])
+                    value_confidence = value_token.confidence
+                    if field == "activeGeneral":
+                        value, value_confidence = _active_general_consensus(
+                            image, value_token, value, line_reader,
+                        )
+                    values[field] = (value, value_confidence)
+
+            percent_count = sum(
+                field in values for field, _row, kind in INFO_FIELD_ROWS if kind == "percent"
+            )
+            numeric_count = sum(
+                field in values for field, _row, kind in INFO_FIELD_ROWS if kind in ("number", "percent")
+            )
+            if len(anchor_fields) < 2 or percent_count < 4 or numeric_count < 6:
+                continue
+
+            results = [
+                {
+                    "field": field,
+                    "value": values[field][0],
+                    "confidence": min(structural_confidence, values[field][1]),
+                }
+                for field, _row, _kind in INFO_FIELD_ROWS
+                if field in values
+            ]
+            score = (len(results), len(anchor_fields), structural_confidence)
+            candidates.append((score, results))
+
+    if not candidates:
+        return False, []
+    _, results = max(candidates, key=lambda item: item[0])
+    return True, results
+
+
 def _neighbor_value(label: Token, tokens: Sequence[Token]) -> Optional[tuple[int, float]]:
     candidates = []
     for token in tokens:
@@ -417,7 +726,7 @@ def _title_consensus(
     for scale in (1, 2, 4):
         text, score = line_reader(crop, scale)
         value = _enhancement_value(text)
-        if value is not None and 0 <= value <= 99 and 0 <= score <= 1:
+        if value is not None and 0 <= value <= 15 and 0 <= score <= 1:
             votes.setdefault(value, []).append(score)
     if not votes:
         return None
@@ -448,7 +757,7 @@ def _horse_stage(
         match = HORSE_STAGE_RE.search(text)
         if match:
             value = int(match.group(1))
-            if 0 <= value <= 99:
+            if 0 <= value <= 80:
                 votes.setdefault(value, []).append(token.confidence)
     if not votes:
         return True, None
@@ -498,6 +807,64 @@ def _player_max_health(
     return maximum, confidence
 
 
+def _horse_max_health(
+    image: Any,
+    tokens: Sequence[Token],
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> Optional[tuple[int, float]]:
+    """우측 하단의 ``(현재/최대HP)`` 군마 체력만 고른다."""
+    height, width = image.shape[:2]
+    candidates = []
+    for token in tokens:
+        text = re.sub(r"\s+", "", unicodedata.normalize("NFKC", token.text))
+        match = HORSE_HEALTH_RATIO_RE.fullmatch(text)
+        if not match:
+            continue
+        current = int(match.group(1).replace(",", ""))
+        maximum = int(match.group(2).replace(",", ""))
+        if maximum < 1 or maximum > 1_000_000 or current < 0 or current > maximum:
+            continue
+        normalized_x = token.cx / width
+        normalized_y = token.cy / height
+        normalized_height = token.height / height
+        if not (0.70 <= normalized_x <= 0.99 and 0.72 <= normalized_y <= 0.99):
+            continue
+        if not (0.008 <= normalized_height <= 0.08):
+            continue
+        confidence = token.confidence
+        x0 = max(0, int(math.floor(token.x0)))
+        x1 = min(width, int(math.ceil(token.x1)))
+        y0 = max(0, int(math.floor(token.y0)))
+        y1 = min(height, int(math.ceil(token.y1)))
+        if x1 > x0 and y1 > y0:
+            crop = image[y0:y1, x0:x1]
+            votes: list[tuple[int, int, float]] = []
+            for scale in (1, 2, 4):
+                recrop_text, score = line_reader(crop, scale)
+                recrop_match = HORSE_HEALTH_RATIO_RE.fullmatch(
+                    re.sub(r"\s+", "", unicodedata.normalize("NFKC", recrop_text)),
+                )
+                if not recrop_match or not 0 <= score <= 1:
+                    votes = []
+                    break
+                recrop_current = int(recrop_match.group(1).replace(",", ""))
+                recrop_maximum = int(recrop_match.group(2).replace(",", ""))
+                if recrop_maximum < 1 or recrop_current < 0 or recrop_current > recrop_maximum:
+                    votes = []
+                    break
+                votes.append((recrop_current, recrop_maximum, score))
+            ratios = {(current_value, maximum_value) for current_value, maximum_value, _score in votes}
+            if len(votes) == 3 and len(ratios) == 1 and votes[0][1] == maximum:
+                # 다른 최대체력으로의 외삽은 금지하고, 세 raw score 중 최저값만 쓴다.
+                confidence = max(confidence, min(score for _current, _maximum, score in votes))
+        distance = abs(normalized_x - 0.91) + abs(normalized_y - 0.93)
+        candidates.append((distance, -confidence, maximum, confidence))
+    if not candidates:
+        return None
+    _, _, maximum, confidence = min(candidates)
+    return maximum, confidence
+
+
 def parse_panel(
     image: Any,
     tokens: Sequence[Token],
@@ -505,11 +872,12 @@ def parse_panel(
     profile: str = DEFAULT_PROFILE,
 ) -> tuple[bool, list[dict[str, Any]]]:
     normalized = [(token, compact_text(token.text)) for token in tokens if token.confidence >= 0.30]
+    info_panel, info_results = _information_panel(image, normalized, line_reader)
     stat_labels = [(token, STAT_FIELDS[text]) for token, text in normalized if text in STAT_FIELDS]
     quantity_titles = [token for token, text in normalized if text == "기량"]
     stat_panel = bool(quantity_titles) and len({field for _, field in stat_labels}) >= 3
 
-    results: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = list(info_results)
     if stat_panel:
         for label, field in stat_labels:
             match = _neighbor_value(label, tokens)
@@ -518,6 +886,15 @@ def parse_panel(
                 results.append({"field": field, "value": value, "confidence": confidence})
         # title + exact label/value 구조는 panel 판별에만 사용한다.
         # 숫자 confidence는 잘못 읽은 값도 반복될 수 있어 절대 상향하지 않는다.
+
+    for title, text in normalized:
+        combined = COMBINED_GEAR_TITLE_RE.fullmatch(text)
+        if not combined:
+            continue
+        field = GEAR_FIELDS[combined.group(1)]
+        value = int(combined.group(2))
+        if 0 <= value <= 15 and field not in {item["field"] for item in results}:
+            results.append({"field": field, "value": value, "confidence": title.confidence})
 
     gear_categories = [(token, GEAR_FIELDS[text]) for token, text in normalized if text in GEAR_FIELDS]
     for category, field in gear_categories:
@@ -539,20 +916,35 @@ def parse_panel(
             results.append({"field": "maxHealth", "value": value, "confidence": confidence})
             hud_visible = True
 
+        horse_health = _horse_max_health(image, tokens, line_reader)
+        if horse_health is not None:
+            value, confidence = horse_health
+            results.append({"field": "horseMaxHealth", "value": value, "confidence": confidence})
+            hud_visible = True
+            horse_level = RED_HARE_HEALTH_LEVELS.get(value)
+            if horse_level is not None:
+                results.append({"field": "horse", "value": "적토마", "confidence": confidence})
+                if "horseLevel" not in {item["field"] for item in results}:
+                    results.append({"field": "horseLevel", "value": horse_level, "confidence": confidence})
+
     texts = {text for _, text in normalized}
     marker_count = sum(any(marker in text for text in texts) for marker in ENHANCEMENT_MARKERS)
     has_stage = any("단계" in text and ("→" in text or "->" in text) for text in texts)
     # 작은 단계 제목이 detector에서 빠져도 성공/하락/button/비용의 네 구조가
     # 동시에 있으면 강화 panel로 볼 수 있다. 장비 종류가 없으면 값은 비운다.
     enhancement_panel = marker_count >= 3 and (has_stage or marker_count >= 4)
-    panel_visible = stat_panel or enhancement_panel or horse_panel or hud_visible or bool(results)
+    panel_visible = info_panel or stat_panel or enhancement_panel or horse_panel or hud_visible or bool(results)
     order = {name: index for index, name in enumerate(
         (
-            "maxHealth", "horseLevel", "weapon", "helmet", "armor", "shoes",
+            "maxHealth", "healthStat", "activeGeneral", "attackPower", "defense",
+            "attackPowerBonusPct", "damageReductionPct", "criticalChancePct",
+            "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
+            "moveSpeedBonusPct", "horseMaxHealth", "horse", "horseLevel",
+            "weapon", "helmet", "armor", "shoes",
             "strength", "agility", "vitality", "intelligence",
         )
     )}
-    results.sort(key=lambda item: order[item["field"]])
+    results.sort(key=lambda item: order.get(item["field"], len(order)))
     return panel_visible, results
 
 

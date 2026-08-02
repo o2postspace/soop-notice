@@ -2,11 +2,20 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 const {
   buildGamcomSnapshots,
+  buildGamcomTerritoryChanges,
   buildReferenceRows,
+  fetchGamcomTerritories,
+  GAMCOM_TERRITORY_URL,
   mergeGamcomMembers,
   parseGamcomFactionPayload,
+  parseGamcomTerritoryPayload,
+  SNAPSHOT_FIELDS,
 } = require("../lib/samguk-gamcom-sync");
 
 const COLLECTED_AT = "2026-08-03T03:04:05.000Z";
@@ -60,6 +69,17 @@ function currentMember(index, overrides = {}) {
     intelligence: 13,
     maxHealth: 1575,
     attackPower: 110,
+    healthStat: 153.9,
+    activeGeneral: "영객 (하후돈)",
+    defense: 7,
+    attackPowerBonusPct: 5,
+    damageReductionPct: 2.3,
+    criticalChancePct: 15,
+    criticalDamagePct: 120,
+    skillCooldownReductionPct: 8,
+    skillDamageBonusPct: 4.5,
+    moveSpeedBonusPct: 3,
+    horseMaxHealth: 176.9,
     ...overrides,
   };
 }
@@ -92,6 +112,71 @@ function completeRoster() {
   };
 }
 
+function territoryGroup(number) {
+  if (number <= 20) return { group: "위", start: 1 };
+  if (number <= 40) return { group: "촉", start: 21 };
+  return { group: "오", start: 41 };
+}
+
+function territoryId(number) {
+  const { group, start } = territoryGroup(number);
+  return `${group}-${String(number - start + 1).padStart(3, "0")}`;
+}
+
+function normalizedTerritories(overrides = {}) {
+  return Array.from({ length: 60 }, (_value, index) => {
+    const number = index + 1;
+    const owner = number === 8 ? "위" : number === 25 ? "촉" : number === 47 ? "오" : "미점령";
+    return {
+      id: territoryId(number),
+      number,
+      x: 310 + (index % 10) * 54,
+      y: 115 + Math.floor(index / 10) * 54,
+      owner,
+      capital: [8, 25, 47].includes(number),
+      facility: "없음",
+      level: 3,
+      ...(overrides[number] || {}),
+    };
+  });
+}
+
+function rawTerritoryPayload(overrides = {}) {
+  const forces = { "위": [], "촉": [], "오": [] };
+  normalizedTerritories(overrides).forEach(territory => {
+    const { group } = territoryGroup(territory.number);
+    forces[group].push({
+      castleKey: territory.id,
+      name: String(territory.number),
+      level: territory.level,
+      owner: territory.owner,
+      isCapital: territory.capital,
+      facilityType: territory.facility,
+      x: territory.x,
+      y: territory.y,
+    });
+  });
+  return { forces };
+}
+
+function loadGamcomAppsScript() {
+  const context = {
+    Utilities: {
+      DigestAlgorithm: { SHA_256: "SHA_256" },
+      Charset: { UTF_8: "UTF_8" },
+      computeDigest: (_algorithm, value) => Array.from(
+        crypto.createHash("sha256").update(value, "utf8").digest(),
+        byte => byte > 127 ? byte - 256 : byte,
+      ),
+    },
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(
+    __dirname,
+    "../scripts/google-apps-script/samguk-gamcom-sync.gs",
+  ), "utf8"), context);
+  return context;
+}
+
 test("Gamcom RSC text에서 30명 세력 데이터를 정규화한다", () => {
   const rows = parseGamcomFactionPayload(rscPayload(rawGamcomRows()), {
     expectedNation: "촉나라",
@@ -115,6 +200,17 @@ test("Gamcom RSC text에서 30명 세력 데이터를 정규화한다", () => {
     vitality: 12,
     intelligence: 13,
   });
+});
+
+test("Node와 Apps Script의 Gamcom 완전 스냅샷 계약은 같은 29개 필드다", () => {
+  const context = loadGamcomAppsScript();
+  const appsScriptFields = Array.from(context.SAMGUK_GAMCOM_SNAPSHOT_FIELDS);
+
+  assert.equal(SNAPSHOT_FIELDS.length, 29);
+  assert.deepEqual(appsScriptFields, Array.from(SNAPSHOT_FIELDS));
+  assert.ok(SNAPSHOT_FIELDS.includes("maxHealth"));
+  assert.ok(SNAPSHOT_FIELDS.includes("attackPower"));
+  assert.ok(SNAPSHOT_FIELDS.includes("horseMaxHealth"));
 });
 
 test("HTML의 self.__next_f.push 조각에서도 RSC rows를 추출한다", () => {
@@ -172,6 +268,160 @@ test("세력 페이지는 정확한 인원수, 고유 닉네임, 동일 국가�
       expectedCount: 30,
     }),
     /strength|숫자|number/i,
+  );
+});
+
+test("Gamcom 영토는 60칸 전체와 우리 원장의 불변 ID·번호·좌표를 검증한다", () => {
+  const current = normalizedTerritories();
+  const territories = parseGamcomTerritoryPayload(JSON.stringify(rawTerritoryPayload()), {
+    currentTerritories: current,
+  });
+
+  assert.equal(territories.length, 60);
+  assert.deepEqual(territories[0], current[0]);
+  assert.deepEqual(territories.at(-1), current.at(-1));
+  assert.deepEqual(
+    territories.filter(territory => territory.capital).map(territory => [territory.number, territory.owner]),
+    [[8, "위"], [25, "촉"], [47, "오"]],
+  );
+});
+
+test("Apps Script도 60칸을 검증하고 바뀐 영토만 기존 영토입력 20열로 만든다", () => {
+  const context = loadGamcomAppsScript();
+  const current = normalizedTerritories();
+  const externalPayload = rawTerritoryPayload({
+    1: { owner: "위", facility: "병영", level: 4 },
+    27: { owner: "위" },
+  });
+  const external = context.samgukGamcomParseTerritories_(JSON.stringify(externalPayload), current);
+  const headers = [
+    "territory_observation_id", "영토ID", "확인시각", "근거종류", "근거(URL/타임코드)",
+    "번호", "X", "Y", "소유국", "수도", "시설", "레벨", "특수지", "점령상태",
+    "점령률", "검증상태", "교차검증수", "증거해시", "메모", "입력시각",
+  ];
+  const sheet = {
+    getLastColumn: () => headers.length,
+    getRange: () => ({ getDisplayValues: () => [headers] }),
+  };
+  const result = context.samgukGamcomTerritoryRows_(
+    sheet,
+    current,
+    external,
+    new Date(COLLECTED_AT),
+  );
+  const rows = Array.from(result.rows, row => Array.from(row));
+
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every(row => row.length === 20));
+  assert.equal(rows[0][headers.indexOf("영토ID")], "위-001");
+  assert.equal(rows[0][headers.indexOf("소유국")], "위");
+  assert.equal(rows[0][headers.indexOf("시설")], "병영");
+  assert.equal(rows[1][headers.indexOf("특수지")], "Y");
+  assert.equal(rows[1][headers.indexOf("근거종류")], "Gamcom");
+  assert.match(rows[1][headers.indexOf("메모")], /원문 갱신시각 미제공/);
+  assert.equal(rows[0][headers.indexOf("증거해시")], rows[1][headers.indexOf("증거해시")]);
+});
+
+test("Gamcom 영토의 누락·중복·불변 좌표 변경·잘못된 상태를 전부 거부한다", () => {
+  const current = normalizedTerritories();
+
+  const missing = rawTerritoryPayload();
+  missing.forces["위"].pop();
+  assert.throws(
+    () => parseGamcomTerritoryPayload(JSON.stringify(missing), { currentTerritories: current }),
+    error => error?.code === "invalid_territories",
+  );
+
+  const duplicateCoordinate = rawTerritoryPayload();
+  duplicateCoordinate.forces["위"][1].x = duplicateCoordinate.forces["위"][0].x;
+  duplicateCoordinate.forces["위"][1].y = duplicateCoordinate.forces["위"][0].y;
+  assert.throws(
+    () => parseGamcomTerritoryPayload(JSON.stringify(duplicateCoordinate), { currentTerritories: current }),
+    /중복/,
+  );
+
+  const coordinateDrift = rawTerritoryPayload();
+  coordinateDrift.forces["위"][0].x += 1;
+  assert.throws(
+    () => parseGamcomTerritoryPayload(JSON.stringify(coordinateDrift), { currentTerritories: current }),
+    /불변|좌표/,
+  );
+
+  const invalidUnclaimed = rawTerritoryPayload();
+  invalidUnclaimed.forces["위"][0].facilityType = "장원";
+  assert.throws(
+    () => parseGamcomTerritoryPayload(JSON.stringify(invalidUnclaimed), { currentTerritories: current }),
+    /미점령/,
+  );
+
+  const missingCapital = rawTerritoryPayload();
+  missingCapital.forces["오"][6].isCapital = false;
+  assert.throws(
+    () => parseGamcomTerritoryPayload(JSON.stringify(missingCapital), { currentTerritories: current }),
+    /수도/,
+  );
+});
+
+test("Gamcom 영토 변경분만 상태형 관측으로 만들고 낮아진 값과 재점령도 반영한다", () => {
+  const baseline = normalizedTerritories();
+  const occupied = normalizedTerritories({
+    1: { owner: "위", facility: "병영", level: 4 },
+    27: { owner: "위" },
+  });
+  const first = buildGamcomTerritoryChanges(baseline, occupied, { collectedAt: COLLECTED_AT });
+
+  assert.equal(first.changedCount, 2);
+  assert.equal(first.observedAt, COLLECTED_AT);
+  assert.equal(first.sourceUpdatedAt, null);
+  assert.equal(first.changes[0].sourceType, "Gamcom");
+  assert.equal(first.changes[0].evidence, GAMCOM_TERRITORY_URL);
+  assert.deepEqual(first.changes[0].changedFields, ["owner", "facility", "level"]);
+  assert.match(first.changes[0].note, /원문 갱신시각 미제공/);
+  assert.equal(first.changes[1].number, 27);
+  assert.equal(first.changes[1].special, true);
+  assert.equal(new Set(first.changes.map(change => change.evidenceHash)).size, 1);
+
+  const reverted = buildGamcomTerritoryChanges(occupied, baseline, {
+    collectedAt: "2026-08-03T03:19:05.000Z",
+  });
+  assert.equal(reverted.changedCount, 2);
+  assert.equal(reverted.changes[0].owner, "미점령");
+  assert.equal(reverted.changes[0].facility, "없음");
+  assert.equal(reverted.changes[0].level, 3, "영토 레벨도 MAX가 아닌 최신 상태를 써야 한다");
+  assert.notEqual(reverted.changes[0].territoryObservationId, first.changes[0].territoryObservationId);
+
+  const unchanged = buildGamcomTerritoryChanges(baseline, baseline, { collectedAt: COLLECTED_AT });
+  assert.equal(unchanged.changedCount, 0);
+  assert.deepEqual(unchanged.changes, []);
+});
+
+test("Gamcom 영토 fetch는 고정 JSON endpoint와 content-type을 강제한다", async () => {
+  let requestedUrl = null;
+  const payload = JSON.stringify(rawTerritoryPayload());
+  const territories = await fetchGamcomTerritories({
+    currentTerritories: normalizedTerritories(),
+    fetchImpl: async (url, options) => {
+      requestedUrl = url;
+      assert.equal(options.redirect, "error");
+      assert.equal(options.headers.Accept, "application/json");
+      return new Response(payload, {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    },
+  });
+  assert.equal(requestedUrl, GAMCOM_TERRITORY_URL);
+  assert.equal(territories.length, 60);
+
+  await assert.rejects(
+    fetchGamcomTerritories({
+      currentTerritories: normalizedTerritories(),
+      fetchImpl: async () => new Response(payload, {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    }),
+    error => error?.code === "invalid_response",
   );
 });
 
@@ -286,9 +536,24 @@ test("변경된 최댓값만 시트+Gamcom 기준값 스냅샷으로 만든다",
 
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].playerId, "P001");
+  assert.equal(Object.keys(snapshots[0].fields).length, 29);
   assert.equal(snapshots[0].fields.weapon, 9);
-  assert.equal(snapshots[0].fields.maxHealth, undefined);
-  assert.equal(snapshots[0].fields.attackPower, undefined);
+  assert.equal(snapshots[0].fields.maxHealth, 1575);
+  assert.equal(snapshots[0].fields.attackPower, 110);
+  assert.equal(snapshots[0].fields.healthStat, 153.9);
+  assert.equal(snapshots[0].fields.activeGeneral, "영객 (하후돈)");
+  assert.equal(snapshots[0].fields.defense, 7);
+  assert.equal(snapshots[0].fields.attackPowerBonusPct, 5);
+  assert.equal(snapshots[0].fields.damageReductionPct, 2.3);
+  assert.equal(snapshots[0].fields.criticalChancePct, 15);
+  assert.equal(snapshots[0].fields.criticalDamagePct, 120);
+  assert.equal(snapshots[0].fields.skillCooldownReductionPct, 8);
+  assert.equal(snapshots[0].fields.skillDamageBonusPct, 4.5);
+  assert.equal(snapshots[0].fields.moveSpeedBonusPct, 3);
+  assert.equal(snapshots[0].fields.horseMaxHealth, 176.9);
+  assert.equal(typeof snapshots[0].fields.healthStat, "number");
+  assert.equal(typeof snapshots[0].fields.activeGeneral, "string");
+  assert.equal(typeof snapshots[0].fields.horseMaxHealth, "number");
   assert.deepEqual(snapshots[0].sourceTypes, ["sheet", "gamcom"]);
   assert.equal(snapshots[0].sourceCount, 2);
   assert.equal(snapshots[0].verification, "gamcom-max");

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""SOOPNOTICE 삼국지 방송 추적용 Excel 워크북 생성기."""
+"""구형 SOOPNOTICE 삼국지 Excel 워크북 생성기.
+
+운영 원장은 Apps Script ``setupSamgukSheet()``가 관리한다. 이 파일의 A:AD
+로컬 XLSX 스키마는 호환 보관용이며 운영 Google Sheet에 다시 올리면 안 된다.
+"""
 
 from __future__ import annotations
 
@@ -72,6 +76,11 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=Path,
         default=Path.home() / "삼국지_방송_추적시트.xlsx",
+    )
+    parser.add_argument(
+        "--allow-legacy-schema",
+        action="store_true",
+        help="운영 원장과 호환되지 않는 구형 로컬 XLSX 생성을 명시적으로 허용합니다.",
     )
     return parser.parse_args()
 
@@ -1156,6 +1165,12 @@ def build_workbook(
 
 def main() -> None:
     args = parse_args()
+    if not args.allow_legacy_schema:
+        raise SystemExit(
+            "구형 A:AD XLSX 생성기는 운영 원장과 호환되지 않아 차단되었습니다. "
+            "운영 원장은 Apps Script setupSamgukSheet()를 사용하세요. "
+            "보관용 XLSX가 꼭 필요하면 --allow-legacy-schema를 명시하세요."
+        )
     result = build_workbook(args.html, args.snapshot, args.territory, args.output)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
