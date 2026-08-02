@@ -453,6 +453,9 @@
   setInterval(function () {
     if (!document.hidden && currentTab === 'samguk') window.loadSamgukData(true);
   }, REFRESH_INTERVAL_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && currentTab === 'samguk') window.loadSamgukData(true);
+  });
   window.addEventListener('online', function () {
     if (currentTab === 'samguk') window.loadSamgukData(true);
   });

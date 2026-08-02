@@ -492,6 +492,8 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
   assert.match(html, /member\.powerStatus === 'provisional'/);
   assert.match(html, /member\.powerIndex/);
   assert.match(html, /member\.powerRankScore/);
+  assert.match(html, /const POWER_DISPLAY_MULTIPLIER = 125/);
+  assert.match(html, /Math\.round\(number \* POWER_DISPLAY_MULTIPLIER\)/);
   assert.match(html, /현재 관측 파워랭킹/);
   assert.match(html, /확인된 구성요소의 하한점수/);
   assert.doesNotMatch(html, /coverage 85% 미만은 순위에서 제외/);
@@ -500,9 +502,28 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
   assert.match(html, /최대 HP/);
   assert.match(html, /평타/);
   assert.match(html, /파워 v1 미반영/);
+  assert.match(html, /function samgukTextValue\(value, suffix\)/);
+  const componentFunction = html.match(/function componentCell\(member, key\) \{[\s\S]*?\n  \}/)?.[0] || "";
+  assert.match(componentFunction, /samgukTextValue/);
+  assert.doesNotMatch(componentFunction, /samgukValue\(/);
   const rankingFunction = html.match(/function renderSamgukPowerRanking\(\) \{[\s\S]*?\n\}/)?.[0] || "";
   assert.doesNotMatch(rankingFunction, /member\.powerScore/);
   assert.doesNotMatch(rankingFunction, /scoreField.*strength/);
+});
+
+test("현황판과 파워랭킹은 같은 시트 payload를 쓰고 화면 복귀 시 즉시 갱신한다", () => {
+  const client = fs.readFileSync(path.join(__dirname, "../../public/samguk.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
+
+  assert.match(client, /const REFRESH_INTERVAL_MS = 60 \* 1000/);
+  assert.match(client, /function applyPayload\(data, mode\) \{[\s\S]*?mergeMembers\(data\.members\)/);
+  assert.match(client, /currentSamgukTab === 'ranking'\) renderSamgukPowerRanking\(\)/);
+  assert.match(client, /else renderSamguk\(\)/);
+  assert.match(client, /setInterval\(function \(\) \{[\s\S]*?loadSamgukData\(true\)[\s\S]*?REFRESH_INTERVAL_MS/);
+  assert.match(client, /document\.addEventListener\('visibilitychange',[\s\S]*?loadSamgukData\(true\)/);
+  assert.match(html, /currentTab === 'samguk' && window\.loadSamgukData/);
+  assert.match(html, /async function communityRefreshCurrentView\(\) \{\s*if \(currentTab === 'samguk'\)/);
+  assert.match(html, /await window\.loadSamgukData\(true\)/);
 });
 
 test("참가자나 영토가 일부만 계산되면 정상 시트로 채택하지 않는다", async () => {
