@@ -18,6 +18,10 @@ const MAX_TARGETS = 90;
 const MAX_SEGMENTS_PER_BATCH = 12;
 const MAX_GRAY_FRAMES_PER_SEGMENT = 8;
 const MAX_OCR_SAMPLES_PER_CANDIDATE_SEGMENT = MAX_GRAY_FRAMES_PER_SEGMENT;
+const HUD_COMBAT_PROFILE_ID = "hud-combat-v1";
+const DEFAULT_HUD_PROBE_INTERVAL_MS = 10 * 60_000;
+const MIN_HUD_PROBE_INTERVAL_MS = 60_000;
+const MAX_HUD_PROBE_INTERVAL_MS = 24 * 60 * 60_000;
 const MIN_TASK_LEASE_MS = 100;
 const MIN_TASK_DEADLINE_MARGIN_MS = 25;
 const MAX_TASK_DEADLINE_MARGIN_MS = 5_000;
@@ -276,6 +280,18 @@ function normalizeBatch(output, profileId) {
     : normalizeBatchObject(output, { expectedProfileId: profileId });
 }
 
+function keepsOcrBurstAlive(batch) {
+  if (batch.panelVisible !== true) return false;
+  if (batch.profileId !== HUD_COMBAT_PROFILE_ID) return true;
+  // The combat HUD is visible during ordinary play. A max-HP-only result must
+  // still reach the change tracker, but it must not hold a 30-second OCR burst
+  // open as though a transient stats/equipment panel were on screen.
+  return !(
+    batch.results.length > 0
+      && batch.results.every(result => result.field === "maxHealth")
+  );
+}
+
 function normalizedObservedAtMs(value) {
   try {
     const timestamp = typeof value === "number" ? value : Date.parse(value);
@@ -459,6 +475,17 @@ function createSamgukHlsMonitor(options = {}) {
   if (typeof profileId !== "string" || !PROFILE_ID_PATTERN.test(profileId)) {
     fail("invalid_config", "profileId 형식이 올바르지 않습니다.");
   }
+  const hudProbeIntervalMs = options.hudProbeIntervalMs === undefined
+    ? DEFAULT_HUD_PROBE_INTERVAL_MS
+    : options.hudProbeIntervalMs;
+  if (!Number.isSafeInteger(hudProbeIntervalMs)
+    || hudProbeIntervalMs < MIN_HUD_PROBE_INTERVAL_MS
+    || hudProbeIntervalMs > MAX_HUD_PROBE_INTERVAL_MS) {
+    fail(
+      "invalid_config",
+      `hudProbeIntervalMs는 ${MIN_HUD_PROBE_INTERVAL_MS}~${MAX_HUD_PROBE_INTERVAL_MS} 정수여야 합니다.`,
+    );
+  }
   const queuePath = options.queuePath;
   const appendFn = options.appendFn || appendObservationQueue;
   if (ocrEnabled && (typeof queuePath !== "string" || !queuePath.trim() || typeof appendFn !== "function")) {
@@ -568,6 +595,7 @@ function createSamgukHlsMonitor(options = {}) {
     offlineResults: 0,
     failures: 0,
     uiCandidates: 0,
+    hudProbes: 0,
     confirmedUiPanels: 0,
     earlyBurstEnds: 0,
     duplicateSegments: 0,
@@ -595,9 +623,28 @@ function createSamgukHlsMonitor(options = {}) {
     lastErrorAt: null,
   };
   const hiddenBurstFrames = new Map();
+  const nextHudProbeAt = new Map();
+  const activeHudProbes = new Set();
+  const hudProbePhaseIndex = new Map(targets.map((target, index) => [target.id, index]));
 
   function monotonicNow() {
     return clock();
+  }
+
+  function hudProbeDue(target, now) {
+    if (!ocrEnabled || profileId !== HUD_COMBAT_PROFILE_ID) return false;
+    if (!nextHudProbeAt.has(target.id)) {
+      const phaseIndex = hudProbePhaseIndex.get(target.id) || 0;
+      const phaseOffset = Math.floor(hudProbeIntervalMs * phaseIndex / targets.length);
+      nextHudProbeAt.set(target.id, now + phaseOffset);
+    }
+    return now >= nextHudProbeAt.get(target.id);
+  }
+
+  function postponeHudProbe(target, now) {
+    if (profileId === HUD_COMBAT_PROFILE_ID) {
+      nextHudProbeAt.set(target.id, now + hudProbeIntervalMs);
+    }
   }
 
   function throwIfAborted(signal) {
@@ -625,6 +672,8 @@ function createSamgukHlsMonitor(options = {}) {
     streamIdentities.delete(target.id);
     pendingCandidates.delete(target.id);
     hiddenBurstFrames.delete(target.id);
+    nextHudProbeAt.delete(target.id);
+    activeHudProbes.delete(target.id);
   }
 
   function commitSegment(target, quality, segment, contentHash) {
@@ -833,6 +882,7 @@ function createSamgukHlsMonitor(options = {}) {
     let processedSegments = 0;
     let duplicateSegments = 0;
     let lastGateResult = null;
+    let latestProbeFrame = null;
     for (const segment of segments) {
       const segmentHash = contentHashFor(segment);
       if (isContentDuplicate(target, "SD", segmentHash)) {
@@ -849,8 +899,14 @@ function createSamgukHlsMonitor(options = {}) {
       commitSegment(target, "SD", segment, segmentHash);
       stats.segmentsProcessed += 1;
       processedSegments += 1;
+      latestProbeFrame = {
+        mediaSequence: segment.mediaSequence,
+        sampleIndex: Math.min(4, frameCount - 1),
+        sampleCount: frameCount,
+      };
       if (candidateIndices.length > 0) {
         stats.uiCandidates += 1;
+        postponeHudProbe(target, monotonicNow());
         if (Number.isSafeInteger(segment.mediaSequence)) {
           pendingCandidates.set(target.id, Object.freeze({
             mediaSequence: segment.mediaSequence,
@@ -872,6 +928,32 @@ function createSamgukHlsMonitor(options = {}) {
           processedSegments,
         };
       }
+    }
+    const probeNow = monotonicNow();
+    if (latestProbeFrame && hudProbeDue(target, probeNow)) {
+      const candidateIndices = Object.freeze([latestProbeFrame.sampleIndex]);
+      const candidateRuns = candidateRunsFor(candidateIndices);
+      stats.hudProbes += 1;
+      postponeHudProbe(target, probeNow);
+      activeHudProbes.add(target.id);
+      if (Number.isSafeInteger(latestProbeFrame.mediaSequence)) {
+        pendingCandidates.set(target.id, Object.freeze({
+          ...latestProbeFrame,
+          candidateIndices,
+          candidateRuns,
+          hudProbe: true,
+        }));
+      }
+      return {
+        duplicate: false,
+        uiCandidate: true,
+        hudProbe: true,
+        gateResult: lastGateResult,
+        ...latestProbeFrame,
+        candidateIndices,
+        candidateRuns,
+        processedSegments,
+      };
     }
     return {
       duplicate: processedSegments === 0,
@@ -940,6 +1022,7 @@ function createSamgukHlsMonitor(options = {}) {
     let consecutiveHiddenFrames = initialHiddenFrames;
     let endBurst = false;
     for (const segment of segments) {
+      let hudSegmentCountedAsHidden = false;
       const segmentHash = contentHashFor(segment);
       if (isContentDuplicate(target, "HD", segmentHash)) {
         stats.duplicateSegments += 1;
@@ -959,9 +1042,15 @@ function createSamgukHlsMonitor(options = {}) {
       if (isExactCandidateSegment) {
         const plannedSamples = candidateOcrSampleIndices(pending);
         if (plannedSamples.length > 0) {
-          sampleIndices = plannedSamples;
+          sampleIndices = pending.hudProbe === true ? plannedSamples.slice(0, 1) : plannedSamples;
           mustEvaluateAllCandidateSamples = true;
         }
+      } else if (profileId === HUD_COMBAT_PROFILE_ID && activeHudProbes.has(target.id)) {
+        // A periodic HUD probe deliberately bypasses the generic panel gate for
+        // one sample of the next segment so maxHealth can receive independent
+        // segment evidence without opening a sustained OCR burst.
+        sampleIndices = [usesSegmentBatch ? 4 : null];
+        mustEvaluateAllCandidateSamples = true;
       } else if (usesSegmentBatch) {
         const grayFrames = await decodeGrayFrame(segment.body, { signal: signal || undefined });
         throwIfAborted(signal);
@@ -1006,6 +1095,13 @@ function createSamgukHlsMonitor(options = {}) {
         }), { signal: signal || undefined });
         throwIfAborted(signal);
         const batch = normalizeBatch(output, profileId);
+        const burstVisible = keepsOcrBurstAlive(batch);
+        if (profileId === HUD_COMBAT_PROFILE_ID) {
+          if (burstVisible) activeHudProbes.delete(target.id);
+          else if (batch.results.some(result => result.field === "maxHealth")) {
+            activeHudProbes.add(target.id);
+          }
+        }
         const observations = flattenBroadcastBatch(batch, {
           profileId,
           playerId: target.playerId,
@@ -1044,10 +1140,23 @@ function createSamgukHlsMonitor(options = {}) {
           mediaSequence: segment.mediaSequence,
           sampleIndex,
           panelVisible: batch.panelVisible,
+          burstVisible,
           observationCount: observations.length,
         }));
-        if (batch.panelVisible === true) consecutiveHiddenFrames = 0;
-        else if (batch.panelVisible === false) consecutiveHiddenFrames += 1;
+        if (burstVisible) {
+          consecutiveHiddenFrames = 0;
+          hudSegmentCountedAsHidden = false;
+        } else if (profileId === HUD_COMBAT_PROFILE_ID) {
+          // Adjacent samples from one HLS segment are one evidence unit. Count
+          // HUD-only/hidden samples once per segment so the next segment can
+          // still provide the independent confirmation required by tracker.
+          if (!hudSegmentCountedAsHidden) {
+            consecutiveHiddenFrames += 1;
+            hudSegmentCountedAsHidden = true;
+          }
+        } else if (batch.panelVisible === false) {
+          consecutiveHiddenFrames += 1;
+        }
         if (consecutiveHiddenFrames >= 2 && !mustEvaluateAllCandidateSamples) {
           endBurst = true;
           break;
@@ -1095,11 +1204,12 @@ function createSamgukHlsMonitor(options = {}) {
           initialHiddenFrames: hiddenBurstFrames.get(task.target.id) || 0,
           signal,
         });
-        const visibleFrames = ocr.frames.filter(frame => frame.panelVisible === true).length;
+        const visibleFrames = ocr.frames.filter(frame => frame.burstVisible === true).length;
         if (visibleFrames > 0) stats.confirmedUiPanels += visibleFrames;
         if (ocr.endBurst) {
           hiddenBurstFrames.delete(task.target.id);
           pendingCandidates.delete(task.target.id);
+          activeHudProbes.delete(task.target.id);
           stats.earlyBurstEnds += 1;
           return { live: true, uiCandidate: false, endBurst: true, ocr };
         }
@@ -1128,6 +1238,7 @@ function createSamgukHlsMonitor(options = {}) {
     if (!uiCandidate) {
       hiddenBurstFrames.delete(task.target.id);
       pendingCandidates.delete(task.target.id);
+      activeHudProbes.delete(task.target.id);
     }
     return { live: true, uiCandidate, gate: gateResult };
   }
@@ -1293,6 +1404,7 @@ function createSamgukHlsMonitor(options = {}) {
 
 module.exports = {
   DEFAULT_SCHEDULER_OPTIONS,
+  DEFAULT_HUD_PROBE_INTERVAL_MS,
   MAX_TARGETS,
   SamgukHlsMonitorError,
   abortableDelay,

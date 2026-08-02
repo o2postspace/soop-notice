@@ -47,8 +47,8 @@ function close(actual, expected, epsilon = 0.0001) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
 }
 
-test("v1.0 상수와 30/35/20/15 가중치를 고정한다", () => {
-  assert.equal(POWER_INDEX_VERSION, "v1.0");
+test("v1.1 상수와 30/35/20/15 가중치를 고정한다", () => {
+  assert.equal(POWER_INDEX_VERSION, "v1.1");
   assert.deepEqual(POWER_WEIGHTS, { stats: 30, gear: 35, engravings: 20, horse: 15 });
   assert.deepEqual(STATS_INTERNAL_WEIGHTS, { level: 0.40, abilities: 0.60 });
   assert.equal(GEAR_MAX_LEVEL, 15);
@@ -56,16 +56,16 @@ test("v1.0 상수와 30/35/20/15 가중치를 고정한다", () => {
   assert.equal(ENGRAVING_PRIOR_N, 10);
 });
 
-test("레벨과 기량 4종 합은 각각 전체 로스터 inclusive 백분위로 0~100을 만든다", () => {
+test("레벨과 기량 4종은 각각 전체 로스터 inclusive 백분위로 0~100을 만든다", () => {
   const results = calculateRosterPowerIndexes([
-    member({ level: 0, strength: 0 }),
-    member({ level: 10, strength: 10 }),
-    member({ level: 20, strength: 20, weapon: 15, armor: 15, shoes: 15, horseLevel: 80 }),
+    member({ level: 0, strength: 0, agility: 0, vitality: 0, intelligence: 0 }),
+    member({ level: 10, strength: 10, agility: 10, vitality: 10, intelligence: 10 }),
+    member({ level: 20, strength: 20, agility: 20, vitality: 20, intelligence: 20, weapon: 15, armor: 15, shoes: 15, horseLevel: 80 }),
   ]);
 
   assert.deepEqual(results.map(result => result.components.stats.score), [0, 50, 100]);
   assert.equal(results[2].components.stats.level, 20);
-  assert.equal(results[2].components.stats.abilityTotal, 20);
+  assert.equal(results[2].components.stats.abilityTotal, 80);
   assert.equal(results[2].components.gear.score, 100);
   assert.equal(results[2].components.horse.score, 100);
   assert.equal(results[2].score, 80);
@@ -76,9 +76,9 @@ test("레벨과 기량 4종 합은 각각 전체 로스터 inclusive 백분위�
 
 test("동점 레벨·기량에는 같은 midrank를 주고 단일 표본은 50점으로 둔다", () => {
   const tied = calculateRosterPowerIndexes([
-    member({ level: 10, strength: 10 }),
-    member({ level: 10, strength: 10 }),
-    member({ level: 20, strength: 20 }),
+    member({ level: 10, strength: 10, agility: 10, vitality: 10, intelligence: 10 }),
+    member({ level: 10, strength: 10, agility: 10, vitality: 10, intelligence: 10 }),
+    member({ level: 20, strength: 20, agility: 20, vitality: 20, intelligence: 20 }),
   ]);
   assert.deepEqual(tied.map(result => result.components.stats.score), [25, 25, 100]);
 
@@ -86,7 +86,7 @@ test("동점 레벨·기량에는 같은 midrank를 주고 단일 표본은 50�
   assert.equal(single[0].components.stats.score, 50);
 });
 
-test("레벨과 기량 결측은 Stats coverage의 40%와 60%를 독립적으로 반영한다", () => {
+test("레벨과 각 기량 결측은 Stats coverage에 독립적으로 반영한다", () => {
   const [missingLevel, missingAbility] = calculateRosterPowerIndexes([
     member({ level: unknown(), strength: 10 }),
     member({ level: 10, strength: unknown() }),
@@ -99,12 +99,14 @@ test("레벨과 기량 결측은 Stats coverage의 40%와 60%를 독립적으로
   assert.equal(missingLevel.status, POWER_STATUSES.PROVISIONAL);
   assert.equal(missingLevel.rankable, true);
 
-  assert.equal(missingAbility.components.stats.coverage, 40);
-  assert.equal(missingAbility.components.stats.lower, 20);
-  assert.equal(missingAbility.components.stats.upper, 80);
-  assert.equal(missingAbility.coverage, 82);
-  assert.equal(missingAbility.status, POWER_STATUSES.INSUFFICIENT);
-  assert.equal(missingAbility.rankable, false);
+  assert.equal(missingAbility.components.stats.coverage, 85);
+  assert.equal(missingAbility.components.stats.lower, 42.5);
+  assert.equal(missingAbility.components.stats.upper, 57.5);
+  assert.equal(missingAbility.coverage, 95.5);
+  assert.equal(missingAbility.status, POWER_STATUSES.PROVISIONAL);
+  assert.equal(missingAbility.rankable, true);
+  assert.equal(missingAbility.components.stats.statPercentiles.strength, null);
+  assert.equal(missingAbility.components.stats.statPercentiles.agility, 50);
 });
 
 test("장비는 무기 50%, 방어 30%, 각갑 20%이며 군주 방어는 두갑·흉갑 평균이다", () => {
@@ -286,12 +288,15 @@ test("원값 0과 empty는 coverage에 포함하지만 null과 unknown은 포함
 });
 
 test("createPowerIndexContext와 단일 계산 API가 로스터 분포를 재사용한다", () => {
-  const roster = [member({ level: 0, strength: 0 }), member({ level: 20, strength: 20 })];
+  const roster = [
+    member({ level: 0, strength: 0, agility: 0, vitality: 0, intelligence: 0 }),
+    member({ level: 20, strength: 20, agility: 20, vitality: 20, intelligence: 20 }),
+  ];
   const context = createPowerIndexContext(roster);
   const result = calculatePowerIndex(roster[1], context);
 
   assert.equal(result.components.stats.score, 100);
-  assert.equal(result.version, "v1.0");
+  assert.equal(result.version, "v1.1");
 });
 
 test("강화 상한, 말 상한, 각인 스키마와 eligible 슬롯 수를 엄격히 검증한다", () => {

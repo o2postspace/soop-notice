@@ -8,7 +8,7 @@ const {
 } = require("./samguk-observations");
 
 const DEFAULT_CONFIRMATION_WINDOW_MS = 120_000;
-const MAX_TRACKED_KEYS = 90 * 11;
+const MAX_TRACKED_KEYS = 90 * MAX_BATCH_RESULTS;
 const MAX_OBSERVATION_BATCH_SIZE = MAX_BATCH_RESULTS;
 const MAX_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const BASELINE_KEYS = new Set(["playerId", "field", "value"]);

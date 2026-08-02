@@ -88,13 +88,13 @@ test("setup은 출력 관리자-only와 입력 warning-only 보호, 드롭다운
   assert.match(text, /setFrozenRows/);
   assert.match(text, /setFrozenColumns/);
   assert.match(text, /createFilter\(\)/);
-  assert.match(text, /\["B2:Q5001", "X2:X5001"\]/);
+  assert.match(text, /\["B2:Q5001", "X2:AC5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["장비현황"\], \["C2:R91"\]\)/);
   assert.match(text, /\["B2:O5001", "S2:S5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["게임정보"\], \["A2:F30"\]\)/);
 });
 
-test("webhook은 A:Y 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
+test("webhook은 A:AD 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
   const text = source(webhookPath);
   assert.doesNotThrow(() => new Function(text));
   assert.match(text, /samgukFindFirstEmptyObservationRow_\(sheet, headers\.length\)/);

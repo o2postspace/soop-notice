@@ -224,6 +224,17 @@ def add_whole_validation(ws, cell_range: str, max_value: int) -> None:
     validation.add(cell_range)
 
 
+def add_decimal_validation(ws, cell_range: str, max_value: int) -> None:
+    validation = DataValidation(
+        type="decimal", operator="between", formula1="0", formula2=str(max_value), allow_blank=True
+    )
+    validation.error = f"0~{max_value} 범위의 숫자만 입력하세요."
+    validation.errorTitle = "잘못된 숫자"
+    validation.showErrorMessage = True
+    ws.add_data_validation(validation)
+    validation.add(cell_range)
+
+
 def snapshot_value(member: dict, *keys):
     for key in keys:
         if key in member and member[key] is not None:
@@ -279,9 +290,19 @@ def add_guide_sheet(
         ("1. 방송 확인", "방송모니터링에서 LIVE 링크를 열고 레벨·말·장비·능력치를 확인합니다."),
         ("2. 값 기록", "관측입력에는 현재 스냅샷 전체와 근거 URL/타임코드·확인시각·증거해시를 함께 남깁니다."),
         ("3. 교차검증", "서로 다른 두 출처가 같은 값을 확인하거나 방송의 서로 다른 두 프레임이 일치한 스냅샷만 추가합니다."),
-        ("4. 현황/랭킹", "현재현황은 교차검증된 최신 스냅샷 한 행을 통째로 반영합니다. 별도 무력점수가 없으면 무력 스탯만 비교합니다."),
-        ("5. 영토 기록", "영토 변화도 교차검증된 완전한 스냅샷을 영토입력에 추가하고 가장 최근 확인시각의 행을 표시합니다."),
-        ("OCR 연결", "OCR설정에 캡처 해상도와 항목별 좌표를 넣으면 추후 모니터링 프로그램에서 그대로 사용할 수 있습니다."),
+        (
+            "4. 현황/파워랭킹",
+            "현재현황은 교차검증된 최신 스냅샷 한 행을 통째로 반영합니다. 사이트 파워 v1은 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%를 고정 가중치로 합산합니다.",
+        ),
+        (
+            "5. 랭킹 신뢰도",
+            "결측치는 0점이 아닌 0~100 가능 구간으로 남겨 전원을 중간값 추정순위에 표시합니다. 수집률 85%는 신뢰도 플래그이며, 100% 수집·현황/장비 교차검증·비교 표본 임계치를 모두 충족해야 확정입니다.",
+        ),
+        ("6. 영토 기록", "영토 변화도 교차검증된 완전한 스냅샷을 영토입력에 추가하고 가장 최근 확인시각의 행을 표시합니다."),
+        (
+            "OCR 연결",
+            "OCR설정에 캡처 해상도와 항목별 좌표를 넣습니다. 최대체력은 플레이어 HUD의 현재/최대 표기에서 수집하고, 평타는 동일 대상·조건의 표본 수와 대표값을 함께 기록합니다. 두 전투 관측값은 파워 v1에 넣지 않습니다.",
+        ),
         ("초기 데이터", "공개 지통실 조회값을 시트 기준값으로 넣었습니다." if has_snapshot else "현재 네트워크 스냅샷 없이 90명 명단만 넣었습니다."),
         ("초기 영토", "공개 지도 60개를 시트 기준값으로 넣었습니다." if has_territory else "영토 원본 없이 빈 입력 구조만 만들었습니다."),
         ("주의", "후보값은 이 시트에 넣지 않습니다. 교차검증 프로그램이 승격한 완전한 스냅샷만 아래에 추가하세요."),
@@ -534,7 +555,8 @@ def add_observations_sheet(
         "observation_id", "player_id", "확인시각", "근거종류", "근거(URL/타임코드)",
         "레벨", "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
         "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
-        "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모", "입력시각",
+        "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모", "최대체력",
+        "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각",
     ]
     ws.append(headers)
     comments = {
@@ -545,7 +567,12 @@ def add_observations_sheet(
         18: "서로 다른 출처의 일치 개수입니다. 방송은 서로 다른 프레임 두 장을 한 출처의 교차검증으로 봅니다.",
         19: "후보값은 넣지 않습니다. 기준값·교차검증·방송교차검증 스냅샷만 현재현황에 반영됩니다.",
         23: "0~100. 방송교차검증은 95 이상인 서로 다른 두 프레임이 필요합니다.",
-        25: "값을 시트에 입력한 시각입니다.",
+        25: "플레이어 HUD의 현재/최대 체력 중 최대값입니다. 우측 하단 군마 체력과 구분합니다.",
+        26: "동일 대상·동일 조건의 비치명 기본공격 표본으로 만든 대표값입니다. 단일 화면의 숫자를 확정값으로 쓰지 않습니다.",
+        27: "평타피해대표값 계산에 실제로 사용한 표본 수입니다.",
+        28: "평타 표본을 수집한 동일 대상 또는 대상군입니다.",
+        29: "무기·버프·치명타 여부 등 피해 비교에 필요한 조건입니다.",
+        30: "값을 시트에 입력한 시각입니다.",
     }
     for column, text in comments.items():
         ws.cell(1, column).comment = Comment(text, "SOOPNOTICE")
@@ -577,12 +604,24 @@ def add_observations_sheet(
                 nonzero_snapshot_value(snap, "stat_intelligence", "intelligence"),
                 nonzero_snapshot_value(snap, "power_score", "powerScore", "power"),
             ]
-            if not any(value not in (None, "") for value in values):
+            combat_values = [
+                nonzero_snapshot_value(snap, "max_health", "maxHealth", "maxHP", "최대체력"),
+                nonzero_snapshot_value(
+                    snap, "basic_attack_damage", "basicAttackDamage", "평타피해대표값"
+                ),
+                nonzero_snapshot_value(
+                    snap, "basic_attack_sample_count", "basicAttackSampleCount", "평타표본수"
+                ),
+                snapshot_value(snap, "basic_attack_target", "basicAttackTarget", "평타대상"),
+                snapshot_value(snap, "combat_conditions", "combatConditions", "전투조건"),
+            ]
+            if not any(value not in (None, "") for value in values + combat_values):
                 continue
             ws.append([
                 f"INIT-{generated_at:%Y%m%d}-{index:03d}", member["player_id"], fetched_at,
                 "시트", source_url, *values, 1, "기준값", "", f"INIT-{generated_at:%Y%m%d}",
-                "초기 1회 수집", "", "공개 지통실의 시작 기준 스냅샷.", fetched_at,
+                "초기 1회 수집", "", "공개 지통실의 시작 기준 스냅샷.", *combat_values,
+                fetched_at,
             ])
             initial_count += 1
 
@@ -590,7 +629,7 @@ def add_observations_sheet(
     style_body(ws, 2, MAX_INPUT_ROW, len(headers))
     for row in range(2, MAX_INPUT_ROW + 1):
         ws.cell(row, 3).number_format = "yyyy-mm-dd hh:mm:ss"
-        ws.cell(row, 25).number_format = "yyyy-mm-dd hh:mm:ss"
+        ws.cell(row, 30).number_format = "yyyy-mm-dd hh:mm:ss"
         ws.cell(row, 1).fill = PatternFill("solid", fgColor="F2F4F7")
         ws.cell(row, 1).protection = Protection(locked=True)
 
@@ -598,10 +637,15 @@ def add_observations_sheet(
     add_list_validation(ws, f"D2:D{MAX_INPUT_ROW}", "'기준정보'!$E$2:$E$8")
     add_list_validation(ws, f"S2:S{MAX_INPUT_ROW}", "'기준정보'!$G$2:$G$5")
     add_whole_validation(ws, f"F2:F{MAX_INPUT_ROW}", 10000)
-    add_whole_validation(ws, f"H2:L{MAX_INPUT_ROW}", 999)
-    add_whole_validation(ws, f"M2:Q{MAX_INPUT_ROW}", 1000000)
+    add_whole_validation(ws, f"H2:H{MAX_INPUT_ROW}", 80)
+    add_whole_validation(ws, f"I2:L{MAX_INPUT_ROW}", 15)
+    add_whole_validation(ws, f"M2:P{MAX_INPUT_ROW}", 1000000)
+    add_decimal_validation(ws, f"Q2:Q{MAX_INPUT_ROW}", 1000000)
     add_whole_validation(ws, f"R2:R{MAX_INPUT_ROW}", 10)
     add_whole_validation(ws, f"W2:W{MAX_INPUT_ROW}", 100)
+    add_whole_validation(ws, f"Y2:Y{MAX_INPUT_ROW}", 1000000)
+    add_decimal_validation(ws, f"Z2:Z{MAX_INPUT_ROW}", 1000000)
+    add_whole_validation(ws, f"AA2:AA{MAX_INPUT_ROW}", 10000)
 
     status_range = f"S2:S{MAX_INPUT_ROW}"
     status_colors = {
@@ -620,9 +664,12 @@ def add_observations_sheet(
             fill=PatternFill("solid", fgColor=COLORS["red"]),
         ),
     )
-    ws.auto_filter.ref = f"A1:Y{MAX_INPUT_ROW}"
+    ws.auto_filter.ref = f"A1:AD{MAX_INPUT_ROW}"
     ws.freeze_panes = "F2"
-    set_widths(ws, [22, 12, 20, 16, 48, 10, 16, 11, 12, 12, 12, 12, 11, 11, 11, 11, 12, 13, 18, 44, 18, 16, 13, 52, 20])
+    set_widths(ws, [
+        22, 12, 20, 16, 48, 10, 16, 11, 12, 12, 12, 12, 11, 11, 11,
+        11, 12, 13, 18, 44, 18, 16, 13, 52, 13, 16, 13, 24, 36, 20,
+    ])
     ws.sheet_properties.tabColor = "FFC000"
     return initial_count
 
@@ -662,13 +709,14 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
         "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화", "장비총강화",
         "무력", "기민", "기력", "지모", "무력점수", "최종확인", "최근근거", "출처종류",
         "교차검증수", "검증상태", "신선도", "기량합계", "랭킹점수", "공동순위",
-        "정렬순번", "선택원본행",
+        "정렬순번", "선택원본행", "최대체력", "평타피해대표값", "평타표본수",
+        "평타대상", "전투조건",
     ]
     ws.append(headers)
     source_columns = {
         7: "F", 8: "G", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
         15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 20: "C", 21: "E",
-        22: "D", 23: "R", 24: "S",
+        22: "D", 23: "R", 24: "S", 31: "Y", 32: "Z", 33: "AA", 34: "AB", 35: "AC",
     }
     for row_index, member in enumerate(roster, start=2):
         participant_row = row_index
@@ -727,9 +775,12 @@ def add_current_sheet(wb: Workbook, roster: list[dict]) -> None:
         )
     ws.column_dimensions["AC"].hidden = True
     ws.column_dimensions["AD"].hidden = True
-    ws.auto_filter.ref = "A1:AB91"
+    ws.auto_filter.ref = "A1:AI91"
     ws.freeze_panes = "G2"
-    set_widths(ws, [12, 9, 18, 16, 20, 16, 9, 16, 10, 11, 11, 11, 11, 13, 10, 10, 10, 10, 12, 20, 46, 14, 13, 18, 14, 11, 12, 11, 10, 11])
+    set_widths(ws, [
+        12, 9, 18, 16, 20, 16, 9, 16, 10, 11, 11, 11, 11, 13, 10, 10, 10,
+        10, 12, 20, 46, 14, 13, 18, 14, 11, 12, 11, 10, 11, 13, 16, 13, 24, 36,
+    ])
     ws.sheet_properties.tabColor = "4472C4"
 
 
@@ -926,6 +977,7 @@ def add_ocr_sheet(wb: Workbook) -> None:
         ("weapon", "무기강화"), ("helmet", "두갑강화"), ("armor", "흉갑강화"),
         ("shoes", "각갑강화"), ("strength", "무력"), ("agility", "기민"),
         ("vitality", "기력"), ("intelligence", "지모"), ("powerScore", "무력점수"),
+        ("maxHealth", "최대체력"), ("basicAttackDamage", "평타피해대표값"),
     ]
     for key, label in fields:
         ws.append(["default", label, "", "", "", "", "1920x1080", 1, "N", "", f"OCR key: {key}"])
@@ -974,7 +1026,7 @@ def build_workbook(
     wb.remove(wb.active)
     wb.properties.title = "SOOPNOTICE 삼국지 방송 추적 시트"
     wb.properties.creator = "SOOPNOTICE"
-    wb.properties.description = "90명 방송 모니터링, 장비·기량 교차검증, 60개 영토 현황 및 무력 랭킹"
+    wb.properties.description = "90명 방송 모니터링, 장비·기량·전투 관측 교차검증, 60개 영토 현황 및 파워랭킹 보조 원장"
     wb.calculation.fullCalcOnLoad = True
     wb.calculation.forceFullCalc = True
     wb.calculation.calcMode = "auto"
@@ -1004,6 +1056,16 @@ def build_workbook(
         raise RuntimeError(f"시트 구성이 다릅니다: {check.sheetnames}")
     if check["참가자"].max_row != 91:
         raise RuntimeError("참가자 행 수 검증 실패")
+    observation_headers = [check["관측입력"].cell(1, column).value for column in range(1, 31)]
+    if observation_headers[24:30] != [
+        "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각",
+    ]:
+        raise RuntimeError("관측입력 A:AD 전투 관측 스키마 검증 실패")
+    current_headers = [check["현재현황"].cell(1, column).value for column in range(1, 36)]
+    if current_headers[30:35] != [
+        "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건",
+    ]:
+        raise RuntimeError("현재현황 AE:AI 전투 관측 스키마 검증 실패")
     if territories and check["영토현황"].max_row != 61:
         raise RuntimeError("영토 행 수 검증 실패")
     if territories:
@@ -1043,6 +1105,7 @@ def build_workbook(
     current_formula = str(check["현재현황"]["G2"].value or "")
     current_evidence_formula = str(check["현재현황"]["U2"].value or "")
     current_row_formula = str(check["현재현황"]["AD2"].value or "")
+    current_combat_formulas = [str(check["현재현황"].cell(2, column).value or "") for column in range(31, 36)]
     growth_formula = str(check["현재현황"]["Z2"].value or "")
     growth_rank_formula = str(check["현재현황"]["AB2"].value or "")
     ranking_score_formula = str(check["무력랭킹"]["H2"].value or "")
@@ -1056,6 +1119,9 @@ def build_workbook(
         raise RuntimeError("현재현황 최신 확인시각 수식 검증 실패")
     if "$AD2" not in current_formula or "$AD2" not in current_evidence_formula:
         raise RuntimeError("현재현황 값/근거 원본행 일치 검증 실패")
+    for formula, source_column in zip(current_combat_formulas, ("Y", "Z", "AA", "AB", "AC")):
+        if "$AD2" not in formula or f"관측입력!${source_column}:${source_column}" not in formula:
+            raise RuntimeError("현재현황 전투 관측 원본행 일치 검증 실패")
     if territories and "$R2" not in territory_formula:
         raise RuntimeError("영토현황 원본행 일치 검증 실패")
     if "SUM(O2:R2)" not in growth_formula:

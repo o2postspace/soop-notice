@@ -15,6 +15,11 @@ const ALLOWED_FIELDS = Object.freeze([
   "vitality",
   "intelligence",
   "powerScore",
+  "maxHealth",
+  "basicAttackDamage",
+  "basicAttackSampleCount",
+  "basicAttackTarget",
+  "combatConditions",
 ]);
 const SOURCE_TYPES = Object.freeze(["sheet", "fmkorea", "broadcast"]);
 const MIN_BROADCAST_CONFIDENCE = 0.95;
@@ -39,6 +44,15 @@ const NUMERIC_FIELD_MAXIMUMS = Object.freeze({
   vitality: 1_000_000,
   intelligence: 1_000_000,
   powerScore: 1_000_000,
+  maxHealth: 1_000_000,
+  basicAttackDamage: 1_000_000,
+  basicAttackSampleCount: 10_000,
+});
+const DECIMAL_NUMERIC_FIELDS = new Set(["powerScore", "basicAttackDamage"]);
+const TEXT_FIELD_MAX_LENGTHS = Object.freeze({
+  horse: 80,
+  basicAttackTarget: 120,
+  combatConditions: 240,
 });
 const PLAYER_ID_PATTERN = /^P\d{3}$/;
 const OBSERVATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -131,15 +145,15 @@ function normalizeNumber(value, field) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > maximum) {
     fail("invalid_value", `${field} 값은 0 이상 ${maximum} 이하의 숫자여야 합니다.`);
   }
-  if (field !== "powerScore" && !Number.isInteger(value)) {
+  if (!DECIMAL_NUMERIC_FIELDS.has(field) && !Number.isInteger(value)) {
     fail("invalid_value", `${field} 값은 정수여야 합니다.`);
   }
   return Object.is(value, -0) ? 0 : value;
 }
 
 function normalizeValue(field, value) {
-  if (field === "horse") {
-    return normalizeText(value, "horse", { maxLength: 80 });
+  if (Object.prototype.hasOwnProperty.call(TEXT_FIELD_MAX_LENGTHS, field)) {
+    return normalizeText(value, field, { maxLength: TEXT_FIELD_MAX_LENGTHS[field] });
   }
   return normalizeNumber(value, field);
 }
