@@ -1204,6 +1204,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
   .samguk-source-badge { border: 1px solid #d9dceb; background: #f5f6fb; color: #71778e; }
   .samguk-source-badge.is-sheet { border-color: #bfe1ca; background: #edf8f0; color: #34774a; }
+  .samguk-source-badge.is-gamcom { border-color: #b8dced; background: #edf8fd; color: #24718f; }
   .samguk-source-badge.is-fmkorea { border-color: #cbd5f4; background: #f0f3ff; color: #4c62a5; }
   .samguk-source-badge.is-broadcast { border-color: #f0c8c8; background: #fff1f1; color: #b55353; }
   .samguk-verification-badge { border: 1px solid #cfd3f7; background: #f0f1ff; color: #5361cf; }
@@ -1324,6 +1325,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .samguk-rank-coverage { color: #888; }
   html.dark .samguk-source-badge { background: #272832; border-color: #404250; color: #999dac; }
   html.dark .samguk-source-badge.is-sheet { background: #1c3023; border-color: #31523c; color: #78bd8e; }
+  html.dark .samguk-source-badge.is-gamcom { background: #19313c; border-color: #2c5264; color: #79bdd7; }
   html.dark .samguk-source-badge.is-fmkorea { background: #22283a; border-color: #384666; color: #91a7e8; }
   html.dark .samguk-source-badge.is-broadcast { background: #382222; border-color: #613b3b; color: #e39494; }
   html.dark .samguk-verification-badge { background: #272940; border-color: #41466d; color: #99a2f6; }
@@ -3525,10 +3527,10 @@ function samgukPublicDataCoverage(member) {
 }
 
 function samgukReviewBadge(member) {
-  const sourceCount = samgukObservationSourceCount(member);
-  const isCross = sourceCount >= 2;
+  const label = samgukVerificationLabel(member, false);
+  const isCross = /^교차검증/.test(label);
   return '<span class="samguk-review-badge ' + (isCross ? 'is-confirmed' : 'is-baseline') + '">'
-    + (isCross ? '교차검증 ' + sourceCount : '시트 기준') + '</span>';
+    + label + '</span>';
 }
 
 function samgukObservationSourceCount(member) {
@@ -3547,18 +3549,30 @@ function samgukSourceKinds(member) {
     const value = String(chunk || '').trim().toLowerCase();
     if (!value) return;
     if (/broadcast|stream|soop|ocr|방송/.test(value)) found.add('broadcast');
+    if (/gamcom|감컴|지통실|외부참고/.test(value)) found.add('gamcom');
     if (/fmkorea|fmk|에펨|펨코/.test(value)) found.add('fmkorea');
     if (/sheet|google|시트|관리표/.test(value)) found.add('sheet');
   });
   if (!found.size) found.add('sheet');
-  return ['sheet', 'fmkorea', 'broadcast'].filter(function(kind) { return found.has(kind); });
+  return ['sheet', 'gamcom', 'fmkorea', 'broadcast'].filter(function(kind) { return found.has(kind); });
 }
 
 function samgukSourceBadges(member) {
-  const labels = { sheet: '시트', fmkorea: '에펨코리아', broadcast: '방송' };
+  const labels = { sheet: '시트', gamcom: 'Gamcom', fmkorea: '에펨코리아', broadcast: '방송' };
   return samgukSourceKinds(member).map(function(kind) {
     return '<span class="samguk-source-badge is-' + kind + '">' + labels[kind] + '</span>';
   }).join('');
+}
+
+function samgukVerificationLabel(member, compact) {
+  const sourceCount = samgukObservationSourceCount(member);
+  const status = String(member && member.verificationStatus || 'baseline');
+  if (['cross-verified', 'broadcast-verified'].includes(status) && sourceCount >= 2) {
+    return (compact ? '교차 ' : '교차검증 ') + sourceCount;
+  }
+  const kinds = samgukSourceKinds(member);
+  if (kinds.includes('gamcom')) return compact ? 'MAX' : '최댓값 병합';
+  return compact ? '시트' : '시트 기준';
 }
 
 function samgukSafeEvidenceUrl(value) {
@@ -3583,11 +3597,11 @@ function samgukObservedLabel(value) {
 }
 
 function samgukObservationMeta(member) {
-  const sourceCount = samgukObservationSourceCount(member);
   const observed = samgukObservedLabel(member && member.observedAt);
   const evidenceUrl = samgukSafeEvidenceUrl(member && member.evidence);
-  const verification = '<span class="samguk-verification-badge' + (sourceCount >= 2 ? ' is-cross' : '') + '">'
-    + (sourceCount >= 2 ? '교차검증 ' + sourceCount : '시트 기준') + '</span>';
+  const verificationLabel = samgukVerificationLabel(member, false);
+  const verification = '<span class="samguk-verification-badge' + (/^교차검증/.test(verificationLabel) ? ' is-cross' : '') + '">'
+    + verificationLabel + '</span>';
   let time = '';
   if (evidenceUrl) {
     time = '<a class="samguk-observed-link" href="' + escapeHtml(evidenceUrl)
@@ -3599,14 +3613,14 @@ function samgukObservationMeta(member) {
 }
 
 function samgukPowerObservationMeta(member) {
-  const sourceCount = samgukObservationSourceCount(member);
   const observed = samgukObservedLabel(member && member.observedAt);
   const equipmentObserved = samgukObservedLabel(member && member.equipmentObservedAt);
   const hasEngravings = Array.isArray(member && member.engravings) && member.engravings.length > 0;
   const evidenceUrl = samgukSafeEvidenceUrl(member && (member.evidence || member.equipmentEvidence));
   const title = ['현황 ' + (observed || '시각 미확인'), '각인 ' + (equipmentObserved || '미수집')].join(' · ');
-  const verification = '<span class="samguk-verification-badge' + (sourceCount >= 2 ? ' is-cross' : '') + '">'
-    + (sourceCount >= 2 ? '교차 ' + sourceCount : '시트') + '</span>';
+  const verificationLabel = samgukVerificationLabel(member, true);
+  const verification = '<span class="samguk-verification-badge' + (/^교차 /.test(verificationLabel) ? ' is-cross' : '') + '">'
+    + verificationLabel + '</span>';
   const engraving = '<span class="samguk-rank-coverage">각인' + (hasEngravings ? '✓' : '—') + '</span>';
   const link = evidenceUrl
     ? '<a class="samguk-observed-link" href="' + escapeHtml(evidenceUrl) + '" target="_blank" rel="noopener">근거</a>'

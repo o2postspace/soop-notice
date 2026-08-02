@@ -11,12 +11,12 @@
  * 백업_YYYYMMDD_HHmmss_탭이름으로 보존하고 공통 열을 새 탭으로 이관합니다.
  */
 
-var SAMGUK_SETUP_VERSION = "2026.08.02.4";
+var SAMGUK_SETUP_VERSION = "2026.08.03.2";
 var SAMGUK_SETUP_MAX_INPUT_ROW = 5001;
 var SAMGUK_SETUP_PROTECTION_PREFIX = "[SOOPNOTICE_SETUP]";
 var SAMGUK_SETUP_SHEET_ORDER = [
   "사용법", "게임정보", "기준정보", "참가자", "방송모니터링", "관측입력",
-  "현재현황", "장비현황", "무력랭킹", "영토입력", "영토현황", "OCR설정", "변경로그"
+  "현재현황", "장비현황", "무력랭킹", "외부참고", "영토입력", "영토현황", "OCR설정", "변경로그"
 ];
 
 var SAMGUK_SETUP_HEADERS = {
@@ -60,6 +60,12 @@ var SAMGUK_SETUP_HEADERS = {
     "레벨", "랭킹점수", "기준", "무력점수", "무력", "기민", "기력", "지모",
     "장비총강화", "최종확인", "출처종류", "교차검증수", "검증상태", "근거", "정렬순번"
   ],
+  "외부참고": [
+    "player_id", "SOOP_ID", "국가", "세력/길드", "닉네임", "장수/직업",
+    "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
+    "무력", "기민", "기력", "지모", "채택필드", "우리값유지",
+    "우리기준확인", "외부수집시각", "외부갱신시각", "출처URL", "적용정책", "주의"
+  ],
   "영토입력": [
     "territory_observation_id", "영토ID", "확인시각", "근거종류", "근거(URL/타임코드)",
     "번호", "X", "Y", "소유국", "수도", "시설", "레벨", "특수지", "점령상태",
@@ -89,6 +95,7 @@ var SAMGUK_SETUP_SPECS = {
   "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:AI91", tabColor: "#4472C4" },
   "장비현황": { rows: 91, freezeRows: 1, freezeColumns: 2, filter: "A1:R91", tabColor: "#BF9000" },
   "무력랭킹": { rows: 91, freezeRows: 1, freezeColumns: 0, filter: "A1:T91", tabColor: "#C00000" },
+  "외부참고": { rows: 91, freezeRows: 1, freezeColumns: 3, filter: "A1:X91", tabColor: "#5B9BD5" },
   "영토입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:T5001", tabColor: "#ED7D31" },
   "영토현황": { rows: 61, freezeRows: 1, freezeColumns: 4, filter: "A1:Q61", tabColor: "#548235" },
   "OCR설정": { rows: 20, freezeRows: 1, freezeColumns: 0, filter: "A1:K20", tabColor: "#7030A0" },
@@ -101,6 +108,7 @@ var SAMGUK_SETUP_MIGRATION_KEYS = {
   "방송모니터링": "player_id",
   "관측입력": "player_id",
   "장비현황": "SOOP_ID",
+  "외부참고": "player_id",
   "영토입력": "영토ID",
   "OCR설정": "profile_id"
 };
@@ -159,7 +167,7 @@ function setupSamgukSheet() {
     spreadsheet.setActiveSheet(prepared["사용법"]);
     SpreadsheetApp.flush();
     spreadsheet.toast(
-      "13개 운영 탭 설치 완료" + (backups.length ? " · 구형 탭 백업 " + backups.length + "개" : ""),
+      "14개 운영 탭 설치 완료" + (backups.length ? " · 구형 탭 백업 " + backups.length + "개" : ""),
       "삼국지 원장",
       8
     );
@@ -356,8 +364,9 @@ function samgukSeedGuide_(sheet) {
     ["운영 원칙", "확인한 화면마다 완전한 스냅샷 한 행을 추가하며 기존 행을 덮어쓰거나 삭제하지 않습니다."],
     ["1. 시트", "Google Sheet 기준값은 초기 baseline으로 즉시 사용합니다."],
     ["2. 에펨코리아", "글에서 추출한 값은 근거 URL과 확인시각을 함께 수집합니다."],
-    ["3. 방송", "방송 화면은 서로 다른 프레임 두 장 또는 다른 출처와 일치할 때 자동 승격합니다."],
-    ["교차검증", "서로 다른 두 출처가 같은 값을 확인한 최신 스냅샷만 관측입력에 추가합니다."],
+    ["3. Gamcom", "외부참고 원본은 90명 완전 매칭 뒤 숫자 최고값만 병합하고 원문 수집시각을 기록합니다."],
+    ["4. 방송", "방송 화면은 서로 다른 프레임 두 장 또는 다른 출처와 일치할 때 자동 승격합니다."],
+    ["교차검증", "에펨코리아·방송은 서로 다른 근거의 같은 값만 교차검증합니다. Gamcom 최고값 병합은 기준값으로 구분합니다."],
     ["현황/랭킹", "현재현황과 장비현황을 합쳐 사이트 파워랭킹 v1을 계산합니다. 장비현황 빈칸은 미관측이며, 미장착은 '없음'으로 적습니다."],
     ["영토", "영토 변화도 완전한 스냅샷을 영토입력에 추가합니다."],
     ["보호", "출력·수식 영역은 관리자 전용이며 입력 영역은 노란 경고 후 편집할 수 있습니다."],
@@ -384,7 +393,12 @@ function samgukSeedReference_(spreadsheet, sheet) {
   var groups = {
     1: ["국가", "위", "촉", "오"],
     3: ["활동상태", "활동", "휴식", "하차"],
-    5: ["근거종류", "시트", "에펨코리아", "방송", "시트+에펨코리아", "시트+방송", "에펨코리아+방송", "시트+에펨코리아+방송"],
+    5: [
+      "근거종류", "시트", "Gamcom", "에펨코리아", "방송", "시트+Gamcom",
+      "시트+에펨코리아", "시트+방송", "Gamcom+에펨코리아", "Gamcom+방송",
+      "에펨코리아+방송", "시트+Gamcom+에펨코리아", "시트+Gamcom+방송",
+      "시트+에펨코리아+방송", "Gamcom+에펨코리아+방송", "시트+Gamcom+에펨코리아+방송"
+    ],
     7: ["검증상태", "기준값", "교차검증", "방송교차검증", "충돌"],
     9: ["모니터링상태", "대기", "수동확인", "OCR연결", "중지"],
     11: ["방송상태", "확인필요", "LIVE", "OFFLINE", "확인실패"],
@@ -582,11 +596,23 @@ function samgukSnapshotValueFormula_(row, selectedColumn, sheetName, sourceColum
   return "=IF(" + selected + "=\"\",\"\",IF(" + value + "=\"\",\"\"," + value + "))";
 }
 
+function samgukMaxAcceptedValueFormula_(row, sheetName, keyColumn, statusColumn, sourceColumn) {
+  var keyRange = sheetName + "!$" + keyColumn + "$2:$" + keyColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var statusRange = sheetName + "!$" + statusColumn + "$2:$" + statusColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var valueRange = sheetName + "!$" + sourceColumn + "$2:$" + sourceColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var accepted = "((" + statusRange + "=\"기준값\")+(" + statusRange + "=\"교차검증\")+(" + statusRange + "=\"방송교차검증\"))>0";
+  return "=IFERROR(MAX(FILTER(" + valueRange + "," + keyRange + "=$A" + row + "," + accepted + "," + valueRange + "<>\"\")),\"\")";
+}
+
 function samgukInstallCurrentFormulas_(sheet) {
   var sourceColumns = {
     7: "F", 8: "G", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
     15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 20: "C", 21: "E",
     22: "D", 23: "R", 24: "S", 31: "Y", 32: "Z", 33: "AA", 34: "AB", 35: "AC"
+  };
+  var monotonicColumns = {
+    7: "F", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
+    15: "M", 16: "N", 17: "O", 18: "P", 19: "Q"
   };
   var rows = [];
   for (var row = 2; row <= 91; row += 1) {
@@ -599,7 +625,9 @@ function samgukInstallCurrentFormulas_(sheet) {
     values[29] = samgukLatestSnapshotRowFormula_("관측입력", "B", "S", "C", row);
     Object.keys(sourceColumns).forEach(function(columnText) {
       var targetColumn = Number(columnText);
-      values[targetColumn - 1] = samgukSnapshotValueFormula_(row, "AD", "관측입력", sourceColumns[targetColumn]);
+      values[targetColumn - 1] = monotonicColumns[targetColumn]
+        ? samgukMaxAcceptedValueFormula_(row, "관측입력", "B", "S", monotonicColumns[targetColumn])
+        : samgukSnapshotValueFormula_(row, "AD", "관측입력", sourceColumns[targetColumn]);
     });
     values[13] = "=IF(COUNT(J" + row + ":M" + row + ")=0,\"\",SUM(J" + row + ":M" + row + "))";
     values[24] = "=IF(T" + row + "=\"\",\"미확인\",IF(NOW()-T" + row + "<=1/24,\"최신\",IF(NOW()-T" + row + "<=6/24,\"확인 필요\",\"오래됨\")))";
@@ -674,6 +702,7 @@ function samgukConfigureAllSheets_(sheets) {
   sheets["현재현황"].getRange("T2:T91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["장비현황"].getRange("O2:O91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["무력랭킹"].getRange("P2:P91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
+  sheets["외부참고"].getRange("S2:U91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["영토현황"].getRange("L2:L61").setNumberFormat("yyyy-mm-dd hh:mm:ss");
 
   sheets["현재현황"].hideColumns(29, 2);
@@ -696,7 +725,7 @@ function samgukApplyValidations_(sheets) {
   samgukListValidation_(sheets["방송모니터링"].getRange("G2:G91"), reference.getRange("K2:K5"));
   samgukListValidation_(sheets["방송모니터링"].getRange("J2:J91"), reference.getRange("I2:I5"));
   samgukListValidation_(sheets["관측입력"].getRange("B2:B5001"), sheets["참가자"].getRange("A2:A91"));
-  samgukListValidation_(sheets["관측입력"].getRange("D2:D5001"), reference.getRange("E2:E8"));
+  samgukListValidation_(sheets["관측입력"].getRange("D2:D5001"), reference.getRange("E2:E16"));
   samgukListValidation_(sheets["관측입력"].getRange("S2:S5001"), reference.getRange("G2:G5"));
   samgukNumberValidation_(sheets["관측입력"].getRange("F2:F5001"), 10000);
   samgukNumberValidation_(sheets["관측입력"].getRange("H2:H5001"), 80);
@@ -708,7 +737,7 @@ function samgukApplyValidations_(sheets) {
   samgukNumberValidation_(sheets["관측입력"].getRange("AA2:AA5001"), 10000);
 
   samgukListValidation_(sheets["영토입력"].getRange("B2:B5001"), sheets["영토현황"].getRange("A2:A61"));
-  samgukListValidation_(sheets["영토입력"].getRange("D2:D5001"), reference.getRange("E2:E8"));
+  samgukListValidation_(sheets["영토입력"].getRange("D2:D5001"), reference.getRange("E2:E16"));
   samgukListValidation_(sheets["영토입력"].getRange("I2:I5001"), reference.getRange("P2:P5"));
   samgukListValidation_(sheets["영토입력"].getRange("J2:J5001"), reference.getRange("R2:R3"));
   samgukListValidation_(sheets["영토입력"].getRange("K2:K5001"), reference.getRange("T2:T5"));
@@ -745,7 +774,7 @@ function samgukNumberValidation_(targetRange, maximum) {
 function samgukApplyAllProtections_(sheets) {
   SAMGUK_SETUP_SHEET_ORDER.forEach(function(name) { samgukRemoveManagedProtections_(sheets[name]); });
 
-  ["사용법", "기준정보", "현재현황", "무력랭킹", "영토현황", "변경로그"].forEach(function(name) {
+  ["사용법", "기준정보", "현재현황", "무력랭킹", "외부참고", "영토현황", "변경로그"].forEach(function(name) {
     samgukProtectAdminOnly_(sheets[name], []);
   });
   samgukProtectInputSheet_(sheets["게임정보"], ["A2:F30"]);

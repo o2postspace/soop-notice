@@ -10,6 +10,7 @@ const appsScriptDirectory = path.join(scriptsDirectory, "google-apps-script");
 const setupPath = path.join(appsScriptDirectory, "samguk-sheet-setup.gs");
 const seedPath = path.join(appsScriptDirectory, "samguk-sheet-seed.generated.gs");
 const webhookPath = path.join(appsScriptDirectory, "samguk-observation-webhook.gs");
+const gamcomSyncPath = path.join(appsScriptDirectory, "samguk-gamcom-sync.gs");
 const builderPath = path.join(scriptsDirectory, "build-samguk-tracker.py");
 const fallback = require("../data/samguk-fallback.json");
 
@@ -45,7 +46,7 @@ test("설치용 generated seed는 현재 fallback의 참가자 90명과 영토 6
   assert.equal(check.status, 0, check.stderr);
 });
 
-test("setup은 13개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 설치한다", () => {
+test("setup은 14개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 설치한다", () => {
   const text = source(setupPath);
   assert.doesNotThrow(() => new Function(text));
   const orderMatch = text.match(/var SAMGUK_SETUP_SHEET_ORDER = (\[[\s\S]*?\]);/);
@@ -53,7 +54,7 @@ test("setup은 13개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   const order = vm.runInNewContext(orderMatch[1]);
   assert.deepEqual(Array.from(order), [
     "사용법", "게임정보", "기준정보", "참가자", "방송모니터링", "관측입력",
-    "현재현황", "장비현황", "무력랭킹", "영토입력", "영토현황", "OCR설정", "변경로그",
+    "현재현황", "장비현황", "무력랭킹", "외부참고", "영토입력", "영토현황", "OCR설정", "변경로그",
   ]);
   assert.match(text, /spreadsheet\.rename\("SOOPNOTICE 삼국지 운영원장"\)/);
   assert.match(text, /백업_" \+ timestamp \+ "_" \+ originalName/);
@@ -65,6 +66,8 @@ test("setup은 13개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   assert.match(text, /SAMGUK_SETUP_SEED\.members\.length !== 90/);
   assert.match(text, /SAMGUK_SETUP_SEED\.territories\.length !== 60/);
   assert.match(text, /samgukInstallCurrentFormulas_/);
+  assert.match(text, /samgukMaxAcceptedValueFormula_/);
+  assert.match(text, /var monotonicColumns =/);
   assert.match(text, /MAX\(FILTER\(/);
   assert.match(text, /RANK\.EQ/);
   assert.match(text, /setProperty\("SAMGUK_SETUP_VERSION"/);
@@ -106,6 +109,20 @@ test("webhook은 A:AD 전체가 빈 첫 행만 쓰고 미래 관측시각을 400
   assert.match(text, /observedAt > Date\.now\(\) \+ SAMGUK_MAX_CLOCK_SKEW_MS/);
   assert.match(text, /throw new Error\("future_observed_at"\)/);
   assert.match(text, /return 400/);
+  assert.match(text, /"gamcom-max": "기준값"/);
+  assert.match(text, /invalid_gamcom_max/);
+});
+
+test("Gamcom Apps Script는 최고값 기준과 안정적 중복 제거·트리거 교체 순서를 강제한다", () => {
+  const text = source(gamcomSyncPath);
+  assert.doesNotThrow(() => new Function(text));
+  assert.match(text, /Math\.max\(currentValue, externalValue\)/);
+  assert.match(text, /samgukGamcomFillParticipantText_/);
+  assert.match(text, /samgukGamcomMigrateLegacyProvenance_/);
+  assert.match(text, /samgukGamcomInstallMonotonicFormulas_/);
+  assert.match(text, /"검증상태": "기준값"/);
+  assert.doesNotMatch(text, /sourceUrl: member\.gamcom\.sourceUrl,\s*collectedAt:/);
+  assert.match(text, /var result = syncSamgukGamcom\(\);[\s\S]*getProjectTriggers\(\)/);
 });
 
 test("Python 원장 generator도 빈 A열에 ID 수식을 미리 채우지 않는다", () => {

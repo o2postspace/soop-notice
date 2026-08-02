@@ -21,7 +21,7 @@ const ALLOWED_FIELDS = Object.freeze([
   "basicAttackTarget",
   "combatConditions",
 ]);
-const SOURCE_TYPES = Object.freeze(["sheet", "fmkorea", "broadcast"]);
+const SOURCE_TYPES = Object.freeze(["sheet", "gamcom", "fmkorea", "broadcast"]);
 const MIN_BROADCAST_CONFIDENCE = 0.95;
 const DEFAULT_CONSENSUS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_OBSERVATION_FUTURE_SKEW_MS = 5 * 60 * 1000;
@@ -164,6 +164,7 @@ function hostMatches(hostname, root) {
 
 function sourceHostAllowed(sourceType, hostname) {
   if (sourceType === "sheet") return hostname === "docs.google.com";
+  if (sourceType === "gamcom") return hostname === "gamcom-3kingdom.vercel.app";
   if (sourceType === "fmkorea") return hostMatches(hostname, "fmkorea.com");
   if (sourceType === "broadcast") {
     return hostMatches(hostname, "sooplive.com") || hostMatches(hostname, "sooplive.co.kr");

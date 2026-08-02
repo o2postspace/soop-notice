@@ -22,6 +22,7 @@ function observation(overrides = {}) {
   const sourceType = overrides.sourceType || "sheet";
   const urls = {
     sheet: "https://docs.google.com/spreadsheets/d/test/edit",
+    gamcom: "https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84",
     fmkorea: "https://www.fmkorea.com/123456",
     broadcast: "https://play.sooplive.co.kr/testbj/1234",
   };
@@ -89,6 +90,9 @@ test("허용 필드, 값, URL host와 임의 상태 필드를 엄격히 검증�
     ocrConfidence: "0.97",
   }));
   assert.equal(broadcast.ocrConfidence, 0.97);
+
+  const gamcom = normalizeObservation(observation({ sourceType: "gamcom" }));
+  assert.equal(gamcom.sourceType, "gamcom");
 });
 
 test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 사용한다", () => {

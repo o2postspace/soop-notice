@@ -14,6 +14,7 @@ const OBSERVATION_SHEET = "관측입력";
 const PARTICIPANT_SHEET = "참가자";
 const OBSERVATION_LAST_COLUMN = "AD";
 const MAX_OBSERVATION_ROW = 5001;
+const MAX_SNAPSHOT_BATCH = 100;
 const MAX_TOKEN_BYTES = 32 * 1024;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 512 * 1024;
@@ -47,10 +48,16 @@ const EXPECTED_HEADERS = Object.freeze([
   "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모",
   "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각",
 ]);
-const SOURCE_LABELS = Object.freeze({ sheet: "시트", fmkorea: "에펨코리아", broadcast: "방송" });
+const SOURCE_LABELS = Object.freeze({
+  sheet: "시트",
+  gamcom: "Gamcom",
+  fmkorea: "에펨코리아",
+  broadcast: "방송",
+});
 const STATUS_LABELS = Object.freeze({
   "cross-source": "교차검증",
   "broadcast-repeat": "방송교차검증",
+  "gamcom-max": "기준값",
 });
 
 class SamgukGoogleSheetWriterError extends Error {
@@ -91,7 +98,7 @@ function allowedSourceUrl(value) {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password) return false;
     const host = url.hostname.toLowerCase();
-    return ["docs.google.com", "fmkorea.com", "sooplive.com", "sooplive.co.kr"]
+    return ["docs.google.com", "gamcom-3kingdom.vercel.app", "fmkorea.com", "sooplive.com", "sooplive.co.kr"]
       .some(root => host === root || host.endsWith(`.${root}`));
   } catch {
     return false;
@@ -120,7 +127,7 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
   if (!Object.prototype.hasOwnProperty.call(STATUS_LABELS, snapshot.verification)) {
     fail("invalid_snapshot", "교차검증 상태가 올바르지 않습니다.");
   }
-  if (!Array.isArray(snapshot.sourceTypes) || snapshot.sourceTypes.length < 1 || snapshot.sourceTypes.length > 3
+  if (!Array.isArray(snapshot.sourceTypes) || snapshot.sourceTypes.length < 1 || snapshot.sourceTypes.length > 4
       || snapshot.sourceTypes.some(value => !Object.prototype.hasOwnProperty.call(SOURCE_LABELS, value))) {
     fail("invalid_snapshot", "근거 출처가 올바르지 않습니다.");
   }
@@ -147,6 +154,11 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
       && (sourceTypes.size !== 1 || !sourceTypes.has("broadcast")
         || snapshot.primarySourceType !== "broadcast")) {
     fail("invalid_snapshot", "방송 반복검증은 방송 근거만 사용할 수 있습니다.");
+  }
+  if (snapshot.verification === "gamcom-max"
+      && (sourceTypes.size !== 2 || !sourceTypes.has("sheet") || !sourceTypes.has("gamcom")
+        || snapshot.primarySourceType !== "gamcom" || snapshot.sourceCount !== 2)) {
+    fail("invalid_snapshot", "Gamcom 최고값 병합 근거가 올바르지 않습니다.");
   }
   if (!snapshot.fields || typeof snapshot.fields !== "object" || Array.isArray(snapshot.fields)
       || FIELD_NAMES.some(field => !Object.prototype.hasOwnProperty.call(snapshot.fields, field))) {
@@ -527,7 +539,149 @@ function createSamgukGoogleSheetWriter(options = {}) {
     }
   }
 
-  return Object.freeze({ appendSnapshot });
+  async function appendSnapshotsUnlocked(inputs) {
+    const snapshots = inputs.map(input => normalizeSnapshot(input, now()));
+    const observationIds = new Set();
+    for (const snapshot of snapshots) {
+      if (observationIds.has(snapshot.observationId)) {
+        fail("duplicate_observation_id", "batch 안에 중복 observationId가 있습니다.");
+      }
+      observationIds.add(snapshot.observationId);
+    }
+
+    const metadataQuery = new URLSearchParams({ fields: "properties(timeZone)" });
+    const metadata = await request(apiUrl("", metadataQuery));
+    if (!metadata.ok || metadata.body?.properties?.timeZone !== "Asia/Seoul") {
+      fail("invalid_sheet", "Google Sheet timezone은 Asia/Seoul이어야 합니다.");
+    }
+
+    const stateQuery = new URLSearchParams({
+      majorDimension: "ROWS",
+      valueRenderOption: "FORMULA",
+    });
+    stateQuery.append("ranges", `'${OBSERVATION_SHEET}'!A1:${OBSERVATION_LAST_COLUMN}1`);
+    stateQuery.append("ranges", `'${OBSERVATION_SHEET}'!A2:${OBSERVATION_LAST_COLUMN}${MAX_OBSERVATION_ROW}`);
+    stateQuery.append("ranges", `'${PARTICIPANT_SHEET}'!A2:A91`);
+    const state = await request(apiUrl("/values:batchGet", stateQuery));
+    if (!state.ok || !Array.isArray(state.body?.valueRanges) || state.body.valueRanges.length !== 3) {
+      fail("invalid_sheet", "Google Sheet 구조를 읽지 못했습니다.");
+    }
+    const headers = state.body.valueRanges[0].values?.[0] || [];
+    if (headers.length !== EXPECTED_HEADERS.length
+        || headers.some((header, index) => header !== EXPECTED_HEADERS[index])) {
+      fail("invalid_sheet", "관측입력 헤더가 예상 구조와 다릅니다.");
+    }
+    const roster = new Set((state.body.valueRanges[2].values || []).map(row => String(row[0] || "").trim()));
+    const indexRows = state.body.valueRanges[1].values || [];
+    if (!Array.isArray(indexRows)
+        || indexRows.some(row => !Array.isArray(row) || row.length > EXPECTED_HEADERS.length)) {
+      fail("invalid_sheet", "관측입력 행 구조가 올바르지 않습니다.");
+    }
+
+    const existingById = new Map();
+    const emptyRows = [];
+    for (let index = 0; index < MAX_OBSERVATION_ROW - 1; index += 1) {
+      const row = indexRows[index] || [];
+      const observationId = String(row[0] || "");
+      if (observationId && !existingById.has(observationId)) existingById.set(observationId, { row, rowNumber: index + 2 });
+      if (rowIsEmpty(row)) emptyRows.push(index + 2);
+    }
+
+    const results = [];
+    const writes = [];
+    let emptyCursor = 0;
+    for (const snapshot of snapshots) {
+      if (!roster.has(snapshot.playerId)) fail("unknown_player", `참가자에 없는 playerId입니다: ${snapshot.playerId}`);
+      const expectedRow = snapshotRow(snapshot);
+      const existing = existingById.get(snapshot.observationId);
+      if (existing) {
+        assertMatchingRow(existing.row, expectedRow, { ignoreInputTime: true });
+        results.push({ observationId: snapshot.observationId, duplicate: true, appendedRow: existing.rowNumber });
+        continue;
+      }
+      if (emptyCursor >= emptyRows.length) fail("observation_sheet_full", "관측입력 5000행이 모두 사용 중입니다.");
+      const rowNumber = emptyRows[emptyCursor];
+      emptyCursor += 1;
+      const range = `'${OBSERVATION_SHEET}'!A${rowNumber}:${OBSERVATION_LAST_COLUMN}${rowNumber}`;
+      writes.push({ range, majorDimension: "ROWS", values: [expectedRow], rowNumber, expectedRow });
+      results.push({ observationId: snapshot.observationId, duplicate: false, appendedRow: rowNumber });
+    }
+
+    if (writes.length > 0) {
+      const prewriteQuery = new URLSearchParams({
+        majorDimension: "ROWS",
+        valueRenderOption: "FORMULA",
+      });
+      writes.forEach(item => prewriteQuery.append("ranges", item.range));
+      const prewrite = await request(apiUrl("/values:batchGet", prewriteQuery));
+      if (!prewrite.ok || !Array.isArray(prewrite.body?.valueRanges)
+          || prewrite.body.valueRanges.length !== writes.length) {
+        fail("upstream_error", "Google Sheet 일괄 저장 직전 상태를 확인하지 못했습니다.");
+      }
+      if (prewrite.body.valueRanges.some(valueRange => !rowIsEmpty(valueRange?.values?.[0] || []))) {
+        fail("target_row_conflict", "Google Sheet 일괄 저장 대상 행이 먼저 사용되었습니다.");
+      }
+
+      const update = await request(apiUrl("/values:batchUpdate"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({
+          valueInputOption: "RAW",
+          data: writes.map(({ range, majorDimension, values }) => ({ range, majorDimension, values })),
+        }),
+      });
+      if (!update.ok || update.body?.totalUpdatedRows !== writes.length
+          || !Array.isArray(update.body?.responses) || update.body.responses.length !== writes.length
+          || update.body.responses.some(item => item?.updatedRows !== 1)) {
+        fail("upstream_error", `Google Sheet 일괄 저장에 실패했습니다 (${update.status}).`);
+      }
+
+      const readbackQuery = new URLSearchParams({
+        majorDimension: "ROWS",
+        valueRenderOption: "UNFORMATTED_VALUE",
+        dateTimeRenderOption: "SERIAL_NUMBER",
+      });
+      writes.forEach(item => readbackQuery.append("ranges", item.range));
+      const readback = await request(apiUrl("/values:batchGet", readbackQuery));
+      if (!readback.ok || !Array.isArray(readback.body?.valueRanges)
+          || readback.body.valueRanges.length !== writes.length) {
+        fail("upstream_error", "Google Sheet 일괄 저장 검증에 실패했습니다.");
+      }
+      readback.body.valueRanges.forEach((valueRange, index) => {
+        const row = valueRange?.values?.[0] || [];
+        assertMatchingRow(row, writes[index].expectedRow);
+      });
+    }
+
+    return {
+      ok: true,
+      results,
+      appendedCount: writes.length,
+      duplicateCount: results.length - writes.length,
+    };
+  }
+
+  async function appendSnapshots(inputs) {
+    if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > MAX_SNAPSHOT_BATCH) {
+      fail("invalid_snapshot_batch", `snapshot batch는 1~${MAX_SNAPSHOT_BATCH}개여야 합니다.`);
+    }
+    const ids = new Set();
+    for (const input of inputs) {
+      const id = input && typeof input === "object" ? input.observationId : null;
+      if (typeof id === "string" && ids.has(id)) {
+        fail("duplicate_observation_id", "batch 안에 중복 observationId가 있습니다.");
+      }
+      if (typeof id === "string") ids.add(id);
+    }
+    const lock = acquireLock(lockPath);
+    try {
+      return await appendSnapshotsUnlocked(inputs);
+    } finally {
+      lock.release();
+    }
+  }
+
+  return Object.freeze({ appendSnapshot, appendSnapshots });
 }
 
 module.exports = {
@@ -540,6 +694,7 @@ module.exports = {
   GOOGLE_TOKEN_URI,
   KST_OFFSET_DAYS,
   MAX_OBSERVATION_ROW,
+  MAX_SNAPSHOT_BATCH,
   SamgukGoogleSheetWriterError,
   createSamgukGoogleSheetWriter,
   normalizeSnapshot,
