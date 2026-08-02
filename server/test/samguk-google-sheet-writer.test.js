@@ -8,6 +8,7 @@ const path = require("node:path");
 const {
   EXPECTED_HEADERS,
   GOOGLE_SHEETS_SCOPE,
+  OBSERVATION_LAST_COLUMN,
   createSamgukGoogleSheetWriter,
   normalizeSnapshot,
   readPrivateTokenFile,
@@ -50,6 +51,11 @@ function snapshot(overrides = {}) {
       vitality: 13,
       intelligence: 14,
       powerScore: null,
+      maxHealth: 1239,
+      basicAttackDamage: 343.5,
+      basicAttackSampleCount: 10,
+      basicAttackTarget: "훈련용 허수아비",
+      combatConditions: "무버프·비치명",
     },
     observedAt: "2026-08-02T06:00:00.000Z",
     verification: "broadcast-repeat",
@@ -119,6 +125,7 @@ test("snapshot 숫자는 Sheet 필드별 상한과 정수 조건을 지킨다", 
     ...snapshot().fields,
     ...NUMERIC_FIELD_MAXIMUMS,
     powerScore: 999_999.5,
+    basicAttackDamage: 999_999.5,
   };
   assert.deepEqual(normalizeSnapshot(snapshot({ fields: maximumFields }), NOW).fields, maximumFields);
 
@@ -126,7 +133,7 @@ test("snapshot 숫자는 Sheet 필드별 상한과 정수 조건을 지킨다", 
     assertInvalidSnapshot(snapshot({
       fields: { ...snapshot().fields, [field]: maximum + 1 },
     }));
-    if (field !== "powerScore") {
+    if (!["powerScore", "basicAttackDamage"].includes(field)) {
       assertInvalidSnapshot(snapshot({
         fields: { ...snapshot().fields, [field]: 1.5 },
       }));
@@ -161,7 +168,7 @@ test("snapshot은 출처 중복·검증 의미 불일치와 2000년 이전 관�
   assert.deepEqual(crossSource.sourceTypes, ["broadcast", "fmkorea"]);
 });
 
-test("OAuth writer는 첫 A:Y 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {
+test("OAuth writer는 첫 A:AD 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const indexRows = Array.from({ length: 90 }, (_value, index) => [
     `OBS-SEED-${String(index + 1).padStart(4, "0")}`,
@@ -193,9 +200,9 @@ test("OAuth writer는 첫 A:Y 완전 빈행만 정확히 쓰고 전체 행을 �
       }
       if (init.method === "PUT") {
         writtenRow = JSON.parse(init.body).values[0];
-        return response({ updatedRows: 1, updatedRange: "관측입력!A92:Y92" });
+        return response({ updatedRows: 1, updatedRange: "관측입력!A92:AD92" });
       }
-      if (url.includes("A92%3AY92")) return response({ values: [writtenRow] });
+      if (url.includes("A92%3AAD92")) return response({ values: [writtenRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
@@ -206,11 +213,17 @@ test("OAuth writer는 첫 A:Y 완전 빈행만 정확히 쓰고 전체 행을 �
     appendedRow: 92,
   });
   assert.equal(released, 1);
-  assert.equal(writtenRow.length, 25);
+  assert.equal(OBSERVATION_LAST_COLUMN, "AD");
+  assert.equal(writtenRow.length, 30);
   assert.equal(writtenRow[0], "OBS-CROSS-1234567890ABCDEF");
   assert.equal(writtenRow[1], "P001");
   assert.equal(writtenRow[22], 95);
-  assert.equal(writtenRow[24], sheetSerial(NOW, "입력"));
+  assert.equal(writtenRow[24], 1239);
+  assert.equal(writtenRow[25], 343.5);
+  assert.equal(writtenRow[26], 10);
+  assert.equal(writtenRow[27], "훈련용 허수아비");
+  assert.equal(writtenRow[28], "무버프·비치명");
+  assert.equal(writtenRow[29], sheetSerial(NOW, "입력"));
   assert.equal(requests.filter(item => item.method === "PUT").length, 1);
 });
 
@@ -231,14 +244,14 @@ test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다"
         { values: [["OBS-CROSS-1234567890ABCDEF", "P001"]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AY2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAD2")) return response({ values: [expectedRow] });
       assert.notEqual(init.method, "PUT");
       throw new Error(`unexpected request: ${url}`);
     },
   });
   const normalized = normalizeSnapshot(snapshot(), NOW);
   expectedRow = snapshotRow(normalized);
-  expectedRow[24] -= 1;
+  expectedRow[29] -= 1;
 
   assert.deepEqual(await writer.appendSnapshot(snapshot()), {
     ok: true,
@@ -247,7 +260,7 @@ test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다"
   });
 });
 
-test("첫 완전 빈 A:Y 행만 고르고 쓰기 직전 부분 점유를 다시 확인한다", async (t) => {
+test("첫 완전 빈 A:AD 행만 고르고 쓰기 직전 부분 점유를 다시 확인한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const partialRow = Array(EXPECTED_HEADERS.length).fill("");
   partialRow[23] = "수동 메모";
@@ -273,13 +286,13 @@ test("첫 완전 빈 A:Y 행만 고르고 쓰기 직전 부분 점유를 다시 
         { values: [partialRow, []] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A3%3AY3") && init.method !== "PUT") {
+      if (url.includes("A3%3AAD3") && init.method !== "PUT") {
         return response({ values: [writtenRow] });
       }
       if (init.method === "PUT") {
         putCalls += 1;
         writtenRow = JSON.parse(init.body).values[0];
-        return response({ updatedRows: 1, updatedRange: "관측입력!A3:Y3" });
+        return response({ updatedRows: 1, updatedRange: "관측입력!A3:AD3" });
       }
       throw new Error(`unexpected request: ${url}`);
     },
@@ -291,7 +304,7 @@ test("첫 완전 빈 A:Y 행만 고르고 쓰기 직전 부분 점유를 다시 
     appendedRow: 3,
   });
   assert.equal(putCalls, 1);
-  assert.ok(requestedUrls.some(url => url.includes("A2%3AY5001")));
+  assert.ok(requestedUrls.some(url => url.includes("A2%3AAD5001")));
   assert.ok(requestedUrls.some(url => url.includes("valueRenderOption=FORMULA")));
 
   let racePutCalls = 0;
@@ -314,7 +327,7 @@ test("첫 완전 빈 A:Y 행만 고르고 쓰기 직전 부분 점유를 다시 
         { values: [[]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AY2") && init.method !== "PUT") {
+      if (url.includes("A2%3AAD2") && init.method !== "PUT") {
         return response({ values: [partialRow] });
       }
       if (init.method === "PUT") racePutCalls += 1;
@@ -333,7 +346,7 @@ test("첫 완전 빈 A:Y 행만 고르고 쓰기 직전 부분 점유를 다시 
 test("비JSON 429·5xx는 최대 3회 안에서 재시도하고 성공 응답만 사용한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const expectedRow = snapshotRow(normalizeSnapshot(snapshot(), NOW));
-  expectedRow[24] -= 1;
+  expectedRow[29] -= 1;
   let metadataCalls = 0;
   const writer = createSamgukGoogleSheetWriter({
     tokenPath,
@@ -356,7 +369,7 @@ test("비JSON 429·5xx는 최대 3회 안에서 재시도하고 성공 응답만
         { values: [[snapshot().observationId, "P001"]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AY2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAD2")) return response({ values: [expectedRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
@@ -397,7 +410,7 @@ test("AbortError는 3회까지만 재시도한 뒤 timeout으로 닫힌다", asy
 test("401은 access token을 한 번만 새로 받고 요청을 다시 인증한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const expectedRow = snapshotRow(normalizeSnapshot(snapshot(), NOW));
-  expectedRow[24] -= 1;
+  expectedRow[29] -= 1;
   const authorizations = [];
   let tokenCalls = 0;
   let metadataCalls = 0;
@@ -423,7 +436,7 @@ test("401은 access token을 한 번만 새로 받고 요청을 다시 인증한
         { values: [[snapshot().observationId, "P001"]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AY2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAD2")) return response({ values: [expectedRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });

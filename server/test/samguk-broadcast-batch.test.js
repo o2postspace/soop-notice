@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   BATCH_FIELDS,
+  MAX_BATCH_RESULTS,
   SamgukBroadcastBatchError,
   appendBroadcastBatch,
   flattenBroadcastBatch,
@@ -75,7 +76,7 @@ test("top-level과 result extra key, 중복·미허용 field를 frame 전체 오
   }))));
 });
 
-test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 11개다", () => {
+test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 12개다", () => {
   const complete = parseBroadcastBatchOutput(JSON.stringify(batch({
     results: BATCH_FIELDS.map((field, index) => ({
       field,
@@ -83,13 +84,15 @@ test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 
       confidence: 0.99,
     })),
   })));
-  assert.equal(complete.results.length, 11);
+  assert.equal(MAX_BATCH_RESULTS, 12);
+  assert.equal(complete.results.length, 12);
+  assert.ok(BATCH_FIELDS.includes("maxHealth"));
 
   const hidden = parseBroadcastBatchOutput(JSON.stringify(batch({ panelVisible: false, results: [] })));
   assert.deepEqual(Array.from(hidden.results), []);
   rejectsWith("invalid_schema", () => parseBroadcastBatchOutput(JSON.stringify(batch({ panelVisible: false }))));
   rejectsWith("invalid_schema", () => parseBroadcastBatchOutput(JSON.stringify(batch({
-    results: Array.from({ length: 12 }, (_value, index) => ({
+    results: Array.from({ length: MAX_BATCH_RESULTS + 1 }, (_value, index) => ({
       field: BATCH_FIELDS[index % BATCH_FIELDS.length],
       value: index,
       confidence: 0.99,

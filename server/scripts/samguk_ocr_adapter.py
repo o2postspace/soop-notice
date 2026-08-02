@@ -47,6 +47,10 @@ INTEGER_RE = re.compile(r"^(\d{1,3}(?:,\d{3})*|\d{1,9})(?:\([+-]?\d+(?:\.\d+)?\)
 ENHANCEMENT_RE = re.compile(r"(?:\(\s*)?\+\s*(\d{1,2})(?:\s*\))?|(?<!\d)(\d{1,2})\s*강")
 ENHANCEMENT_PAREN_RE = re.compile(r"\((\d{1,2})\)$")
 HORSE_STAGE_RE = re.compile(r"(?<!\d)(\d{1,2})단계")
+HEALTH_RATIO_RE = re.compile(
+    r"^\(?\s*(\d{1,3}(?:,\d{3})*|\d{1,7})\s*/\s*"
+    r"(\d{1,3}(?:,\d{3})*|\d{1,7})\s*\)?$",
+)
 
 MODEL_NAMES = (
     "PP-OCRv6_det_small.onnx",
@@ -79,6 +83,7 @@ ENHANCEMENT_MARKERS = (
 )
 HORSE_PANEL_HEADERS = ("군마영",)
 HORSE_PANEL_TABS = ("장착", "강화", "합성")
+HUD_COMBAT_PROFILE = "hud-combat-v1"
 
 
 class AdapterError(Exception):
@@ -457,10 +462,47 @@ def _horse_stage(
     return True, (value, min(structural_confidence, max(scores)))
 
 
+def _player_max_health(
+    image: Any,
+    tokens: Sequence[Token],
+) -> Optional[tuple[int, float]]:
+    """중앙 하단 플레이어 HUD의 ``현재/최대`` 체력 표기만 고른다.
+
+    우측 하단 군마 HP, 좌상단 날짜·재화와 혼동하지 않도록 좌표를
+    해상도 비율로 제한한다. OCR confidence를 구조만으로 올리지 않는다.
+    """
+    height, width = image.shape[:2]
+    candidates = []
+    for token in tokens:
+        match = HEALTH_RATIO_RE.fullmatch(
+            unicodedata.normalize("NFKC", token.text).strip(),
+        )
+        if not match:
+            continue
+        current = int(match.group(1).replace(",", ""))
+        maximum = int(match.group(2).replace(",", ""))
+        if maximum < 1 or maximum > 1_000_000 or current < 0 or current > maximum:
+            continue
+        normalized_x = token.cx / width
+        normalized_y = token.cy / height
+        normalized_height = token.height / height
+        if not (0.20 <= normalized_x <= 0.70 and 0.78 <= normalized_y <= 0.98):
+            continue
+        if not (0.008 <= normalized_height <= 0.08):
+            continue
+        distance = abs(normalized_x - 0.42) + abs(normalized_y - 0.93)
+        candidates.append((distance, -token.confidence, maximum, token.confidence))
+    if not candidates:
+        return None
+    _, _, maximum, confidence = min(candidates)
+    return maximum, confidence
+
+
 def parse_panel(
     image: Any,
     tokens: Sequence[Token],
     line_reader: Callable[[Any, int], tuple[str, float]],
+    profile: str = DEFAULT_PROFILE,
 ) -> tuple[bool, list[dict[str, Any]]]:
     normalized = [(token, compact_text(token.text)) for token in tokens if token.confidence >= 0.30]
     stat_labels = [(token, STAT_FIELDS[text]) for token, text in normalized if text in STAT_FIELDS]
@@ -489,15 +531,26 @@ def parse_panel(
         value, confidence = horse_stage
         results.append({"field": "horseLevel", "value": value, "confidence": confidence})
 
+    hud_visible = False
+    if profile == HUD_COMBAT_PROFILE:
+        max_health = _player_max_health(image, tokens)
+        if max_health is not None:
+            value, confidence = max_health
+            results.append({"field": "maxHealth", "value": value, "confidence": confidence})
+            hud_visible = True
+
     texts = {text for _, text in normalized}
     marker_count = sum(any(marker in text for text in texts) for marker in ENHANCEMENT_MARKERS)
     has_stage = any("단계" in text and ("→" in text or "->" in text) for text in texts)
     # 작은 단계 제목이 detector에서 빠져도 성공/하락/button/비용의 네 구조가
     # 동시에 있으면 강화 panel로 볼 수 있다. 장비 종류가 없으면 값은 비운다.
     enhancement_panel = marker_count >= 3 and (has_stage or marker_count >= 4)
-    panel_visible = stat_panel or enhancement_panel or horse_panel or bool(results)
+    panel_visible = stat_panel or enhancement_panel or horse_panel or hud_visible or bool(results)
     order = {name: index for index, name in enumerate(
-        ("horseLevel", "weapon", "helmet", "armor", "shoes", "strength", "agility", "vitality", "intelligence")
+        (
+            "maxHealth", "horseLevel", "weapon", "helmet", "armor", "shoes",
+            "strength", "agility", "vitality", "intelligence",
+        )
     )}
     results.sort(key=lambda item: order[item["field"]])
     return panel_visible, results
@@ -520,7 +573,7 @@ def run(argv: Sequence[str], stdin: Any) -> dict[str, Any]:
     runtime = RapidOcrRuntime(model_dir)
     image = runtime.decode(png, dimensions)
     tokens = runtime.detect(image)
-    visible, results = parse_panel(image, tokens, runtime.recognize_line)
+    visible, results = parse_panel(image, tokens, runtime.recognize_line, profile=profile)
     return make_batch(profile, visible, results)
 
 

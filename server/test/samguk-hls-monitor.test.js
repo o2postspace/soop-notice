@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  DEFAULT_HUD_PROBE_INTERVAL_MS,
   DEFAULT_SCHEDULER_OPTIONS,
   SamgukHlsMonitorError,
   buildBaselinesFromMembers,
@@ -99,8 +100,9 @@ test("fallback roster를 중복 없는 P001~P090 target과 baseline으로 만든
   assert.equal(targets[0].id, "P001");
   assert.equal(targets.at(-1).id, "P090");
   assert.equal(new Set(targets.map(item => item.bjId)).size, 90);
-  assert.ok(baselines.length > 0 && baselines.length <= 90 * 11);
+  assert.ok(baselines.length > 0 && baselines.length <= 90 * 12);
   assert.equal(baselines.some(item => item.field === "powerScore"), false);
+  assert.equal(DEFAULT_HUD_PROBE_INTERVAL_MS, 10 * 60_000);
 });
 
 test("target은 playerId와 BJ 공개 player URL을 엄격히 묶는다", () => {
@@ -115,6 +117,16 @@ test("target은 playerId와 BJ 공개 player URL을 엄격히 묶는다", () => 
     assert.throws(
       () => normalizeTargets([bad]),
       error => error instanceof SamgukHlsMonitorError && error.code === "invalid_targets",
+    );
+  }
+});
+
+test("HUD probe interval은 기본 10분이며 안전한 운영 범위만 허용한다", () => {
+  assert.doesNotThrow(() => monitorFixture({ hudProbeIntervalMs: 60_000 }));
+  for (const value of [59_999, 86_400_001, 60_000.5, "600000"]) {
+    assert.throws(
+      () => monitorFixture({ hudProbeIntervalMs: value }),
+      error => error instanceof SamgukHlsMonitorError && error.code === "invalid_config",
     );
   }
 });
@@ -1050,6 +1062,66 @@ test("같은 segment의 인접 frame은 보류하고 다음 segment에서 같은
   assert.equal(appendCalls[0].length, 2);
   assert.equal(new Set(appendCalls[0].map(item => item.sourceId)).size, 2);
   assert.equal(new Set(appendCalls[0].map(item => item.evidenceHash)).size, 2);
+});
+
+test("generic gate가 HUD를 놓쳐도 분산 probe가 maxHealth를 두 segment로 확인한 뒤 종료한다", async () => {
+  let sdSequence = 700;
+  let hdSequence = 700;
+  const appendCalls = [];
+  const fixture = monitorFixture({
+    profileId: "hud-combat-v1",
+    baselines: [{ playerId: "P001", field: "maxHealth", value: 1200 }],
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      const sequence = quality === "SD" ? sdSequence++ : hdSequence++;
+      return [batchSegment(sequence, `${quality}-${sequence}`)];
+    },
+    async decodeGrayFrame() { return grayFrameBatch([]); },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(_segment, options) {
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([options.sampleIndex])]);
+    },
+    async runOcr() {
+      return {
+        version: 2,
+        profileId: "hud-combat-v1",
+        panelVisible: true,
+        results: [{ field: "maxHealth", value: 1239, confidence: 0.99 }],
+      };
+    },
+    queuePath: "/tmp/test-hud-max-health-observations.ndjson",
+    appendFn(_path, observations) {
+      appendCalls.push(observations);
+      return { inserted: observations };
+    },
+  });
+
+  const normal = await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  assert.equal(normal.uiCandidate, true);
+  assert.equal(normal.gate.hudProbe, true);
+
+  const first = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  assert.equal(first.uiCandidate, false);
+  assert.equal(first.ocr.panelVisible, true);
+  assert.equal(first.ocr.consecutiveHiddenFrames, 1);
+  assert.equal(first.ocr.endBurst, false);
+  assert.equal(first.ocr.frames.length, 1);
+  assert.ok(first.ocr.frames.every(frame => frame.burstVisible === false));
+  assert.equal(appendCalls.length, 0);
+
+  const second = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  assert.equal(second.endBurst, true);
+  assert.equal(second.ocr.consecutiveHiddenFrames, 2);
+  assert.equal(appendCalls.length, 1);
+  assert.equal(appendCalls[0].length, 2);
+  assert.equal(new Set(appendCalls[0].map(item => item.sourceId)).size, 2);
+  assert.equal(new Set(appendCalls[0].map(item => item.evidenceHash)).size, 2);
+  const immediateNormal = await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  assert.equal(immediateNormal.uiCandidate, false);
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.hudProbes, 1);
+  assert.equal(stats.confirmedUiPanels, 0);
+  assert.equal(stats.earlyBurstEnds, 1);
 });
 
 test("segment의 모든 후보 run을 수집하고 뒤쪽 후보까지 OCR한 후에만 hidden 종료를 판단한다", async () => {

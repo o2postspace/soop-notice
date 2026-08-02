@@ -104,6 +104,9 @@ test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 �
     vitality: 1_000_000,
     intelligence: 1_000_000,
     powerScore: 1_000_000,
+    maxHealth: 1_000_000,
+    basicAttackDamage: 1_000_000,
+    basicAttackSampleCount: 10_000,
   })) {
     assert.equal(normalizeObservation(observation({ field, value: maximum })).value, maximum);
     assert.throws(
@@ -116,6 +119,17 @@ test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 �
     error => error.code === "invalid_value",
   );
   assert.equal(normalizeObservation(observation({ field: "powerScore", value: 1234.5 })).value, 1234.5);
+  assert.equal(normalizeObservation(observation({ field: "basicAttackDamage", value: 343.5 })).value, 343.5);
+  assert.equal(normalizeObservation(observation({ field: "basicAttackTarget", value: "  훈련용 허수아비  " })).value, "훈련용 허수아비");
+  assert.equal(normalizeObservation(observation({ field: "combatConditions", value: "무버프·비치명" })).value, "무버프·비치명");
+  assert.throws(
+    () => normalizeObservation(observation({ field: "basicAttackTarget", value: "가".repeat(121) })),
+    error => error.code === "invalid_schema",
+  );
+  assert.throws(
+    () => normalizeObservation(observation({ field: "combatConditions", value: "가".repeat(241) })),
+    error => error.code === "invalid_schema",
+  );
 });
 
 test("서로 다른 두 출처가 window 안에서 같은 값을 관측해야 교차검증된다", () => {

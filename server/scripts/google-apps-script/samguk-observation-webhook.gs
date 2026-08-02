@@ -15,7 +15,8 @@ var SAMGUK_MAX_OBSERVATION_ROW = 5001;
 var SAMGUK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 var SAMGUK_REQUIRED_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
-  "strength", "agility", "vitality", "intelligence", "powerScore"
+  "strength", "agility", "vitality", "intelligence", "powerScore", "maxHealth",
+  "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions"
 ];
 var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   level: 10000,
@@ -28,7 +29,10 @@ var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   agility: 1000000,
   vitality: 1000000,
   intelligence: 1000000,
-  powerScore: 1000000
+  powerScore: 1000000,
+  maxHealth: 1000000,
+  basicAttackDamage: 1000000,
+  basicAttackSampleCount: 10000
 };
 
 function doGet() {
@@ -111,7 +115,10 @@ function samgukAppendSnapshot_(snapshot) {
   var fieldHeaders = {
     level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
     helmet: "두갑강화", armor: "흉갑강화", shoes: "각갑강화", strength: "무력",
-    agility: "기민", vitality: "기력", intelligence: "지모", powerScore: "무력점수"
+    agility: "기민", vitality: "기력", intelligence: "지모", powerScore: "무력점수",
+    maxHealth: "최대체력", basicAttackDamage: "평타피해대표값",
+    basicAttackSampleCount: "평타표본수", basicAttackTarget: "평타대상",
+    combatConditions: "전투조건"
   };
   var record = {
     observation_id: snapshot.observationId,
@@ -160,7 +167,7 @@ function samgukAppendSnapshot_(snapshot) {
 }
 
 /**
- * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:Y 전체가 비어 있는 첫 행만 사용합니다.
+ * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:AD 전체가 비어 있는 첫 행만 사용합니다.
  */
 function samgukFindFirstEmptyObservationRow_(sheet, columnCount) {
   if (sheet.getMaxRows() < SAMGUK_MAX_OBSERVATION_ROW) {
@@ -203,11 +210,12 @@ function samgukValidateSnapshot_(snapshot) {
     if (!Object.prototype.hasOwnProperty.call(snapshot.fields, key)) throw new Error("incomplete_snapshot:" + key);
     var value = snapshot.fields[key];
     if (value === null) return;
-    if (key === "horse") {
-      if (typeof value !== "string" || value.length > 80) throw new Error("invalid_field:" + key);
+    if (["horse", "basicAttackTarget", "combatConditions"].indexOf(key) >= 0) {
+      var maximumLength = key === "horse" ? 80 : key === "basicAttackTarget" ? 120 : 240;
+      if (typeof value !== "string" || value.length > maximumLength) throw new Error("invalid_field:" + key);
     } else if (typeof value !== "number" || !isFinite(value) || value < 0
         || value > SAMGUK_NUMERIC_FIELD_MAXIMUMS[key]
-        || (key !== "powerScore" && !Number.isInteger(value))) {
+        || (["powerScore", "basicAttackDamage"].indexOf(key) < 0 && !Number.isInteger(value))) {
       throw new Error("invalid_field:" + key);
     }
   });

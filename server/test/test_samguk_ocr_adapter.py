@@ -139,6 +139,41 @@ class AdapterParserTest(unittest.TestCase):
         self.assertFalse(visible)
         self.assertEqual(results, [])
 
+    def test_hud_profile_extracts_player_max_health_from_bottom_center_ratio(self):
+        tokens = [
+            token("1167/1239", .992, 370, 500, 430, 516),
+            token("(860/950HP)", .997, 820, 500, 900, 516),
+        ]
+        visible, results = adapter.parse_panel(
+            self.image,
+            tokens,
+            lambda _crop, _scale: ("", 0),
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertTrue(visible)
+        self.assertEqual(results, [{"field": "maxHealth", "value": 1239, "confidence": .992}])
+
+    def test_default_profile_ignores_hud_and_invalid_ratios(self):
+        tokens = [
+            token("1167/1239", .99, 370, 500, 430, 516),
+            token("1500/1239", .99, 370, 475, 430, 491),
+            token("860/950", .99, 820, 500, 900, 516),
+        ]
+        visible, results = adapter.parse_panel(
+            self.image, tokens, lambda _crop, _scale: ("", 0),
+        )
+        self.assertFalse(visible)
+        self.assertEqual(results, [])
+
+        visible, results = adapter.parse_panel(
+            self.image,
+            tokens[1:],
+            lambda _crop, _scale: ("", 0),
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertFalse(visible)
+        self.assertEqual(results, [])
+
     def test_hard_negative_words_do_not_match_fields(self):
         tokens = [token("군마영", .99, 100, 100, 160, 120), token("강화 확률 10배 주문서", .99, 200, 200, 400, 220)]
         visible, results = adapter.parse_panel(self.image, tokens, lambda _crop, _scale: ("+10", 1))

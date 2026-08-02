@@ -1,6 +1,6 @@
 "use strict";
 
-const POWER_INDEX_VERSION = "v1.0";
+const POWER_INDEX_VERSION = "v1.1";
 const POWER_WEIGHTS = Object.freeze({
   stats: 30,
   gear: 35,
@@ -183,6 +183,10 @@ function completeStatTotal(member) {
 function createPowerIndexContextFromNormalized(members) {
   const levels = members.filter(member => isKnown(member.level)).map(member => member.level.value);
   const statTotals = members.map(completeStatTotal).filter(value => value !== null);
+  const statValues = Object.fromEntries(STAT_FIELDS.map(field => [
+    field,
+    members.filter(member => isKnown(member.stats[field])).map(member => member.stats[field].value),
+  ]));
   const engravingValues = {};
   for (const member of members) {
     for (const engraving of member.engravings) {
@@ -192,9 +196,11 @@ function createPowerIndexContextFromNormalized(members) {
     }
   }
   for (const key of Object.keys(engravingValues)) Object.freeze(engravingValues[key]);
+  for (const field of STAT_FIELDS) Object.freeze(statValues[field]);
   return Object.freeze({
     levels: Object.freeze(levels),
     statTotals: Object.freeze(statTotals),
+    statValues: Object.freeze(statValues),
     engravingValues: Object.freeze(engravingValues),
   });
 }
@@ -226,21 +232,26 @@ function calculateStats(member, context) {
   const abilitiesPercentile = abilitiesKnown ? percentileRank(total, context.statTotals) : null;
   const levelLower = levelKnown ? levelPercentile : 0;
   const levelUpper = levelKnown ? levelPercentile : 100;
-  const abilitiesLower = abilitiesKnown ? abilitiesPercentile : 0;
-  const abilitiesUpper = abilitiesKnown ? abilitiesPercentile : 100;
-  const lower = STATS_INTERNAL_WEIGHTS.level * levelLower
-    + STATS_INTERNAL_WEIGHTS.abilities * abilitiesLower;
-  const upper = STATS_INTERNAL_WEIGHTS.level * levelUpper
-    + STATS_INTERNAL_WEIGHTS.abilities * abilitiesUpper;
-  const coverage = 100 * (
-    (levelKnown ? STATS_INTERNAL_WEIGHTS.level : 0)
-    + (abilitiesKnown ? STATS_INTERNAL_WEIGHTS.abilities : 0)
-  );
+  const abilityWeight = STATS_INTERNAL_WEIGHTS.abilities / STAT_FIELDS.length;
+  const statPercentiles = {};
+  let lower = STATS_INTERNAL_WEIGHTS.level * levelLower;
+  let upper = STATS_INTERNAL_WEIGHTS.level * levelUpper;
+  let coverageWeight = levelKnown ? STATS_INTERNAL_WEIGHTS.level : 0;
+  for (const field of STAT_FIELDS) {
+    const known = isKnown(member.stats[field]);
+    const percentile = known ? percentileRank(member.stats[field].value, context.statValues[field]) : null;
+    statPercentiles[field] = known ? round(percentile) : null;
+    lower += abilityWeight * (known ? percentile : 0);
+    upper += abilityWeight * (known ? percentile : 100);
+    if (known) coverageWeight += abilityWeight;
+  }
+  const coverage = 100 * coverageWeight;
   return makeComponent(POWER_WEIGHTS.stats, lower, upper, coverage, {
     level: levelKnown ? round(member.level.value) : null,
     levelPercentile: levelKnown ? round(levelPercentile) : null,
     abilityTotal: abilitiesKnown ? round(total) : null,
     abilityPercentile: abilitiesKnown ? round(abilitiesPercentile) : null,
+    statPercentiles: Object.freeze(statPercentiles),
   });
 }
 
@@ -380,7 +391,9 @@ function calculateNormalizedPowerIndex(member, context) {
 
 function calculatePowerIndex(member, context) {
   if (!isRecord(context) || !Array.isArray(context.levels)
-      || !Array.isArray(context.statTotals) || !isRecord(context.engravingValues)) {
+      || !Array.isArray(context.statTotals) || !isRecord(context.statValues)
+      || STAT_FIELDS.some(field => !Array.isArray(context.statValues[field]))
+      || !isRecord(context.engravingValues)) {
     fail("createPowerIndexContext로 만든 context가 필요합니다.");
   }
   return calculateNormalizedPowerIndex(normalizeMember(member), context);

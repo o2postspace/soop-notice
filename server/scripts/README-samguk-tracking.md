@@ -11,7 +11,7 @@
 
 `Google Sheet 기준값 + FMK 구조화 입력 + 방송 ROI OCR → samguk-observations.ndjson → 5분 승격 cron → Apps Script webhook → 관측입력 → 현재현황 + 장비현황 → /api/samguk → 파워랭킹`
 
-파워 v1은 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%를 합산한다. 100% 수집값은 확정, 85% 이상은 잠정 순위로 분리하고 그 미만은 순위에서 제외한다. 장비현황 빈칸은 미관측이며 미장착 슬롯은 `없음`, 일반 장수의 두갑 슬롯은 `해당없음`으로 명시한다.
+파워 v1은 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%의 고정 가중치를 합산한다. 결측 구성요소에는 가중치를 재분배하거나 0점을 넣지 않고 가능한 0~100 범위를 유지하며, 화면 순위는 우리 시트에서 실제 확인된 구성요소의 하한점수로 정렬하고 범위 중앙값은 추정치로 함께 표시한다. 수집률 85%는 순위 포함 기준이 아니라 신뢰도 플래그다. `confirmed`는 수집률 100%, 현재현황·장비현황 교차검증, 레벨·기량 비교 표본 임계치가 모두 충족될 때만 사용하며, 나머지는 `provisional` 또는 `insufficient(수집 중·참고)`로 표시한다. 최대체력·평타피해는 비교 보조 관측이며 파워 v1 점수에는 넣지 않는다. 장비현황 빈칸은 미관측이며 미장착 슬롯은 `없음`, 일반 장수의 두갑 슬롯은 `해당없음`으로 명시한다.
 
 ## FMK 관측 입력
 
@@ -31,7 +31,7 @@ node scripts/samguk-submit-observation.js <<'JSON'
 JSON
 ```
 
-지원 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `powerScore`다.
+지원 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `powerScore`, `maxHealth`, `basicAttackDamage`, `basicAttackSampleCount`, `basicAttackTarget`, `combatConditions`다. `basicAttackDamage`는 동일 대상·동일 조건의 비치명 기본공격 표본 대표값으로 넣고, `basicAttackSampleCount`, `basicAttackTarget`, `combatConditions`를 함께 기록한다.
 
 ## Google Sheet 연결
 
@@ -56,7 +56,7 @@ python3 scripts/samguk-google-oauth.py \
   --token /보안/경로/samguk-google-oauth.json
 ```
 
-발급 파일과 상위 디렉터리는 각각 `0600`, `0700`이어야 한다. 서버에는 `SAMGUK_SHEET_WRITE_MODE=oauth`, `SAMGUK_GOOGLE_OAUTH_TOKEN_PATH`, `SAMGUK_SHEET_WRITER_LOCK_PATH`를 절대 경로로 지정한다. writer는 `관측입력!A:Y` 헤더·`참가자`·`Asia/Seoul` timezone을 확인하고, B열 첫 빈행 하나만 OS lock 안에서 기록한 뒤 전체 행을 재조회한다. OAuth 앱이 Testing 상태면 refresh token이 단기 만료될 수 있으므로 장기 무인 운영 전 Google OAuth publishing 상태를 확인한다.
+발급 파일과 상위 디렉터리는 각각 `0600`, `0700`이어야 한다. 서버에는 `SAMGUK_SHEET_WRITE_MODE=oauth`, `SAMGUK_GOOGLE_OAUTH_TOKEN_PATH`, `SAMGUK_SHEET_WRITER_LOCK_PATH`를 절대 경로로 지정한다. writer는 `관측입력!A:AD` 헤더·`참가자`·`Asia/Seoul` timezone을 확인하고, A:AD가 모두 빈 첫 행 하나만 OS lock 안에서 기록한 뒤 전체 행을 재조회한다. 전투 관측은 `관측입력!Y:AC`에 저장되고 `현재현황!AE:AI`로 같은 최신 스냅샷에서 전달된다. OAuth 앱이 Testing 상태면 refresh token이 단기 만료될 수 있으므로 장기 무인 운영 전 Google OAuth publishing 상태를 확인한다.
 
 fallback 기준값이 바뀌면 `node scripts/generate-samguk-sheet-seed.js`로 설치 seed를 다시 생성하고 `--check`로 동기화를 검증한다. 공개 reader는 gviz `headers=1`로 첫 행을 고정하며 `현재현황` 90명, `영토현황` 60개, `게임정보` 1행 이상이 모두 정상일 때만 새 데이터를 채택한다.
 

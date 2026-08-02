@@ -361,6 +361,11 @@ function mergeEquipmentData(members, equipment) {
 function enrichMembersWithPowerIndex(members) {
   const normalizedMembers = members.map(member => ({
     ...member,
+    maxHealth: member.maxHealth ?? null,
+    basicAttackDamage: member.basicAttackDamage ?? null,
+    basicAttackSampleCount: member.basicAttackSampleCount ?? null,
+    basicAttackTarget: member.basicAttackTarget || null,
+    combatConditions: member.combatConditions || null,
     engravings: Array.isArray(member.engravings) ? member.engravings : [],
     equipmentObservedAt: member.equipmentObservedAt || null,
     equipmentEvidence: member.equipmentEvidence || null,
@@ -380,11 +385,19 @@ function enrichMembersWithPowerIndex(members) {
     normalizedMembers.length,
     Math.max(30, Math.ceil(normalizedMembers.length * 0.70)),
   );
+  const fieldSamples = Object.freeze({
+    level: normalizedMembers.filter(member => knownPowerValue(member.level)).length,
+    strength: normalizedMembers.filter(member => knownPowerValue(member.strength)).length,
+    agility: normalizedMembers.filter(member => knownPowerValue(member.agility)).length,
+    vitality: normalizedMembers.filter(member => knownPowerValue(member.vitality)).length,
+    intelligence: normalizedMembers.filter(member => knownPowerValue(member.intelligence)).length,
+  });
   const powerPopulation = {
     sample: populationSample,
     required: populationRequired,
     coverage: Number((100 * populationSample / normalizedMembers.length).toFixed(4)),
     ready: populationSample >= populationRequired,
+    fieldSamples,
   };
   return normalizedMembers.map((member, index) => {
     const power = indexes[index];
@@ -405,6 +418,7 @@ function enrichMembersWithPowerIndex(members) {
     return {
       ...member,
       powerIndex: power.score,
+      powerRankScore: power.lower,
       powerVersion: power.version,
       powerCoverage: power.coverage,
       powerStatus,
@@ -440,6 +454,11 @@ function parseMembersCsv(text) {
     vitality: { aliases: ["기력"], required: true },
     intelligence: { aliases: ["지모"], required: true },
     powerScore: { aliases: ["무력점수", "powerScore"], required: false },
+    maxHealth: { aliases: ["최대체력", "최대HP", "maxHealth"], required: false },
+    basicAttackDamage: { aliases: ["평타피해대표값", "평타피해", "basicAttackDamage"], required: false },
+    basicAttackSampleCount: { aliases: ["평타표본수", "basicAttackSampleCount"], required: false },
+    basicAttackTarget: { aliases: ["평타대상", "basicAttackTarget"], required: false },
+    combatConditions: { aliases: ["전투조건", "combatConditions"], required: false },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["최근근거", "근거", "근거(URL/타임코드)"], required: true },
     reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
@@ -488,6 +507,15 @@ function parseMembersCsv(text) {
       vitality: nullableNumber(cell(row, columns.vitality), "기력", rowNumber, warnings),
       intelligence: nullableNumber(cell(row, columns.intelligence), "지모", rowNumber, warnings),
       powerScore: nullableNumber(cell(row, columns.powerScore), "무력점수", rowNumber, warnings),
+      maxHealth: nullableNumber(cell(row, columns.maxHealth), "최대체력", rowNumber, warnings, 1_000_000),
+      basicAttackDamage: nullableNumber(
+        cell(row, columns.basicAttackDamage), "평타피해대표값", rowNumber, warnings, 1_000_000,
+      ),
+      basicAttackSampleCount: nullableNumber(
+        cell(row, columns.basicAttackSampleCount), "평타표본수", rowNumber, warnings, 10_000,
+      ),
+      basicAttackTarget: cell(row, columns.basicAttackTarget) || null,
+      combatConditions: cell(row, columns.combatConditions) || null,
       sourceType: normalizeSourceType(cell(row, columns.sourceType)),
       sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
       verificationStatus: normalizeVerificationStatus(cell(row, columns.verificationStatus)),

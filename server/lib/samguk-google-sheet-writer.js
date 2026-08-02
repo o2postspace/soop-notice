@@ -12,6 +12,7 @@ const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const GOOGLE_SHEETS_API_ROOT = "https://sheets.googleapis.com/v4/spreadsheets";
 const OBSERVATION_SHEET = "관측입력";
 const PARTICIPANT_SHEET = "참가자";
+const OBSERVATION_LAST_COLUMN = "AD";
 const MAX_OBSERVATION_ROW = 5001;
 const MAX_TOKEN_BYTES = 32 * 1024;
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -32,13 +33,19 @@ const FIELD_HEADERS = Object.freeze({
   vitality: "기력",
   intelligence: "지모",
   powerScore: "무력점수",
+  maxHealth: "최대체력",
+  basicAttackDamage: "평타피해대표값",
+  basicAttackSampleCount: "평타표본수",
+  basicAttackTarget: "평타대상",
+  combatConditions: "전투조건",
 });
 const FIELD_NAMES = Object.freeze(Object.keys(FIELD_HEADERS));
 const EXPECTED_HEADERS = Object.freeze([
   "observation_id", "player_id", "확인시각", "근거종류", "근거(URL/타임코드)",
   "레벨", "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
   "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
-  "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모", "입력시각",
+  "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모",
+  "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각",
 ]);
 const SOURCE_LABELS = Object.freeze({ sheet: "시트", fmkorea: "에펨코리아", broadcast: "방송" });
 const STATUS_LABELS = Object.freeze({
@@ -95,7 +102,7 @@ function normalizeNumericField(field, value) {
   const maximum = NUMERIC_FIELD_MAXIMUMS[field];
   const isValidNumber = typeof value === "number" && Number.isFinite(value)
     && value >= 0 && value <= maximum;
-  const isValidInteger = field === "powerScore" || Number.isSafeInteger(value);
+  const isValidInteger = ["powerScore", "basicAttackDamage"].includes(field) || Number.isSafeInteger(value);
   if (!Number.isSafeInteger(maximum) || !isValidNumber || !isValidInteger) {
     fail("invalid_snapshot", `${field} 값이 올바르지 않습니다.`);
   }
@@ -143,15 +150,16 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
   }
   if (!snapshot.fields || typeof snapshot.fields !== "object" || Array.isArray(snapshot.fields)
       || FIELD_NAMES.some(field => !Object.prototype.hasOwnProperty.call(snapshot.fields, field))) {
-    fail("invalid_snapshot", "완전한 12개 field snapshot이 필요합니다.");
+    fail("invalid_snapshot", `완전한 ${FIELD_NAMES.length}개 field snapshot이 필요합니다.`);
   }
   const fields = {};
   for (const field of FIELD_NAMES) {
     const value = snapshot.fields[field];
     if (value === null) {
       fields[field] = "";
-    } else if (field === "horse") {
-      fields[field] = safeText(value, 80, field);
+    } else if (["horse", "basicAttackTarget", "combatConditions"].includes(field)) {
+      const maximum = field === "horse" ? 80 : field === "basicAttackTarget" ? 120 : 240;
+      fields[field] = safeText(value, maximum, field);
     } else {
       fields[field] = normalizeNumericField(field, value);
     }
@@ -408,7 +416,7 @@ function createSamgukGoogleSheetWriter(options = {}) {
   }
 
   async function getRow(rowNumber, { valueRenderOption = "UNFORMATTED_VALUE" } = {}) {
-    const range = `'${OBSERVATION_SHEET}'!A${rowNumber}:Y${rowNumber}`;
+    const range = `'${OBSERVATION_SHEET}'!A${rowNumber}:${OBSERVATION_LAST_COLUMN}${rowNumber}`;
     const query = new URLSearchParams({ valueRenderOption });
     if (valueRenderOption === "UNFORMATTED_VALUE") {
       query.set("dateTimeRenderOption", "SERIAL_NUMBER");
@@ -459,8 +467,8 @@ function createSamgukGoogleSheetWriter(options = {}) {
       majorDimension: "ROWS",
       valueRenderOption: "FORMULA",
     });
-    query.append("ranges", `'${OBSERVATION_SHEET}'!A1:Y1`);
-    query.append("ranges", `'${OBSERVATION_SHEET}'!A2:Y${MAX_OBSERVATION_ROW}`);
+    query.append("ranges", `'${OBSERVATION_SHEET}'!A1:${OBSERVATION_LAST_COLUMN}1`);
+    query.append("ranges", `'${OBSERVATION_SHEET}'!A2:${OBSERVATION_LAST_COLUMN}${MAX_OBSERVATION_ROW}`);
     query.append("ranges", `'${PARTICIPANT_SHEET}'!A2:A91`);
     const state = await request(apiUrl("/values:batchGet", query));
     if (!state.ok || !Array.isArray(state.body?.valueRanges) || state.body.valueRanges.length !== 3) {
@@ -491,7 +499,7 @@ function createSamgukGoogleSheetWriter(options = {}) {
     }
     if (targetRow === null) fail("observation_sheet_full", "관측입력 5000행이 모두 사용 중입니다.");
 
-    const range = `'${OBSERVATION_SHEET}'!A${targetRow}:Y${targetRow}`;
+    const range = `'${OBSERVATION_SHEET}'!A${targetRow}:${OBSERVATION_LAST_COLUMN}${targetRow}`;
     const rowBeforeWrite = await getRow(targetRow, { valueRenderOption: "FORMULA" });
     if (!rowIsEmpty(rowBeforeWrite)) {
       fail("target_row_conflict", "저장 직전 대상 행이 사용되어 쓰기를 중단했습니다.");
@@ -528,6 +536,7 @@ module.exports = {
   EXPECTED_HEADERS,
   FIELD_HEADERS,
   GOOGLE_SHEETS_SCOPE,
+  OBSERVATION_LAST_COLUMN,
   GOOGLE_TOKEN_URI,
   KST_OFFSET_DAYS,
   MAX_OBSERVATION_ROW,

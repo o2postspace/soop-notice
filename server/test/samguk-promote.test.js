@@ -33,6 +33,8 @@ function payload() {
       soopId: "cnsgkcnehd74",
       level: 10, horse: "백룡마", horseLevel: 1, weapon: 2, helmet: 1, armor: 1, shoes: 1,
       strength: 10, agility: 2, vitality: 3, intelligence: 4, powerScore: null,
+      maxHealth: null, basicAttackDamage: null, basicAttackSampleCount: null,
+      basicAttackTarget: null, combatConditions: null,
       observedAt: "2026-08-02T10:00:00.000Z",
     }],
   };
@@ -69,7 +71,7 @@ test("단독 후보는 버리고 Sheet와 일치한 최신 후보만 완전 스�
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].fields.strength, 11);
   assert.equal(snapshots[0].fields.weapon, 2);
-  assert.equal(Object.keys(snapshots[0].fields).length, 12);
+  assert.equal(Object.keys(snapshots[0].fields).length, 17);
   assert.equal(snapshots[0].sourceCount, 2);
   assert.equal(snapshots[0].verification, "cross-source");
   assert.ok(snapshots[0].sourceTypes.includes(snapshots[0].primarySourceType));

@@ -77,13 +77,14 @@ const PAYLOAD_KEYS = [
 ].sort();
 const RAW_MEMBER_KEYS = [
   "agility", "armor", "crew", "evidence", "helmet", "horse", "horseLevel", "intelligence", "job", "level",
+  "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions", "maxHealth",
   "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
   "sourceType", "strength", "verificationStatus", "vitality", "weapon",
 ].sort();
 const MEMBER_KEYS = [
   ...RAW_MEMBER_KEYS,
   "engravings", "equipmentEvidence", "equipmentObservedAt", "equipmentSourceCount", "equipmentSourceType",
-  "powerComponents", "powerCoverage", "powerIndex", "powerPopulation", "powerRange", "powerRankable", "powerSourcesVerified", "powerStatus", "powerVerified", "powerVersion",
+  "powerComponents", "powerCoverage", "powerIndex", "powerPopulation", "powerRange", "powerRankScore", "powerRankable", "powerSourcesVerified", "powerStatus", "powerVerified", "powerVersion",
 ].sort();
 const TERRITORY_KEYS = [
   "capital", "evidence", "facility", "id", "level", "number", "observedAt", "owner", "reviewStatus",
@@ -182,6 +183,25 @@ test("현재현황의 선택형 무력점수와 교차검증 메타데이터를 
   }
 });
 
+test("현재현황의 최대체력과 검증된 평타 대표값은 선택형 전투 관측으로 읽는다", () => {
+  const headers = [
+    ...MEMBER_HEADERS,
+    "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건",
+  ];
+  const row = [
+    "촉", "테스트", "관우", "test_combat", "관우", "20", "적토마", "3", "5", "4", "4", "4",
+    "40", "10", "20", "5", "2026-08-02 03:00:00", "https://play.sooplive.com/test", "확정",
+    "1,239", "343.5", "4", "동일 훈련 대상", "일반 평타·비치명",
+  ];
+  const member = parseMembersCsv(makeCsv(headers, [row])).members[0];
+
+  assert.equal(member.maxHealth, 1239);
+  assert.equal(member.basicAttackDamage, 343.5);
+  assert.equal(member.basicAttackSampleCount, 4);
+  assert.equal(member.basicAttackTarget, "동일 훈련 대상");
+  assert.equal(member.combatConditions, "일반 평타·비치명");
+});
+
 test("새 검증상태 헤더를 verificationStatus와 호환 reviewStatus가 함께 읽는다", () => {
   const headers = MEMBER_HEADERS.map(header => header === "검수상태" ? "검증상태" : header);
   const row = [
@@ -264,7 +284,7 @@ test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 pa
   assert.ok(state.urls.every(url => new URL(url).pathname.includes(`/d/${DEFAULT_SHEET_ID}/`)));
   assert.ok(state.urls.every(url => new URL(url).searchParams.get("headers") === "1"));
   assert.ok(state.urls.every(url => !url.includes("vercel.app")));
-  assert.equal(payload.members[0].powerVersion, "v1.0");
+  assert.equal(payload.members[0].powerVersion, "v1.1");
   assert.equal(payload.members[0].powerStatus, "insufficient");
   assert.equal(payload.members[0].powerCoverage, 80);
   assert.deepEqual(payload.members[0].engravings, []);
@@ -303,7 +323,13 @@ test("선택형 장비현황 각인을 참가자에 합치고 파워 v1을 확�
   assert.equal(member.powerStatus, "confirmed");
   assert.equal(member.powerRankable, true);
   assert.equal(member.powerSourcesVerified, true);
-  assert.deepEqual(member.powerPopulation, { sample: 1, required: 1, coverage: 100, ready: true });
+  assert.deepEqual(member.powerPopulation, {
+    sample: 1,
+    required: 1,
+    coverage: 100,
+    ready: true,
+    fieldSamples: { level: 1, strength: 1, agility: 1, vitality: 1, intelligence: 1 },
+  });
   assert.equal(member.powerVerified, true);
   assert.equal(member.powerComponents.engravings.filledSlots, 3);
   assert.deepEqual(member.powerRange, { lower: member.powerIndex, upper: member.powerIndex });
@@ -367,6 +393,7 @@ test("90명 로스터는 레벨·기량 비교표본 63명 전까지 확정하�
     required: 63,
     coverage: 68.8889,
     ready: false,
+    fieldSamples: { level: 62, strength: 62, agility: 62, vitality: 62, intelligence: 62 },
   });
   assert.equal(powered[0].powerCoverage, 100);
   assert.equal(powered[0].powerSourcesVerified, true);
@@ -452,7 +479,7 @@ test("삼국지 카드의 기량합계는 네 기량이 모두 있을 때만 사
   assert.match(html, /기량 4종 완비/);
 });
 
-test("파워랭킹은 v1 합산지표·coverage 기준을 사용하고 무력 fallback을 만들지 않는다", () => {
+test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 표시하고 무력 fallback을 만들지 않는다", () => {
   const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
   assert.match(html, /data-samguktab="ranking"[^>]*>파워랭킹</);
@@ -464,9 +491,15 @@ test("파워랭킹은 v1 합산지표·coverage 기준을 사용하고 무력 fa
   assert.match(html, /member\.powerStatus === 'confirmed'/);
   assert.match(html, /member\.powerStatus === 'provisional'/);
   assert.match(html, /member\.powerIndex/);
-  assert.match(html, /coverage 85% 미만은 순위에서 제외/);
-  assert.match(html, /빈칸은 0점으로 바꾸지 않습니다/);
+  assert.match(html, /member\.powerRankScore/);
+  assert.match(html, /현재 관측 파워랭킹/);
+  assert.match(html, /확인된 구성요소의 하한점수/);
+  assert.doesNotMatch(html, /coverage 85% 미만은 순위에서 제외/);
+  assert.match(html, /빈칸은 관측된 0으로 바꾸거나/);
   assert.match(html, /주문서 재고는 아직 사용하지 않은 자원이므로 제외/);
+  assert.match(html, /최대 HP/);
+  assert.match(html, /평타/);
+  assert.match(html, /파워 v1 미반영/);
   const rankingFunction = html.match(/function renderSamgukPowerRanking\(\) \{[\s\S]*?\n\}/)?.[0] || "";
   assert.doesNotMatch(rankingFunction, /member\.powerScore/);
   assert.doesNotMatch(rankingFunction, /scoreField.*strength/);
