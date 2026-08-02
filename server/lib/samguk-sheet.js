@@ -1,16 +1,33 @@
 const FALLBACK_PAYLOAD = require("../data/samguk-fallback.json");
+const { calculateRosterPowerIndexes } = require("./samguk-power-index");
 
 const DEFAULT_SHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 const DEFAULT_TABS = Object.freeze({
   members: "현재현황",
   territories: "영토현황",
   rules: "게임정보",
+  equipment: "장비현황",
 });
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_BYTES = 1024 * 1024;
 const EXPECTED_MEMBER_COUNT = 90;
 const EXPECTED_TERRITORY_COUNT = 60;
 const SOOP_ID_PATTERN = /^[A-Za-z0-9_]{1,30}$/;
+const RULER_JOBS = new Set(["조조", "유비", "손권"]);
+const EQUIPMENT_SLOTS = Object.freeze([
+  ["weapon1", ["무기각인1", "무기 각인1"]],
+  ["weapon2", ["무기각인2", "무기 각인2"]],
+  ["weapon3", ["무기각인3", "무기 각인3"]],
+  ["helmet1", ["두갑각인1", "두갑 각인1"]],
+  ["helmet2", ["두갑각인2", "두갑 각인2"]],
+  ["helmet3", ["두갑각인3", "두갑 각인3"]],
+  ["armor1", ["흉갑각인1", "흉갑 각인1"]],
+  ["armor2", ["흉갑각인2", "흉갑 각인2"]],
+  ["armor3", ["흉갑각인3", "흉갑 각인3"]],
+  ["shoes1", ["각갑각인1", "각갑 각인1"]],
+  ["shoes2", ["각갑각인2", "각갑 각인2"]],
+  ["shoes3", ["각갑각인3", "각갑 각인3"]],
+]);
 
 class SamgukSheetError extends Error {
   constructor(code, message) {
@@ -112,14 +129,14 @@ function cell(row, index) {
   return index >= 0 ? String(row[index] ?? "").trim() : "";
 }
 
-function nullableNumber(value, label, rowNumber, warnings) {
+function nullableNumber(value, label, rowNumber, warnings, maximum = Infinity) {
   const raw = String(value ?? "").trim();
   if (!raw || raw === "-" || raw === "—" || /^#(?:N\/A|VALUE!|REF!|DIV\/0!)/i.test(raw)) {
     return null;
   }
 
   const parsed = Number(raw.replace(/,/g, ""));
-  if (!Number.isFinite(parsed) || parsed < 0) {
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > maximum) {
     warnings.push(`${rowNumber}행 ${label} 값 '${raw}'을(를) 제외했습니다.`);
     return null;
   }
@@ -203,6 +220,204 @@ function normalizeVerificationStatus(value) {
   return "baseline";
 }
 
+function parseEngravingCell(value, slot, rowNumber, warnings) {
+  const raw = String(value ?? "").normalize("NFKC").trim();
+  if (!raw) return { slot, state: "unknown", name: null, value: null, unit: null };
+
+  const token = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  if (["없음", "미장착", "빈칸", "empty", "none"].includes(token)) {
+    return { slot, state: "empty", name: null, value: null, unit: null };
+  }
+  if (["해당없음", "미적용", "n/a", "na", "notapplicable", "-", "—"].includes(token)) {
+    return { slot, state: "not_applicable", name: null, value: null, unit: null };
+  }
+
+  const numeric = /^(.*?)[\s:：]*([+-]?\d+(?:\.\d+)?)\s*(%|퍼센트)?$/.exec(raw);
+  if (numeric) {
+    const name = numeric[1].trim();
+    const parsed = Number(numeric[2]);
+    if (!name || !Number.isFinite(parsed) || parsed < 0) {
+      warnings.push(`${rowNumber}행 ${slot} 각인 '${raw}'을(를) 제외했습니다.`);
+      return { slot, state: "unknown", name: null, value: null, unit: null };
+    }
+    return {
+      slot,
+      state: "observed",
+      name,
+      value: parsed,
+      unit: numeric[3] ? "%" : "value",
+    };
+  }
+
+  if (raw.length > 80) {
+    warnings.push(`${rowNumber}행 ${slot} 각인명이 너무 길어 제외했습니다.`);
+    return { slot, state: "unknown", name: null, value: null, unit: null };
+  }
+  return { slot, state: "observed", name: raw, value: 1, unit: "presence" };
+}
+
+function parseEquipmentCsv(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) throw new SamgukSheetError("empty_sheet", "장비현황 시트가 비어 있습니다.");
+
+  const specification = {
+    name: { aliases: ["닉네임", "이름", "스트리머"], required: true },
+    soopId: { aliases: ["SOOP_ID", "SOOP ID", "BJ_ID"], required: false },
+    observedAt: { aliases: ["최종확인", "확인시각"], required: false },
+    evidence: { aliases: ["최근근거", "근거", "근거(URL/타임코드)"], required: false },
+    sourceType: { aliases: ["출처종류", "출처", "출처종류/출처"], required: false },
+    sourceCount: { aliases: ["교차검증수"], required: false },
+  };
+  EQUIPMENT_SLOTS.forEach(([slot, aliases]) => {
+    specification[slot] = { aliases, required: true };
+  });
+  const columns = makeColumnMap(rows[0], specification);
+  const equipment = [];
+  const warnings = [];
+  const seenKeys = new Set();
+
+  for (let index = 1; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row.every(entry => String(entry).trim() === "")) continue;
+    const rowNumber = index + 1;
+    const name = cell(row, columns.name);
+    const rawSoopId = cell(row, columns.soopId);
+    const soopId = SOOP_ID_PATTERN.test(rawSoopId) ? rawSoopId : null;
+    if (!name) {
+      warnings.push(`${rowNumber}행 장비 참가자 닉네임이 없어 제외했습니다.`);
+      continue;
+    }
+    if (rawSoopId && !soopId) warnings.push(`${rowNumber}행 SOOP_ID '${rawSoopId}'을(를) 닉네임 매칭으로 처리합니다.`);
+    const key = soopId ? `id:${soopId}` : `name:${name}`;
+    if (seenKeys.has(key)) {
+      warnings.push(`${rowNumber}행 장비 참가자 '${name}'가 중복되어 제외했습니다.`);
+      continue;
+    }
+    seenKeys.add(key);
+    equipment.push({
+      name,
+      soopId,
+      engravings: EQUIPMENT_SLOTS.map(([slot]) => (
+        parseEngravingCell(cell(row, columns[slot]), slot, rowNumber, warnings)
+      )),
+      observedAt: normalizeTimestamp(cell(row, columns.observedAt)),
+      evidence: cell(row, columns.evidence) || null,
+      sourceType: normalizeSourceType(cell(row, columns.sourceType)),
+      sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
+    });
+  }
+
+  if (equipment.length === 0) throw new SamgukSheetError("empty_sheet", "유효한 장비 참가자가 없습니다.");
+  return { equipment, warnings };
+}
+
+function mergeEquipmentData(members, equipment) {
+  if (!Array.isArray(members) || !Array.isArray(equipment)) {
+    throw new TypeError("members와 equipment는 배열이어야 합니다.");
+  }
+  const merged = members.map(member => ({ ...member }));
+  const bySoopId = new Map(merged.filter(member => member.soopId).map((member, index) => [member.soopId, index]));
+  const byName = new Map(merged.filter(member => member.name).map((member, index) => [member.name, index]));
+  const warnings = [];
+  const assigned = new Set();
+
+  equipment.forEach(row => {
+    const index = row.soopId
+      ? bySoopId.get(row.soopId)
+      : byName.get(row.name);
+    if (index === undefined) {
+      warnings.push(`장비현황 참가자 '${row.name}'을(를) 현재현황에서 찾지 못했습니다.`);
+      return;
+    }
+    if (assigned.has(index)) {
+      warnings.push(`장비현황 참가자 '${merged[index].name}'의 중복 행을 제외했습니다.`);
+      return;
+    }
+    assigned.add(index);
+    const ruler = RULER_JOBS.has(String(merged[index].job || "").normalize("NFKC").trim());
+    merged[index] = {
+      ...merged[index],
+      engravings: row.engravings.map(engraving => {
+        if (!ruler && String(engraving.slot || "").startsWith("helmet")) {
+          return {
+            ...engraving,
+            state: "not_applicable",
+            name: null,
+            value: null,
+            unit: null,
+          };
+        }
+        return { ...engraving };
+      }),
+      equipmentObservedAt: row.observedAt,
+      equipmentEvidence: row.evidence,
+      equipmentSourceType: row.sourceType,
+      equipmentSourceCount: row.sourceCount,
+    };
+  });
+  return { members: merged, warnings };
+}
+
+function enrichMembersWithPowerIndex(members) {
+  const normalizedMembers = members.map(member => ({
+    ...member,
+    engravings: Array.isArray(member.engravings) ? member.engravings : [],
+    equipmentObservedAt: member.equipmentObservedAt || null,
+    equipmentEvidence: member.equipmentEvidence || null,
+    equipmentSourceType: member.equipmentSourceType || null,
+    equipmentSourceCount: member.equipmentSourceCount ?? null,
+  }));
+  const indexes = calculateRosterPowerIndexes(normalizedMembers);
+  const knownPowerValue = value => {
+    if (typeof value === "number") return Number.isFinite(value);
+    return value && typeof value === "object" && ["observed", "empty"].includes(value.state);
+  };
+  const populationSample = normalizedMembers.filter(member => (
+    knownPowerValue(member.level)
+    && ["strength", "agility", "vitality", "intelligence"].every(field => knownPowerValue(member[field]))
+  )).length;
+  const populationRequired = Math.min(
+    normalizedMembers.length,
+    Math.max(30, Math.ceil(normalizedMembers.length * 0.70)),
+  );
+  const powerPopulation = {
+    sample: populationSample,
+    required: populationRequired,
+    coverage: Number((100 * populationSample / normalizedMembers.length).toFixed(4)),
+    ready: populationSample >= populationRequired,
+  };
+  return normalizedMembers.map((member, index) => {
+    const power = indexes[index];
+    const mainSourcesVerified = Number(member.sourceCount) >= 2
+      && ["cross-verified", "broadcast-verified"].includes(member.verificationStatus)
+      && Number.isFinite(Date.parse(member.observedAt || ""));
+    const equipmentSourceKinds = new Set(String(member.equipmentSourceType || "")
+      .split("+").map(value => value.trim()).filter(Boolean));
+    const equipmentSourcesVerified = member.engravings.length > 0
+      && Number(member.equipmentSourceCount) >= 2
+      && equipmentSourceKinds.size >= 2
+      && Number.isFinite(Date.parse(member.equipmentObservedAt || ""));
+    const powerSourcesVerified = mainSourcesVerified && equipmentSourcesVerified;
+    const powerVerified = powerSourcesVerified && powerPopulation.ready;
+    const powerStatus = power.status === "confirmed" && powerVerified
+      ? "confirmed"
+      : power.rankable ? "provisional" : "insufficient";
+    return {
+      ...member,
+      powerIndex: power.score,
+      powerVersion: power.version,
+      powerCoverage: power.coverage,
+      powerStatus,
+      powerRankable: power.rankable,
+      powerSourcesVerified,
+      powerPopulation: { ...powerPopulation },
+      powerVerified,
+      powerRange: { lower: power.lower, upper: power.upper },
+      powerComponents: power.components,
+    };
+  });
+}
+
 function parseMembersCsv(text) {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new SamgukSheetError("empty_sheet", "현재현황 시트가 비어 있습니다.");
@@ -263,11 +478,11 @@ function parseMembersCsv(text) {
       job: cell(row, columns.job) || null,
       level: nullableNumber(cell(row, columns.level), "레벨", rowNumber, warnings),
       horse: cell(row, columns.horse) || null,
-      horseLevel: nullableNumber(cell(row, columns.horseLevel), "말강화", rowNumber, warnings),
-      weapon: nullableNumber(cell(row, columns.weapon), "무기강화", rowNumber, warnings),
-      helmet: nullableNumber(cell(row, columns.helmet), "두갑강화", rowNumber, warnings),
-      armor: nullableNumber(cell(row, columns.armor), "흉갑강화", rowNumber, warnings),
-      shoes: nullableNumber(cell(row, columns.shoes), "각갑강화", rowNumber, warnings),
+      horseLevel: nullableNumber(cell(row, columns.horseLevel), "말강화", rowNumber, warnings, 80),
+      weapon: nullableNumber(cell(row, columns.weapon), "무기강화", rowNumber, warnings, 15),
+      helmet: nullableNumber(cell(row, columns.helmet), "두갑강화", rowNumber, warnings, 15),
+      armor: nullableNumber(cell(row, columns.armor), "흉갑강화", rowNumber, warnings, 15),
+      shoes: nullableNumber(cell(row, columns.shoes), "각갑강화", rowNumber, warnings, 15),
       strength: nullableNumber(cell(row, columns.strength), "무력", rowNumber, warnings),
       agility: nullableNumber(cell(row, columns.agility), "기민", rowNumber, warnings),
       vitality: nullableNumber(cell(row, columns.vitality), "기력", rowNumber, warnings),
@@ -477,6 +692,7 @@ async function fetchCsv({ fetchImpl, sheetId, sheetName, timeoutMs, maxBytes }) 
 function newestObservedAt(members, territories, fallback) {
   const values = [
     ...members.map(member => member.observedAt),
+    ...members.map(member => member.equipmentObservedAt),
     ...territories.map(territory => territory.observedAt),
   ];
   let newest = null;
@@ -508,7 +724,11 @@ function createSamgukSheetService(options = {}) {
     members: options.tabs?.members || process.env.SAMGUK_STATUS_SHEET || DEFAULT_TABS.members,
     territories: options.tabs?.territories || process.env.SAMGUK_TERRITORY_SHEET || DEFAULT_TABS.territories,
     rules: options.tabs?.rules || process.env.SAMGUK_RULES_SHEET || DEFAULT_TABS.rules,
+    equipment: options.tabs?.equipment || process.env.SAMGUK_EQUIPMENT_SHEET || DEFAULT_TABS.equipment,
   };
+  const equipmentSheetId = options.equipmentSheetId
+    || process.env.SAMGUK_EQUIPMENT_SHEET_ID
+    || sheetId;
   const timeoutMs = positiveInt(options.timeoutMs ?? process.env.SAMGUK_SHEET_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const maxBytes = positiveInt(options.maxBytes ?? process.env.SAMGUK_SHEET_MAX_BYTES, DEFAULT_MAX_BYTES);
   const expectedMemberCount = positiveInt(options.expectedMemberCount, EXPECTED_MEMBER_COUNT);
@@ -519,10 +739,17 @@ function createSamgukSheetService(options = {}) {
 
   async function load() {
     try {
-      const [memberCsv, territoryCsv, ruleCsv] = await Promise.all([
+      const [memberCsv, territoryCsv, ruleCsv, equipmentOutcome] = await Promise.all([
         fetchCsv({ fetchImpl, sheetId, sheetName: tabs.members, timeoutMs, maxBytes }),
         fetchCsv({ fetchImpl, sheetId, sheetName: tabs.territories, timeoutMs, maxBytes }),
         fetchCsv({ fetchImpl, sheetId, sheetName: tabs.rules, timeoutMs, maxBytes }),
+        fetchCsv({
+          fetchImpl,
+          sheetId: equipmentSheetId,
+          sheetName: tabs.equipment,
+          timeoutMs,
+          maxBytes,
+        }).then(text => ({ text })).catch(error => ({ error })),
       ]);
       const memberResult = parseMembersCsv(memberCsv);
       const territoryResult = parseTerritoriesCsv(territoryCsv);
@@ -539,19 +766,35 @@ function createSamgukSheetService(options = {}) {
           `영토현황이 ${territoryResult.territories.length}/${expectedTerritoryCount}개입니다.`,
         );
       }
+      let mergedMembers = memberResult.members;
+      const equipmentWarnings = [];
+      if (equipmentOutcome.error) {
+        equipmentWarnings.push("장비현황을 읽지 못해 각인 파워를 미관측으로 처리했습니다.");
+      } else {
+        try {
+          const equipmentResult = parseEquipmentCsv(equipmentOutcome.text);
+          const merged = mergeEquipmentData(mergedMembers, equipmentResult.equipment);
+          mergedMembers = merged.members;
+          equipmentWarnings.push(...equipmentResult.warnings, ...merged.warnings);
+        } catch (_) {
+          equipmentWarnings.push("장비현황 구조를 읽지 못해 각인 파워를 미관측으로 처리했습니다.");
+        }
+      }
+      const poweredMembers = enrichMembersWithPowerIndex(mergedMembers);
       const readAt = new Date(now()).toISOString();
       const payload = {
         source: "google-sheet",
-        updatedAt: newestObservedAt(memberResult.members, territoryResult.territories, readAt),
+        updatedAt: newestObservedAt(poweredMembers, territoryResult.territories, readAt),
         stale: false,
         sheetUrl,
-        members: memberResult.members,
+        members: poweredMembers,
         territories: territoryResult.territories,
         rules: ruleResult.rules,
         warnings: unique([
           ...memberResult.warnings,
           ...territoryResult.warnings,
           ...ruleResult.warnings,
+          ...equipmentWarnings,
         ]),
       };
       lastGood = clone(payload);
@@ -568,6 +811,7 @@ function createSamgukSheetService(options = {}) {
       fallbackPayload.source = "fallback-seed";
       fallbackPayload.stale = true;
       fallbackPayload.sheetUrl = sheetUrl;
+      fallbackPayload.members = enrichMembersWithPowerIndex(fallbackPayload.members);
       fallbackPayload.warnings = unique([
         ...(fallbackPayload.warnings || []),
         fallbackWarning(error, false),
@@ -591,8 +835,11 @@ module.exports = {
   buildCsvUrl,
   buildSheetUrl,
   createSamgukSheetService,
+  enrichMembersWithPowerIndex,
   normalizeTimestamp,
+  mergeEquipmentData,
   parseCsv,
+  parseEquipmentCsv,
   parseMembersCsv,
   parseRulesCsv,
   parseTerritoriesCsv,

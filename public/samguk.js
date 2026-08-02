@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'soopnotice:samguk:v2';
+  const STORAGE_KEY = 'soopnotice:samguk:v3';
   const STORAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const REFRESH_INTERVAL_MS = 60 * 1000;
   const REQUEST_TIMEOUT_MS = 8000;
@@ -119,6 +119,10 @@
   }
 
   function normalizeMember(row) {
+    const engravings = pick(row, ['engravings', 'equipmentEngravings', '각인']);
+    const powerRange = pick(row, ['powerRange', 'power_range']);
+    const powerComponents = pick(row, ['powerComponents', 'power_components']);
+    const powerPopulation = pick(row, ['powerPopulation', 'power_population']);
     return {
       name: pick(row, ['name', 'nickname', '닉네임']),
       soopId: pick(row, ['soopId', 'soop_id', 'SOOP_ID']),
@@ -137,6 +141,21 @@
       vitality: cleanValue(pick(row, ['vitality', 'stat_vitality', '기력'])),
       intelligence: cleanValue(pick(row, ['intelligence', 'stat_intelligence', '지모'])),
       powerScore: cleanValue(pick(row, ['powerScore', 'power_score', 'power', '무력점수', '무력 점수'])),
+      engravings: Array.isArray(engravings) ? engravings : [],
+      equipmentObservedAt: pick(row, ['equipmentObservedAt', 'equipment_observed_at', '장비최종확인']),
+      equipmentEvidence: pick(row, ['equipmentEvidence', 'equipment_evidence', '장비최근근거']),
+      equipmentSourceType: pick(row, ['equipmentSourceType', 'equipment_source_type', '장비출처종류']),
+      equipmentSourceCount: cleanValue(pick(row, ['equipmentSourceCount', 'equipment_source_count', '장비교차검증수'])),
+      powerIndex: cleanValue(pick(row, ['powerIndex', 'power_index', '파워지수'])),
+      powerVersion: pick(row, ['powerVersion', 'power_version', '파워버전']),
+      powerCoverage: cleanValue(pick(row, ['powerCoverage', 'power_coverage', '파워수집률'])),
+      powerStatus: pick(row, ['powerStatus', 'power_status', '파워상태']),
+      powerRankable: pick(row, ['powerRankable', 'power_rankable', '순위대상']) === true,
+      powerSourcesVerified: pick(row, ['powerSourcesVerified', 'power_sources_verified', '파워출처검증']) === true,
+      powerPopulation: powerPopulation && typeof powerPopulation === 'object' ? powerPopulation : null,
+      powerVerified: pick(row, ['powerVerified', 'power_verified', '파워교차검증']) === true,
+      powerRange: powerRange && typeof powerRange === 'object' ? powerRange : null,
+      powerComponents: powerComponents && typeof powerComponents === 'object' ? powerComponents : null,
       sourceType: pick(row, ['sourceType', 'source_type', 'sourceTypes', '근거종류', '출처종류', '관측경로']),
       sourceCount: cleanValue(pick(row, ['sourceCount', 'source_count', '교차검증수', '출처수'])),
       verificationStatus: pick(row, ['verificationStatus', 'verification_status', '검증상태']),
@@ -153,6 +172,8 @@
     const valueFields = [
       'level', 'horse', 'horseLevel', 'weapon', 'helmet', 'armor', 'shoes',
       'strength', 'agility', 'vitality', 'intelligence', 'powerScore',
+      'engravings', 'equipmentObservedAt', 'equipmentEvidence', 'equipmentSourceType', 'equipmentSourceCount',
+      'powerIndex', 'powerVersion', 'powerCoverage', 'powerStatus', 'powerRankable', 'powerSourcesVerified', 'powerPopulation', 'powerVerified', 'powerRange', 'powerComponents',
       'sourceType', 'sourceCount', 'verificationStatus', 'reviewStatus', 'observedAt', 'evidence',
     ];
 
