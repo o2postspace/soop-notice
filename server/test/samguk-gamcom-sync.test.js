@@ -58,6 +58,8 @@ function currentMember(index, overrides = {}) {
     agility: 11,
     vitality: 12,
     intelligence: 13,
+    maxHealth: 1575,
+    attackPower: 110,
     ...overrides,
   };
 }
@@ -285,6 +287,8 @@ test("변경된 최댓값만 시트+Gamcom 기준값 스냅샷으로 만든다",
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].playerId, "P001");
   assert.equal(snapshots[0].fields.weapon, 9);
+  assert.equal(snapshots[0].fields.maxHealth, undefined);
+  assert.equal(snapshots[0].fields.attackPower, undefined);
   assert.deepEqual(snapshots[0].sourceTypes, ["sheet", "gamcom"]);
   assert.equal(snapshots[0].sourceCount, 2);
   assert.equal(snapshots[0].verification, "gamcom-max");

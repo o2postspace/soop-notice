@@ -12,7 +12,7 @@ const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const GOOGLE_SHEETS_API_ROOT = "https://sheets.googleapis.com/v4/spreadsheets";
 const OBSERVATION_SHEET = "관측입력";
 const PARTICIPANT_SHEET = "참가자";
-const OBSERVATION_LAST_COLUMN = "AD";
+const OBSERVATION_LAST_COLUMN = "AE";
 const MAX_OBSERVATION_ROW = 5001;
 const MAX_SNAPSHOT_BATCH = 100;
 const MAX_TOKEN_BYTES = 32 * 1024;
@@ -35,6 +35,7 @@ const FIELD_HEADERS = Object.freeze({
   intelligence: "지모",
   powerScore: "무력점수",
   maxHealth: "최대체력",
+  attackPower: "공격력",
   basicAttackDamage: "평타피해대표값",
   basicAttackSampleCount: "평타표본수",
   basicAttackTarget: "평타대상",
@@ -46,8 +47,9 @@ const EXPECTED_HEADERS = Object.freeze([
   "레벨", "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
   "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
   "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모",
-  "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각",
+  "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각", "공격력",
 ]);
+const INPUT_TIME_COLUMN_INDEX = EXPECTED_HEADERS.indexOf("입력시각");
 const SOURCE_LABELS = Object.freeze({
   sheet: "시트",
   gamcom: "Gamcom",
@@ -459,7 +461,7 @@ function createSamgukGoogleSheetWriter(options = {}) {
 
   function assertMatchingRow(actual, expected, { ignoreInputTime = false } = {}) {
     for (let index = 0; index < EXPECTED_HEADERS.length; index += 1) {
-      if (ignoreInputTime && index === EXPECTED_HEADERS.length - 1) continue;
+      if (ignoreInputTime && index === INPUT_TIME_COLUMN_INDEX) continue;
       if (!cellsEqual(actual[index], expected[index])) {
         fail("observation_id_conflict", "같은 observationId의 Sheet 내용이 다릅니다.");
       }

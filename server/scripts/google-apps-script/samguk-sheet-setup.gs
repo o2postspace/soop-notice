@@ -11,7 +11,7 @@
  * 백업_YYYYMMDD_HHmmss_탭이름으로 보존하고 공통 열을 새 탭으로 이관합니다.
  */
 
-var SAMGUK_SETUP_VERSION = "2026.08.03.2";
+var SAMGUK_SETUP_VERSION = "2026.08.03.3";
 var SAMGUK_SETUP_MAX_INPUT_ROW = 5001;
 var SAMGUK_SETUP_PROTECTION_PREFIX = "[SOOPNOTICE_SETUP]";
 var SAMGUK_SETUP_SHEET_ORDER = [
@@ -40,7 +40,7 @@ var SAMGUK_SETUP_HEADERS = {
     "레벨", "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
     "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
     "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모", "최대체력",
-    "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각"
+    "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각", "공격력"
   ],
   "현재현황": [
     "player_id", "국가", "세력/길드", "닉네임", "SOOP_ID", "장수/직업", "레벨", "말",
@@ -48,7 +48,7 @@ var SAMGUK_SETUP_HEADERS = {
     "무력", "기민", "기력", "지모", "무력점수", "최종확인", "최근근거", "출처종류",
     "교차검증수", "검증상태", "신선도", "기량합계", "랭킹점수", "공동순위",
     "정렬순번", "선택원본행", "최대체력", "평타피해대표값", "평타표본수",
-    "평타대상", "전투조건"
+    "평타대상", "전투조건", "공격력"
   ],
   "장비현황": [
     "닉네임", "SOOP_ID", "무기각인1", "무기각인2", "무기각인3",
@@ -91,8 +91,8 @@ var SAMGUK_SETUP_SPECS = {
   "기준정보": { rows: 20, freezeRows: 1, freezeColumns: 0, tabColor: "#8497B0" },
   "참가자": { rows: 91, freezeRows: 1, freezeColumns: 1, filter: "A1:J91", tabColor: "#70AD47" },
   "방송모니터링": { rows: 91, freezeRows: 1, freezeColumns: 1, filter: "A1:P91", tabColor: "#00B0F0" },
-  "관측입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:AD5001", tabColor: "#FFC000" },
-  "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:AI91", tabColor: "#4472C4" },
+  "관측입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:AE5001", tabColor: "#FFC000" },
+  "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:AJ91", tabColor: "#4472C4" },
   "장비현황": { rows: 91, freezeRows: 1, freezeColumns: 2, filter: "A1:R91", tabColor: "#BF9000" },
   "무력랭킹": { rows: 91, freezeRows: 1, freezeColumns: 0, filter: "A1:T91", tabColor: "#C00000" },
   "외부참고": { rows: 91, freezeRows: 1, freezeColumns: 3, filter: "A1:X91", tabColor: "#5B9BD5" },
@@ -399,7 +399,7 @@ function samgukSeedReference_(spreadsheet, sheet) {
       "에펨코리아+방송", "시트+Gamcom+에펨코리아", "시트+Gamcom+방송",
       "시트+에펨코리아+방송", "Gamcom+에펨코리아+방송", "시트+Gamcom+에펨코리아+방송"
     ],
-    7: ["검증상태", "기준값", "교차검증", "방송교차검증", "충돌"],
+    7: ["검증상태", "기준값", "교차검증", "방송교차검증", "충돌", "철회"],
     9: ["모니터링상태", "대기", "수동확인", "OCR연결", "중지"],
     11: ["방송상태", "확인필요", "LIVE", "OFFLINE", "확인실패"],
     16: ["영토소유", "위", "촉", "오", "미점령"],
@@ -466,7 +466,7 @@ function samgukSeedOperationalSheets_(sheets) {
       samgukBlankIfNull_(member.intelligence), samgukBlankIfNull_(member.powerScore),
       1, "기준값", "", "INIT-" + seedDate, "초기 1회 수집", "",
       "공개 현황의 설치 기준 스냅샷.", "", "", "", "", "",
-      samgukDateOrBlank_(member.observedAt)
+      samgukDateOrBlank_(member.observedAt), samgukBlankIfNull_(member.attackPower)
     ]);
     equipmentRows.push([
       member.name, member.soopId, "", "", "", "", "", "", "", "", "", "", "", "",
@@ -608,15 +608,16 @@ function samgukInstallCurrentFormulas_(sheet) {
   var sourceColumns = {
     7: "F", 8: "G", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
     15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 20: "C", 21: "E",
-    22: "D", 23: "R", 24: "S", 31: "Y", 32: "Z", 33: "AA", 34: "AB", 35: "AC"
+    22: "D", 23: "R", 24: "S", 31: "Y", 32: "Z", 33: "AA", 34: "AB", 35: "AC",
+    36: "AE"
   };
   var monotonicColumns = {
     7: "F", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
-    15: "M", 16: "N", 17: "O", 18: "P", 19: "Q"
+    15: "M", 16: "N", 17: "O", 18: "P", 19: "Q", 31: "Y", 36: "AE"
   };
   var rows = [];
   for (var row = 2; row <= 91; row += 1) {
-    var values = new Array(35).fill("");
+    var values = new Array(36).fill("");
     values[0] = "=IF(참가자!A" + row + "=\"\",\"\",참가자!A" + row + ")";
     for (var column = 2; column <= 6; column += 1) {
       var letter = String.fromCharCode(64 + column);
@@ -637,7 +638,7 @@ function samgukInstallCurrentFormulas_(sheet) {
     values[28] = "=IF(OR(AA" + row + "=\"\",AA" + row + "<=0),\"\",RANK.EQ(AA" + row + ",$AA$2:$AA$91,0)+COUNTIF($AA$2:AA" + row + ",AA" + row + ")-1)";
     rows.push(values);
   }
-  sheet.getRange(2, 1, 90, 35).setValues(rows);
+  sheet.getRange(2, 1, 90, 36).setValues(rows);
 }
 
 function samgukInstallRankingFormulas_(sheet) {
@@ -726,7 +727,7 @@ function samgukApplyValidations_(sheets) {
   samgukListValidation_(sheets["방송모니터링"].getRange("J2:J91"), reference.getRange("I2:I5"));
   samgukListValidation_(sheets["관측입력"].getRange("B2:B5001"), sheets["참가자"].getRange("A2:A91"));
   samgukListValidation_(sheets["관측입력"].getRange("D2:D5001"), reference.getRange("E2:E16"));
-  samgukListValidation_(sheets["관측입력"].getRange("S2:S5001"), reference.getRange("G2:G5"));
+  samgukListValidation_(sheets["관측입력"].getRange("S2:S5001"), reference.getRange("G2:G6"));
   samgukNumberValidation_(sheets["관측입력"].getRange("F2:F5001"), 10000);
   samgukNumberValidation_(sheets["관측입력"].getRange("H2:H5001"), 80);
   samgukNumberValidation_(sheets["관측입력"].getRange("I2:L5001"), 15);
@@ -735,6 +736,7 @@ function samgukApplyValidations_(sheets) {
   samgukNumberValidation_(sheets["관측입력"].getRange("W2:W5001"), 100);
   samgukNumberValidation_(sheets["관측입력"].getRange("Y2:Z5001"), 1000000);
   samgukNumberValidation_(sheets["관측입력"].getRange("AA2:AA5001"), 10000);
+  samgukNumberValidation_(sheets["관측입력"].getRange("AE2:AE5001"), 1000000);
 
   samgukListValidation_(sheets["영토입력"].getRange("B2:B5001"), sheets["영토현황"].getRange("A2:A61"));
   samgukListValidation_(sheets["영토입력"].getRange("D2:D5001"), reference.getRange("E2:E16"));
@@ -781,7 +783,7 @@ function samgukApplyAllProtections_(sheets) {
 
   samgukProtectInputSheet_(sheets["참가자"], ["B2:J91"]);
   samgukProtectInputSheet_(sheets["방송모니터링"], ["G2:P91"]);
-  samgukProtectInputSheet_(sheets["관측입력"], ["B2:Q5001", "X2:AC5001"]);
+  samgukProtectInputSheet_(sheets["관측입력"], ["B2:Q5001", "X2:AC5001", "AE2:AE5001"]);
   samgukProtectInputSheet_(sheets["장비현황"], ["C2:R91"]);
   samgukProtectInputSheet_(sheets["영토입력"], ["B2:O5001", "S2:S5001"]);
   samgukProtectInputSheet_(sheets["OCR설정"], ["C2:K20"]);

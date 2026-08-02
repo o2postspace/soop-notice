@@ -77,7 +77,7 @@ const PAYLOAD_KEYS = [
 ].sort();
 const RAW_MEMBER_KEYS = [
   "agility", "armor", "crew", "evidence", "helmet", "horse", "horseLevel", "intelligence", "job", "level",
-  "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions", "maxHealth",
+  "attackPower", "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions", "maxHealth",
   "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
   "sourceType", "strength", "verificationStatus", "vitality", "weapon",
 ].sort();
@@ -192,16 +192,17 @@ test("현재현황의 선택형 무력점수와 교차검증 메타데이터를 
 test("현재현황의 최대체력과 검증된 평타 대표값은 선택형 전투 관측으로 읽는다", () => {
   const headers = [
     ...MEMBER_HEADERS,
-    "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건",
+    "최대체력", "공격력", "평타피해대표값", "평타표본수", "평타대상", "전투조건",
   ];
   const row = [
     "촉", "테스트", "관우", "test_combat", "관우", "20", "적토마", "3", "5", "4", "4", "4",
     "40", "10", "20", "5", "2026-08-02 03:00:00", "https://play.sooplive.com/test", "확정",
-    "1,239", "343.5", "4", "동일 훈련 대상", "일반 평타·비치명",
+    "1,239", "110", "343.5", "4", "동일 훈련 대상", "일반 평타·비치명",
   ];
   const member = parseMembersCsv(makeCsv(headers, [row])).members[0];
 
   assert.equal(member.maxHealth, 1239);
+  assert.equal(member.attackPower, 110);
   assert.equal(member.basicAttackDamage, 343.5);
   assert.equal(member.basicAttackSampleCount, 4);
   assert.equal(member.basicAttackTarget, "동일 훈련 대상");
@@ -506,6 +507,7 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
   assert.match(html, /빈칸은 관측된 0으로 바꾸거나/);
   assert.match(html, /주문서 재고는 아직 사용하지 않은 자원이므로 제외/);
   assert.match(html, /최대 HP/);
+  assert.match(html, /공격력/);
   assert.match(html, /평타/);
   assert.match(html, /파워 v1 미반영/);
   assert.match(html, /function samgukTextValue\(value, suffix\)/);

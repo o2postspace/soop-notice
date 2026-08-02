@@ -68,6 +68,7 @@ test("setup은 14개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   assert.match(text, /samgukInstallCurrentFormulas_/);
   assert.match(text, /samgukMaxAcceptedValueFormula_/);
   assert.match(text, /var monotonicColumns =/);
+  assert.match(text, /31: "Y", 36: "AE"/);
   assert.match(text, /MAX\(FILTER\(/);
   assert.match(text, /RANK\.EQ/);
   assert.match(text, /setProperty\("SAMGUK_SETUP_VERSION"/);
@@ -87,17 +88,20 @@ test("setup은 출력 관리자-only와 입력 warning-only 보호, 드롭다운
   assert.match(text, /requireNumberBetween/);
   assert.match(text, /getRange\("H2:H5001"\), 80/);
   assert.match(text, /getRange\("I2:L5001"\), 15/);
+  assert.match(text, /\["검증상태", "기준값", "교차검증", "방송교차검증", "충돌", "철회"\]/);
+  assert.match(text, /reference\.getRange\("G2:G6"\)/);
+  assert.match(text, /getRange\("AE2:AE5001"\), 1000000/);
   assert.doesNotMatch(text, /getRange\("H2:L5001"\), 999/);
   assert.match(text, /setFrozenRows/);
   assert.match(text, /setFrozenColumns/);
   assert.match(text, /createFilter\(\)/);
-  assert.match(text, /\["B2:Q5001", "X2:AC5001"\]/);
+  assert.match(text, /\["B2:Q5001", "X2:AC5001", "AE2:AE5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["장비현황"\], \["C2:R91"\]\)/);
   assert.match(text, /\["B2:O5001", "S2:S5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["게임정보"\], \["A2:F30"\]\)/);
 });
 
-test("webhook은 A:AD 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
+test("webhook은 A:AE 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
   const text = source(webhookPath);
   assert.doesNotThrow(() => new Function(text));
   assert.match(text, /samgukFindFirstEmptyObservationRow_\(sheet, headers\.length\)/);
