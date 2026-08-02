@@ -107,10 +107,11 @@ function samgukAppendSnapshot_(snapshot) {
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
   var values = new Array(headers.length).fill("");
-  var sourceLabels = { sheet: "시트", fmkorea: "에펨코리아", broadcast: "방송" };
+  var sourceLabels = { sheet: "시트", gamcom: "Gamcom", fmkorea: "에펨코리아", broadcast: "방송" };
   var statusLabels = {
     "cross-source": "교차검증",
-    "broadcast-repeat": "방송교차검증"
+    "broadcast-repeat": "방송교차검증",
+    "gamcom-max": "기준값"
   };
   var fieldHeaders = {
     level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
@@ -187,13 +188,15 @@ function samgukValidateSnapshot_(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) throw new Error("invalid_snapshot");
   if (!/^OBS-[A-Z0-9-]{8,120}$/.test(String(snapshot.observationId || ""))) throw new Error("invalid_observation_id");
   if (!/^P\d{3}$/.test(String(snapshot.playerId || ""))) throw new Error("invalid_player_id");
-  if (["cross-source", "broadcast-repeat"].indexOf(snapshot.verification) < 0) throw new Error("not_cross_verified");
-  if (["sheet", "fmkorea", "broadcast"].indexOf(snapshot.primarySourceType) < 0) throw new Error("invalid_source");
-  if (!Array.isArray(snapshot.sourceTypes) || snapshot.sourceTypes.length < 1 || snapshot.sourceTypes.length > 3) {
+  if (["cross-source", "broadcast-repeat", "gamcom-max"].indexOf(snapshot.verification) < 0) {
+    throw new Error("not_verified");
+  }
+  if (["sheet", "gamcom", "fmkorea", "broadcast"].indexOf(snapshot.primarySourceType) < 0) throw new Error("invalid_source");
+  if (!Array.isArray(snapshot.sourceTypes) || snapshot.sourceTypes.length < 1 || snapshot.sourceTypes.length > 4) {
     throw new Error("invalid_source_types");
   }
   snapshot.sourceTypes.forEach(function(sourceType) {
-    if (["sheet", "fmkorea", "broadcast"].indexOf(sourceType) < 0) throw new Error("invalid_source_types");
+    if (["sheet", "gamcom", "fmkorea", "broadcast"].indexOf(sourceType) < 0) throw new Error("invalid_source_types");
   });
   if (snapshot.sourceTypes.filter(function(value, index, values) {
     return values.indexOf(value) === index;
@@ -204,6 +207,14 @@ function samgukValidateSnapshot_(snapshot) {
   if (snapshot.verification === "broadcast-repeat"
       && (snapshot.sourceTypes.length !== 1 || snapshot.sourceTypes[0] !== "broadcast")) {
     throw new Error("invalid_broadcast_repeat");
+  }
+  if (snapshot.verification === "gamcom-max"
+      && (snapshot.sourceTypes.length !== 2
+        || snapshot.sourceTypes.indexOf("sheet") < 0
+        || snapshot.sourceTypes.indexOf("gamcom") < 0
+        || snapshot.primarySourceType !== "gamcom"
+        || snapshot.sourceCount !== 2)) {
+    throw new Error("invalid_gamcom_max");
   }
   if (!snapshot.fields || typeof snapshot.fields !== "object" || Array.isArray(snapshot.fields)) throw new Error("invalid_fields");
   SAMGUK_REQUIRED_FIELDS.forEach(function(key) {
@@ -252,7 +263,7 @@ function samgukSafeCellValue_(value) {
 }
 
 function samgukAllowedSourceUrl_(value) {
-  return /^https:\/\/(?:[a-z0-9-]+\.)?(?:docs\.google\.com|fmkorea\.com|sooplive\.com|sooplive\.co\.kr)(?:[\/:?#]|$)/i.test(value);
+  return /^https:\/\/(?:[a-z0-9-]+\.)?(?:docs\.google\.com|gamcom-3kingdom\.vercel\.app|fmkorea\.com|sooplive\.com|sooplive\.co\.kr)(?:[\/:?#]|$)/i.test(value);
 }
 
 function samgukHmacHex_(payload, secret) {

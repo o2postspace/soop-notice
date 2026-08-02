@@ -71,6 +71,16 @@ function snapshot(overrides = {}) {
   };
 }
 
+function batchSnapshot(index, overrides = {}) {
+  const number = index + 1;
+  return snapshot({
+    observationId: `OBS-BATCH-${String(number).padStart(4, "0")}-ABCDEF12`,
+    playerId: `P${String((index % 90) + 1).padStart(3, "0")}`,
+    evidenceHash: number.toString(16).padStart(64, "0"),
+    ...overrides,
+  });
+}
+
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
@@ -166,6 +176,231 @@ test("snapshot은 출처 중복·검증 의미 불일치와 2000년 이전 관�
     sourceCount: 2,
   }), NOW);
   assert.deepEqual(crossSource.sourceTypes, ["broadcast", "fmkorea"]);
+});
+
+test("Gamcom 삼국지 페이지는 최고값 기준 출처로 정규화한다", () => {
+  const gamcomUrl = "https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84";
+  const normalized = normalizeSnapshot(snapshot({
+    verification: "gamcom-max",
+    primarySourceType: "gamcom",
+    sourceTypes: ["gamcom", "sheet"],
+    sourceCount: 2,
+    sourceUrls: [
+      gamcomUrl,
+      "https://docs.google.com/spreadsheets/d/1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY/edit",
+    ],
+  }), NOW);
+
+  assert.equal(normalized.sourceTypes[0], "gamcom");
+  assert.equal(normalized.sourceUrls[0], gamcomUrl);
+});
+
+test("appendSnapshots는 90개를 한 lock과 한 상태 조회로 분류한 뒤 명시 범위에 일괄 쓰고 전체 재검증한다", async (t) => {
+  const { directory, tokenPath } = temporaryToken(t);
+  const inputs = Array.from({ length: 90 }, (_value, index) => batchSnapshot(index));
+  const existingDuplicate = snapshotRow(normalizeSnapshot(inputs[0], NOW));
+  existingDuplicate[29] -= 1;
+  const partialRow = Array(EXPECTED_HEADERS.length).fill("");
+  partialRow[23] = "수동 메모";
+  const roster = Array.from({ length: 90 }, (_value, index) => [
+    `P${String(index + 1).padStart(3, "0")}`,
+  ]);
+  let acquired = 0;
+  let released = 0;
+  let metadataCalls = 0;
+  let stateCalls = 0;
+  let prewriteCalls = 0;
+  let readbackCalls = 0;
+  let batchUpdateCalls = 0;
+  let batchData = null;
+  let readbackRanges = null;
+  const writer = createSamgukGoogleSheetWriter({
+    tokenPath,
+    sheetId: "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY",
+    lockPath: path.join(directory, "batch-writer.guard"),
+    now: () => NOW,
+    acquireLock: () => {
+      acquired += 1;
+      return { release() { released += 1; } };
+    },
+    fetchImpl: async (url, init = {}) => {
+      if (url === "https://oauth2.googleapis.com/token") {
+        return response({ access_token: "access-token", expires_in: 3600 });
+      }
+      if (url.includes("fields=properties%28timeZone%29")) {
+        metadataCalls += 1;
+        return response({ properties: { timeZone: "Asia/Seoul" } });
+      }
+      if (url.endsWith("/values:batchUpdate")) {
+        batchUpdateCalls += 1;
+        assert.equal(init.method, "POST");
+        const body = JSON.parse(init.body);
+        assert.equal(body.valueInputOption, "RAW");
+        batchData = body.data;
+        return response({
+          totalUpdatedRows: batchData.length,
+          totalUpdatedColumns: EXPECTED_HEADERS.length,
+          totalUpdatedCells: batchData.length * EXPECTED_HEADERS.length,
+          totalUpdatedSheets: 1,
+          responses: batchData.map(item => ({
+            updatedRange: item.range.replaceAll("'", ""),
+            updatedRows: 1,
+            updatedColumns: EXPECTED_HEADERS.length,
+            updatedCells: EXPECTED_HEADERS.length,
+          })),
+        });
+      }
+      if (url.includes("/values:batchGet")) {
+        if (stateCalls === 0) {
+          stateCalls += 1;
+          return response({ valueRanges: [
+            { values: [EXPECTED_HEADERS] },
+            { values: [existingDuplicate, partialRow] },
+            { values: roster },
+          ] });
+        }
+        if (!batchData) {
+          prewriteCalls += 1;
+          const ranges = new URL(url).searchParams.getAll("ranges");
+          return response({ valueRanges: ranges.map(range => ({ range, values: [] })) });
+        }
+        readbackCalls += 1;
+        assert.ok(batchData);
+        readbackRanges = new URL(url).searchParams.getAll("ranges");
+        const writtenByRange = new Map(batchData.map(item => [item.range, item.values]));
+        return response({ valueRanges: readbackRanges.map(range => ({
+          range,
+          values: writtenByRange.get(range),
+        })) });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    },
+  });
+
+  const result = await writer.appendSnapshots(inputs);
+  assert.deepEqual(result, {
+    ok: true,
+    results: inputs.map((input, index) => ({
+      observationId: input.observationId,
+      duplicate: index === 0,
+      appendedRow: index === 0 ? 2 : index + 3,
+    })),
+    appendedCount: 89,
+    duplicateCount: 1,
+  });
+  assert.equal(acquired, 1);
+  assert.equal(released, 1);
+  assert.equal(metadataCalls, 1);
+  assert.equal(stateCalls, 1);
+  assert.equal(prewriteCalls, 1);
+  assert.equal(batchUpdateCalls, 1);
+  assert.equal(readbackCalls, 1);
+  assert.equal(batchData.length, 89);
+  assert.deepEqual(
+    batchData.map(item => item.range),
+    Array.from({ length: 89 }, (_value, index) => `'관측입력'!A${index + 4}:AD${index + 4}`),
+  );
+  assert.ok(batchData.every(item => item.majorDimension === "ROWS" && item.values.length === 1));
+  assert.deepEqual(readbackRanges, batchData.map(item => item.range));
+});
+
+test("appendSnapshots는 입력 중복과 100개 초과를 lock·조회 전에 거부한다", async (t) => {
+  const { directory, tokenPath } = temporaryToken(t);
+  let acquired = 0;
+  let fetchCalls = 0;
+  const writer = createSamgukGoogleSheetWriter({
+    tokenPath,
+    sheetId: "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY",
+    lockPath: path.join(directory, "preflight-writer.guard"),
+    now: () => NOW,
+    acquireLock: () => {
+      acquired += 1;
+      return { release() {} };
+    },
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error("사전 검증에서 API를 호출하면 안 됩니다.");
+    },
+  });
+
+  await assert.rejects(
+    writer.appendSnapshots([batchSnapshot(0), batchSnapshot(0)]),
+    error => error?.code === "duplicate_observation_id",
+  );
+  await assert.rejects(
+    writer.appendSnapshots(Array.from({ length: 101 }, (_value, index) => batchSnapshot(index))),
+    error => error?.code === "invalid_snapshot_batch",
+  );
+  assert.equal(acquired, 0);
+  assert.equal(fetchCalls, 0);
+});
+
+test("appendSnapshots는 기존 ID 충돌이나 공간 부족이면 batchUpdate 전에 전체 실패한다", async (t) => {
+  const { directory, tokenPath } = temporaryToken(t);
+  const conflictingRow = snapshotRow(normalizeSnapshot(batchSnapshot(0), NOW));
+  conflictingRow[5] += 1;
+  let conflictWrites = 0;
+  const conflictWriter = createSamgukGoogleSheetWriter({
+    tokenPath,
+    sheetId: "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY",
+    lockPath: path.join(directory, "conflict-writer.guard"),
+    now: () => NOW,
+    acquireLock: () => ({ release() {} }),
+    fetchImpl: async (url) => {
+      if (url === "https://oauth2.googleapis.com/token") {
+        return response({ access_token: "access-token", expires_in: 3600 });
+      }
+      if (url.includes("fields=properties%28timeZone%29")) {
+        return response({ properties: { timeZone: "Asia/Seoul" } });
+      }
+      if (url.includes("/values:batchGet")) return response({ valueRanges: [
+        { values: [EXPECTED_HEADERS] },
+        { values: [conflictingRow] },
+        { values: [["P001"]] },
+      ] });
+      conflictWrites += 1;
+      throw new Error(`unexpected write: ${url}`);
+    },
+  });
+
+  await assert.rejects(
+    conflictWriter.appendSnapshots([batchSnapshot(0), batchSnapshot(1)]),
+    error => error?.code === "observation_id_conflict",
+  );
+  assert.equal(conflictWrites, 0);
+
+  const fullRows = Array.from({ length: 5000 }, (_value, index) => [
+    `OBS-FULL-${String(index + 1).padStart(4, "0")}-ABCDEF12`,
+  ]);
+  let fullWrites = 0;
+  const fullWriter = createSamgukGoogleSheetWriter({
+    tokenPath,
+    sheetId: "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY",
+    lockPath: path.join(directory, "full-writer.guard"),
+    now: () => NOW,
+    acquireLock: () => ({ release() {} }),
+    fetchImpl: async (url) => {
+      if (url === "https://oauth2.googleapis.com/token") {
+        return response({ access_token: "access-token", expires_in: 3600 });
+      }
+      if (url.includes("fields=properties%28timeZone%29")) {
+        return response({ properties: { timeZone: "Asia/Seoul" } });
+      }
+      if (url.includes("/values:batchGet")) return response({ valueRanges: [
+        { values: [EXPECTED_HEADERS] },
+        { values: fullRows },
+        { values: [["P001"]] },
+      ] });
+      fullWrites += 1;
+      throw new Error(`unexpected write: ${url}`);
+    },
+  });
+
+  await assert.rejects(
+    fullWriter.appendSnapshots([batchSnapshot(0)]),
+    error => error?.code === "observation_sheet_full",
+  );
+  assert.equal(fullWrites, 0);
 });
 
 test("OAuth writer는 첫 A:AD 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {

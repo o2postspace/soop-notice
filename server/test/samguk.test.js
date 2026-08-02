@@ -162,6 +162,12 @@ test("현재현황의 선택형 무력점수와 교차검증 메타데이터를 
   assert.equal(combined.members[0].sourceType, "sheet+fmkorea+broadcast");
   assert.equal(combined.members[0].verificationStatus, "broadcast-verified");
 
+  const gamcom = parseMembersCsv(makeCsv(headers, [[
+    ...base, "12,345", "시트+Gamcom", "2", "교차검증",
+  ]]));
+  assert.equal(gamcom.members[0].sourceType, "sheet+gamcom");
+  assert.equal(gamcom.members[0].sourceCount, 2);
+
   const invalid = parseMembersCsv(makeCsv(headers, [[
     ...base, "not-a-score", "직접 방송", "0", "",
   ]]));

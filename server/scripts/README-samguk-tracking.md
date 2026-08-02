@@ -3,13 +3,14 @@
 공개 화면에는 `검수대기`를 노출하지 않는다. 후보 관측은 로컬 NDJSON 큐에만 보관하고, 아래 조건을 만족한 최신값만 완전한 스냅샷으로 Google Sheet `관측입력`에 추가한다.
 
 - 현재 Google Sheet 값은 기준값으로 즉시 사용
+- Gamcom은 3개국 90명 완전 매칭 뒤 숫자 필드의 더 큰 값만 채택하고 문자열은 원장 빈칸만 보완
 - Sheet·에펨코리아·방송 중 서로 다른 두 출처가 24시간 안에 같은 값을 확인
 - 방송 OCR만 사용할 때는 신뢰도 0.95 이상인 서로 다른 두 프레임이 같은 값을 확인
 - 같은 최신 시각의 검증값이 충돌하면 직전 기준값 유지
 
 ## 흐름
 
-`Google Sheet 기준값 + FMK 구조화 입력 + 방송 ROI OCR → samguk-observations.ndjson → 5분 승격 cron → Apps Script webhook → 관측입력 → 현재현황 + 장비현황 → /api/samguk → 파워랭킹`
+`Google Sheet 기준값 + Gamcom 보조자료 + FMK 구조화 입력 + 방송 ROI OCR → 관측입력 → 현재현황 + 장비현황 → /api/samguk → 파워랭킹`
 
 파워 v1은 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%의 고정 가중치를 합산한다. 결측 구성요소에는 가중치를 재분배하거나 0점을 넣지 않고 가능한 0~100 범위를 유지하며, 화면 순위는 우리 시트에서 실제 확인된 구성요소의 하한점수로 정렬하고 범위 중앙값은 추정치로 함께 표시한다. 수집률 85%는 순위 포함 기준이 아니라 신뢰도 플래그다. `confirmed`는 수집률 100%, 현재현황·장비현황 교차검증, 레벨·기량 비교 표본 임계치가 모두 충족될 때만 사용하며, 나머지는 `provisional` 또는 `insufficient(수집 중·참고)`로 표시한다. 최대체력·평타피해는 비교 보조 관측이며 파워 v1 점수에는 넣지 않는다. 장비현황 빈칸은 미관측이며 미장착 슬롯은 `없음`, 일반 장수의 두갑 슬롯은 `해당없음`으로 명시한다.
 
@@ -41,12 +42,17 @@ JSON
    - `google-apps-script/samguk-sheet-seed.generated.gs`
    - `google-apps-script/samguk-sheet-setup.gs`
    - `google-apps-script/samguk-observation-webhook.gs`
-2. 소유자 계정으로 `setupSamgukSheet()`를 실행한다. 13개 운영 탭, 90명, 60개 영토, 수식, 드롭다운, 필터와 보호가 멱등 적용되며 구형 탭은 `백업_...`으로 숨김 보존된다.
+   - `google-apps-script/samguk-gamcom-sync.gs`
+2. 소유자 계정으로 `setupSamgukSheet()`를 실행한다. 14개 운영 탭, 90명, 60개 영토, 수식, 드롭다운, 필터와 보호가 멱등 적용되며 구형 탭은 `백업_...`으로 숨김 보존된다.
 3. 추가 관리자는 Script Property `SAMGUK_SHEET_ADMIN_EMAILS`에 쉼표로 구분해 등록한다. 보호만 다시 설치할 때는 `reapplySamgukSheetProtections()`를 실행한다.
 4. Script Property에 `SAMGUK_WEBHOOK_SECRET`과 필요하면 `SAMGUK_SPREADSHEET_ID`를 저장한다.
 5. 웹 앱 `/exec` URL과 같은 secret을 서버의 `SAMGUK_SHEET_WEBHOOK_URL`, `SAMGUK_SHEET_WEBHOOK_SECRET`에 저장한다. 평문 env 대신 `SAMGUK_SHEET_WEBHOOK_URL_PATH`, `SAMGUK_SHEET_WEBHOOK_SECRET_PATH`로 현재 사용자 소유의 0400/0600 일반 파일을 지정할 수 있으며 평문 env가 경로 설정보다 우선한다. Apps Script 응답 제한은 `SAMGUK_SHEET_WEBHOOK_TIMEOUT_MS`로 조정하며 기본 30초, 최대 60초다.
 6. 먼저 `SAMGUK_TRACKING_ENABLED=1`, `SAMGUK_TRACKING_WRITE_ENABLED=0`으로 dry-run을 확인한다.
 7. 정상일 때만 `SAMGUK_TRACKING_WRITE_ENABLED=1`로 전환한다.
+
+### Gamcom 보조자료
+
+[위](https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84)·[촉](https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89)·[오](https://gamcom-3kingdom.vercel.app/factions/%EC%98%A4) 페이지는 우리 원장을 대체하지 않는다. `installSamgukGamcomSync()`를 한 번 실행하면 즉시 동기화하고 `syncSamgukGamcom()` 15분 트리거를 하나만 설치한다. 매번 국가별 30명과 우리 원장 90명의 닉네임·국가가 전부 일치해야 쓰며, 숫자는 `MAX(우리값, Gamcom값)`, 세력·직업·말은 우리 값을 우선한다. 레벨·강화·능력치·원본 무력점수는 이후 더 낮은 관측이 들어와도 현황에서 내려가지 않는다. 원문에 개별 갱신시각이 없으므로 `외부참고`에 수집시각·출처 URL·채택 필드·유지 필드를 남기고, 실제 상승분만 `관측입력`에 `시트+Gamcom`·`기준값` 스냅샷으로 추가한다. 이는 두 출처의 값이 같다는 의미의 `교차검증`과 구분한다.
 
 Apps Script를 배포하지 않는 단일 서버 운영에서는 전용 OAuth writer도 사용할 수 있다. OAuth 계정은 원장 소유자 또는 보호 관리자여야 하며 다른 writer와 병행하지 않는다.
 

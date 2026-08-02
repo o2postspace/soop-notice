@@ -181,6 +181,7 @@ function normalizeSingleSourceType(value) {
     .toLowerCase()
     .replace(/[\s_-]+/g, "");
   if (["fmkorea", "fmk", "fm코리아", "에펨코리아", "에펨"].includes(token)) return "fmkorea";
+  if (["gamcom", "감컴", "삼국지지통실", "외부참고"].includes(token)) return "gamcom";
   if (["broadcast", "방송", "직접방송", "방송화면", "다시보기", "클립", "vod", "soop"].includes(token)) {
     return "broadcast";
   }
@@ -190,7 +191,7 @@ function normalizeSingleSourceType(value) {
 
 function normalizeSourceType(value) {
   const sources = new Set(String(value || "").split(/[,|+\/·]/).map(normalizeSingleSourceType).filter(Boolean));
-  const canonical = ["sheet", "fmkorea", "broadcast"].filter(source => sources.has(source));
+  const canonical = ["sheet", "gamcom", "fmkorea", "broadcast"].filter(source => sources.has(source));
   return canonical.length > 0 ? canonical.join("+") : "sheet";
 }
 

@@ -118,7 +118,7 @@ function buildPromotionSnapshots(payload, queued, { windowMs, now = Date.now() }
     const evidenceHashes = [...new Set(accepted.flatMap(candidate => candidate.evidenceHashes))].sort();
     const digest = crypto.createHash("sha256").update(JSON.stringify({ playerId, fields, evidenceHashes })).digest("hex");
     const sourceTypeSet = new Set(supporting.map(item => item.sourceType));
-    const sourceTypes = ["sheet", "fmkorea", "broadcast"].filter(sourceType => sourceTypeSet.has(sourceType));
+    const sourceTypes = ["sheet", "gamcom", "fmkorea", "broadcast"].filter(sourceType => sourceTypeSet.has(sourceType));
     const nonSheet = [...supporting].sort((left, right) => Date.parse(right.observedAt) - Date.parse(left.observedAt))
       .find(item => item.sourceType !== "sheet");
     const confidences = supporting.map(item => item.ocrConfidence).filter(value => value !== null);
