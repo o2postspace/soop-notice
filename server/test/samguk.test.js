@@ -303,24 +303,28 @@ test("fallback 최신 스냅샷은 기량 랭킹 품질 기준을 만족한다",
   assert.equal(growthScore(snapshot.members.find(member => member.name === "감스트")), 50);
 });
 
-test("삼국지 카드의 기량합계는 네 기량만 사용한다", () => {
+test("삼국지 카드의 기량합계는 네 기량이 모두 있을 때만 사용한다", () => {
   const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
   assert.match(
     html,
-    /function samgukGrowthScore\(member\) \{\s*return samgukPositiveTotal\(member, \['strength', 'agility', 'vitality', 'intelligence'\]\);\s*\}/,
+    /function samgukGrowthScore\(member\) \{\s*return samgukCompleteTotal\(member, \['strength', 'agility', 'vitality', 'intelligence'\]\);\s*\}/,
   );
   assert.doesNotMatch(html, /function samgukGrowthScore\(member\)[\s\S]{0,200}powerScore/);
+  assert.match(html, /기량 4종 완비/);
 });
 
 test("무력랭킹은 전체 데이터셋에서 무력점수와 무력 스탯 스케일을 섞지 않는다", () => {
   const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
+  assert.match(html, /powerScoreCoverage === SAMGUK_MEMBERS\.length/);
   assert.match(html, /const scoreField = hasPowerScore \? 'powerScore' : 'strength';/);
   assert.match(html, /const scoreLabel = hasPowerScore \? '무력점수' : '무력 스탯';/);
   assert.match(html, /samgukNumber\(member\[scoreField\]\)/);
   assert.match(html, /무력 스탯과 점수 스케일은 섞지 않습니다/);
-  assert.match(html, /별도 무력점수가 입력되기 전까지[^\n]+무력 스탯/);
+  assert.match(html, /공개 Wiki에는 레벨·장비·말·각인을 한 숫자로 합치는 공식이 없어/);
+  assert.match(html, /Lv는 캐릭터 레벨의 정의와 효과가 공개 확인되기 전까지 점수에서 제외/);
+  assert.match(html, /공개항목/);
   assert.doesNotMatch(html, /member\.powerScore\s*(?:\|\||\?\?)\s*member\.strength/);
 });
 

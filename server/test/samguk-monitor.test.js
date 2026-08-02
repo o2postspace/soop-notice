@@ -3,12 +3,15 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const vm = require("node:vm");
 const { readObservationQueue } = require("../lib/samguk-observations");
+const { buildPromotionSnapshots } = require("../scripts/samguk-promote-observations");
 const {
   SamgukMonitorError,
   assertActivationAllowed,
   captureRoi,
   createMonitor,
+  createSoopLiveChecker,
   isMonitorEnabled,
   main,
   normalizeMonitorConfig,
@@ -86,6 +89,18 @@ test("설정된 ROI와 안전한 범위만 허용한다", () => {
   );
   assert.throws(
     () => normalizeMonitorConfig(config({
+      ocr: { ...config().ocr, minConfidence: 0.94 },
+    })),
+    error => error.code === "invalid_config" && /0\.95 이상/.test(error.message),
+  );
+  assert.throws(
+    () => normalizeMonitorConfig(config({
+      targets: [{ ...config().targets[0], playerId: "player-1" }],
+    })),
+    error => error.code === "invalid_config" && /playerId 형식/.test(error.message),
+  );
+  assert.throws(
+    () => normalizeMonitorConfig(config({
       targets: [{ ...config().targets[0], rois: [{ ...config().targets[0].rois[0], field: "chat" }] }],
     })),
     error => error.code === "invalid_config",
@@ -143,6 +158,35 @@ test("OCR adapter는 인자 template을 배열에서 치환하고 JSON 계약만
     error => error.code === "invalid_ocr_output" && /허용되지 않은/.test(error.message),
   );
   assert.throws(() => parseOcrOutput("debug log"), error => error.code === "invalid_ocr_output");
+});
+
+test("SOOP LIVE 조회는 브라우저 헤더를 보내고 broad 유무와 HTTP 성공을 구분한다", async () => {
+  const invocations = [];
+  const responses = [
+    { ok: true, status: 200, json: async () => ({ broad: { broad_no: 123 } }) },
+    { ok: true, status: 200, json: async () => ({ broad: null }) },
+  ];
+  const checker = createSoopLiveChecker({
+    fetchImpl: async (url, options) => {
+      invocations.push({ url, options });
+      return responses.shift();
+    },
+  });
+
+  assert.equal(await checker("test_bj"), true);
+  assert.equal(await checker("offline_bj"), false);
+  assert.equal(invocations[0].url, "https://chapi.sooplive.co.kr/api/test_bj/station");
+  assert.deepEqual(invocations[0].options.headers, {
+    Referer: "https://www.sooplive.co.kr/",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    Accept: "application/json",
+  });
+  assert.ok(invocations[0].options.signal instanceof AbortSignal);
+
+  const rejected = createSoopLiveChecker({
+    fetchImpl: async () => ({ ok: false, status: 404 }),
+  });
+  await assert.rejects(() => rejected("test_bj"), /SOOP HTTP 404/);
 });
 
 test("LIVE일 때만 지정 ROI를 관측하고 15초, 대기 때는 60초를 반환한다", async (t) => {
@@ -222,4 +266,67 @@ test("낮은 OCR confidence는 queue에 추가하지 않고 crop을 즉시 지�
   assert.equal(result.appendedCount, 0);
   assert.equal(appendCalls, 0);
   assert.equal(fs.readdirSync(monitor.cropsDir).length, 0);
+});
+
+test("서로 다른 두 방송 frame이 NDJSON에서 promoter와 webhook 계약까지 승격된다", async (t) => {
+  const directory = temporaryDirectory(t);
+  const queuePath = path.join(directory, "queue.ndjson");
+  let currentTime = Date.now() - 60_000;
+  let captureCount = 0;
+  const frameIds = ["frame-a", "frame-b"];
+  const monitor = createMonitor({
+    config: normalizeMonitorConfig(config()),
+    queuePath,
+    stateDir: directory,
+    now: () => currentTime,
+    randomId: () => frameIds.shift(),
+    getLiveStatus: async () => true,
+    captureRoiFn: async ({ outputPath }) => {
+      captureCount += 1;
+      fs.writeFileSync(outputPath, `roi-${captureCount}`);
+    },
+    runOcrFn: async () => ({ value: 123, confidence: 0.98 }),
+    logger: { warn() {} },
+  });
+
+  assert.equal((await monitor.runCycle()).appendedCount, 1);
+  currentTime += 15_000;
+  assert.equal((await monitor.runCycle()).appendedCount, 1);
+
+  const queued = readObservationQueue(queuePath);
+  assert.equal(queued.length, 2);
+  assert.ok(queued.every(item => item.field === "strength" && item.ocrConfidence === 0.98));
+  assert.ok(queued.every(item => item.sourceId.startsWith("screen:player-1-strength-")));
+  assert.equal(new Set(queued.map(item => item.sourceId)).size, 2);
+  assert.equal(new Set(queued.map(item => item.evidenceHash)).size, 2);
+
+  const baselineTime = new Date(currentTime - 60_000).toISOString();
+  const snapshots = buildPromotionSnapshots({
+    source: "google-sheet",
+    stale: false,
+    sheetUrl: "https://docs.google.com/spreadsheets/d/test-sheet/edit",
+    updatedAt: baselineTime,
+    members: [{
+      soopId: "cnsgkcnehd74",
+      level: 10, horse: "백룡마", horseLevel: 1, weapon: 2, helmet: 1, armor: 1, shoes: 1,
+      strength: 10, agility: 2, vitality: 3, intelligence: 4, powerScore: null,
+      observedAt: baselineTime,
+    }],
+  }, queued, { windowMs: 60 * 60_000, now: currentTime });
+
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].fields.strength, 123);
+  assert.equal(snapshots[0].verification, "broadcast-repeat");
+  assert.equal(snapshots[0].primarySourceType, "broadcast");
+  assert.deepEqual(snapshots[0].sourceTypes, ["broadcast"]);
+  assert.equal(snapshots[0].sourceCount, 2);
+  assert.equal(snapshots[0].ocrConfidence, 0.98);
+
+  const webhookPath = path.resolve(
+    __dirname,
+    "../scripts/google-apps-script/samguk-observation-webhook.gs",
+  );
+  const webhook = {};
+  vm.runInNewContext(fs.readFileSync(webhookPath, "utf8"), webhook, { filename: webhookPath });
+  assert.doesNotThrow(() => webhook.samgukValidateSnapshot_(snapshots[0]));
 });

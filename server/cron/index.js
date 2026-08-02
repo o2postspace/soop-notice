@@ -78,6 +78,16 @@ function createRunner({
         windowMs: samgukTracking.windowMs,
         write: samgukTracking.write,
       }))
+      .then((result) => {
+        if (typeof logger.info === "function") {
+          logger.info(
+            `[cron] samguk promotion: mode=${samgukTracking.write ? "write" : "dry-run"}`
+            + ` queued=${result?.queued ?? 0} snapshots=${result?.snapshots?.length ?? 0}`
+            + ` written=${result?.written ?? 0}`,
+          );
+        }
+        return result;
+      })
       .catch((error) => {
         logger.error("[cron] samguk promotion failed:", error.message);
         return null;

@@ -12,6 +12,7 @@ const {
   normalizeObservation,
   observationFingerprint,
   readObservationQueue,
+  rewriteObservationQueue,
   resolveLatestAccepted,
 } = require("../lib/samguk-observations");
 
@@ -90,6 +91,33 @@ test("허용 필드, 값, URL host와 임의 상태 필드를 엄격히 검증�
   assert.equal(broadcast.ocrConfidence, 0.97);
 });
 
+test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 사용한다", () => {
+  for (const [field, maximum] of Object.entries({
+    level: 10_000,
+    horseLevel: 999,
+    weapon: 999,
+    helmet: 999,
+    armor: 999,
+    shoes: 999,
+    strength: 1_000_000,
+    agility: 1_000_000,
+    vitality: 1_000_000,
+    intelligence: 1_000_000,
+    powerScore: 1_000_000,
+  })) {
+    assert.equal(normalizeObservation(observation({ field, value: maximum })).value, maximum);
+    assert.throws(
+      () => normalizeObservation(observation({ field, value: maximum + 1 })),
+      error => error.code === "invalid_value",
+    );
+  }
+  assert.throws(
+    () => normalizeObservation(observation({ field: "level", value: 1.5 })),
+    error => error.code === "invalid_value",
+  );
+  assert.equal(normalizeObservation(observation({ field: "powerScore", value: 1234.5 })).value, 1234.5);
+});
+
 test("서로 다른 두 출처가 window 안에서 같은 값을 관측해야 교차검증된다", () => {
   const sheet = observation();
   const fmkorea = observation({
@@ -136,6 +164,106 @@ test("고신뢰 방송은 서로 다른 frame 두 개가 같은 값을 잡을 �
   assert.deepEqual(findAcceptedConsensus([frame1, { ...frame2, sourceId: frame1.sourceId }]), []);
   assert.deepEqual(findAcceptedConsensus([frame1, { ...frame2, ocrConfidence: 0.94 }]), []);
   assert.deepEqual(findAcceptedConsensus([frame1, { ...frame2, value: 11 }]), []);
+});
+
+test("HLS 방송은 같은 media segment의 연속 frame을 독립 근거로 세지 않는다", () => {
+  const first = observation({
+    sourceType: "broadcast",
+    sourceId: "screen:P001:1770000000000:1111111111111111:4",
+    sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+    evidenceHash: "1".repeat(64),
+    ocrConfidence: 0.99,
+  });
+  const sameSegment = observation({
+    sourceType: "broadcast",
+    sourceId: "screen:P001:1770000003000:1111111111111111:5",
+    sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+    observedAt: "2026-08-02T10:00:03.000Z",
+    evidenceHash: "2".repeat(64),
+    ocrConfidence: 0.99,
+  });
+  const nextSegment = observation({
+    sourceType: "broadcast",
+    sourceId: "screen:P001:1770000006000:2222222222222222:0",
+    sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+    observedAt: "2026-08-02T10:00:06.000Z",
+    evidenceHash: "3".repeat(64),
+    ocrConfidence: 0.99,
+  });
+
+  assert.deepEqual(findAcceptedConsensus([first, sameSegment]), []);
+  const accepted = findAcceptedConsensus([first, sameSegment, nextSegment]);
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0].evidenceUnitIds.length, 2);
+});
+
+test("서로 다른 방송 근거도 현재 시각 기준 window보다 오래되면 승격하지 않는다", () => {
+  const rows = [
+    observation({
+      sourceType: "broadcast",
+      sourceId: "screen:old-frame-1",
+      sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+      evidenceHash: "1".repeat(64),
+      ocrConfidence: 0.99,
+    }),
+    observation({
+      sourceType: "broadcast",
+      sourceId: "screen:old-frame-2",
+      sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+      observedAt: "2026-08-02T10:00:03.000Z",
+      evidenceHash: "2".repeat(64),
+      ocrConfidence: 0.99,
+    }),
+  ];
+  assert.deepEqual(findAcceptedConsensus(rows, {
+    windowMs: 60 * 60 * 1000,
+    now: Date.parse("2026-08-02T11:00:04.000Z"),
+  }), []);
+});
+
+test("저신뢰 방송은 다른 출처와 값이 같아도 교차검증 근거로 세지 않는다", () => {
+  const fmkorea = observation({
+    sourceType: "fmkorea",
+    sourceId: "post-low-confidence",
+    sourceUrl: "https://www.fmkorea.com/123",
+  });
+  const broadcast = observation({
+    sourceType: "broadcast",
+    sourceId: "frame-low-confidence",
+    sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+    ocrConfidence: 0.94,
+  });
+  assert.deepEqual(findAcceptedConsensus([fmkorea, broadcast]), []);
+});
+
+test("저신뢰 최신 frame은 이미 검증된 값의 확인시각을 갱신하지 않는다", () => {
+  const frames = [
+    observation({
+      sourceType: "broadcast",
+      sourceId: "frame-eligible-1",
+      sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+      observedAt: "2026-08-02T10:00:00.000Z",
+      ocrConfidence: 0.98,
+    }),
+    observation({
+      sourceType: "broadcast",
+      sourceId: "frame-eligible-2",
+      sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+      observedAt: "2026-08-02T10:00:02.000Z",
+      ocrConfidence: 0.99,
+    }),
+    observation({
+      sourceType: "broadcast",
+      sourceId: "frame-low-latest",
+      sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+      observedAt: "2026-08-02T10:10:00.000Z",
+      ocrConfidence: 0.1,
+    }),
+  ];
+  const accepted = findAcceptedConsensus(frames);
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0].observedAt, "2026-08-02T10:00:02.000Z");
+  assert.equal(accepted[0].observationIds.length, 2);
 });
 
 test("sheet baseline은 즉시 채택하지만 새 값은 교차검증된 경우에만 덮어쓴다", () => {
@@ -235,6 +363,74 @@ test("동일 관측은 NDJSON queue에 한 번만 append하고 ID 충돌과 손�
   const corrupt = temporaryQueue(t);
   fs.writeFileSync(corrupt, "not-json\n", { mode: 0o600 });
   assert.throws(() => readObservationQueue(corrupt), error => error.code === "queue_corrupt");
+});
+
+test("queue rewrite는 검증·dedupe한 완전한 0600 파일로 원자 교체한다", (t) => {
+  const queue = temporaryQueue(t);
+  appendObservationQueue(queue, observation(), { now: FIXED_NOW });
+  const previousInode = fs.statSync(queue).ino;
+  const replacement = observation({
+    sourceType: "fmkorea",
+    sourceId: "post-rewrite",
+    sourceUrl: "https://www.fmkorea.com/888",
+    value: 11,
+  });
+
+  const result = rewriteObservationQueue(queue, [
+    replacement,
+    { ...replacement, collectedAt: "2026-08-02T11:00:00.000Z" },
+  ], { now: FIXED_NOW });
+
+  assert.equal(result.written, 1);
+  assert.equal(readObservationQueue(queue).length, 1);
+  assert.equal(readObservationQueue(queue)[0].value, 11);
+  assert.notEqual(fs.statSync(queue).ino, previousInode);
+  assert.equal(fs.statSync(queue).mode & 0o777, 0o600);
+  assert.deepEqual(fs.readdirSync(path.dirname(queue)), [path.basename(queue)]);
+
+  const empty = rewriteObservationQueue(queue, [], { now: FIXED_NOW });
+  assert.equal(empty.written, 0);
+  assert.equal(fs.readFileSync(queue, "utf8"), "");
+  assert.equal(fs.statSync(queue).mode & 0o777, 0o600);
+});
+
+test("queue rewrite 검증 실패는 기존 파일을 그대로 보존하고 임시 파일을 남기지 않는다", (t) => {
+  const queue = temporaryQueue(t);
+  appendObservationQueue(queue, observation(), { now: FIXED_NOW });
+  const original = fs.readFileSync(queue, "utf8");
+
+  assert.throws(
+    () => rewriteObservationQueue(queue, [observation({ field: "unknown" })], { now: FIXED_NOW }),
+    error => error.code === "invalid_field",
+  );
+  assert.throws(
+    () => rewriteObservationQueue(queue, [observation()], { maxBytes: 1, now: FIXED_NOW }),
+    error => error.code === "queue_too_large",
+  );
+  assert.equal(fs.readFileSync(queue, "utf8"), original);
+  assert.deepEqual(fs.readdirSync(path.dirname(queue)), [path.basename(queue)]);
+});
+
+test("queue rewrite는 symlink와 일반 파일이 아닌 목적지를 거부한다", (t) => {
+  const queue = temporaryQueue(t);
+  const directory = path.dirname(queue);
+  const target = path.join(directory, "target.ndjson");
+  const link = path.join(directory, "link.ndjson");
+  const invalidDirectory = path.join(directory, "queue-directory");
+  fs.writeFileSync(target, "sentinel\n", { mode: 0o600 });
+  fs.symlinkSync(target, link);
+  fs.mkdirSync(invalidDirectory);
+
+  assert.throws(
+    () => rewriteObservationQueue(link, [observation()], { now: FIXED_NOW }),
+    error => error.code === "invalid_path",
+  );
+  assert.throws(
+    () => rewriteObservationQueue(invalidDirectory, [observation()], { now: FIXED_NOW }),
+    error => error.code === "invalid_path",
+  );
+  assert.equal(fs.readFileSync(target, "utf8"), "sentinel\n");
+  assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
 });
 
 test("CLI는 stdin 입력을 append하고 교차검증 결과를 JSON으로 출력한다", (t) => {
