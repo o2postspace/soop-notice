@@ -6,6 +6,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const {
   SamgukObservationError,
+  MONOTONIC_NUMERIC_FIELDS,
   acceptSheetBaseline,
   appendObservationQueue,
   findAcceptedConsensus,
@@ -98,11 +99,11 @@ test("허용 필드, 값, URL host와 임의 상태 필드를 엄격히 검증�
 test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 사용한다", () => {
   for (const [field, maximum] of Object.entries({
     level: 10_000,
-    horseLevel: 999,
-    weapon: 999,
-    helmet: 999,
-    armor: 999,
-    shoes: 999,
+    horseLevel: 80,
+    weapon: 15,
+    helmet: 15,
+    armor: 15,
+    shoes: 15,
     strength: 1_000_000,
     agility: 1_000_000,
     vitality: 1_000_000,
@@ -112,6 +113,16 @@ test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 �
     attackPower: 1_000_000,
     basicAttackDamage: 1_000_000,
     basicAttackSampleCount: 10_000,
+    healthStat: 1_000_000,
+    defense: 1_000_000,
+    attackPowerBonusPct: 1_000,
+    damageReductionPct: 1_000,
+    criticalChancePct: 1_000,
+    criticalDamagePct: 1_000,
+    skillCooldownReductionPct: 1_000,
+    skillDamageBonusPct: 1_000,
+    moveSpeedBonusPct: 1_000,
+    horseMaxHealth: 1_000_000,
   })) {
     assert.equal(normalizeObservation(observation({ field, value: maximum })).value, maximum);
     assert.throws(
@@ -124,7 +135,16 @@ test("숫자 필드는 원장 validation과 같은 상한 및 정수 규칙을 �
     error => error.code === "invalid_value",
   );
   assert.equal(normalizeObservation(observation({ field: "powerScore", value: 1234.5 })).value, 1234.5);
+  assert.equal(normalizeObservation(observation({ field: "attackPower", value: 110.5 })).value, 110.5);
   assert.equal(normalizeObservation(observation({ field: "basicAttackDamage", value: 343.5 })).value, 343.5);
+  assert.equal(normalizeObservation(observation({ field: "healthStat", value: 176.9 })).value, 176.9);
+  assert.equal(normalizeObservation(observation({ field: "defense", value: 88.25 })).value, 88.25);
+  assert.equal(normalizeObservation(observation({ field: "criticalChancePct", value: 12.5 })).value, 12.5);
+  assert.throws(
+    () => normalizeObservation(observation({ field: "horseMaxHealth", value: 123.5 })),
+    error => error.code === "invalid_value",
+  );
+  assert.equal(normalizeObservation(observation({ field: "activeGeneral", value: "  조조  " })).value, "조조");
   assert.equal(normalizeObservation(observation({ field: "basicAttackTarget", value: "  훈련용 허수아비  " })).value, "훈련용 허수아비");
   assert.equal(normalizeObservation(observation({ field: "combatConditions", value: "무버프·비치명" })).value, "무버프·비치명");
   assert.throws(
@@ -321,16 +341,55 @@ test("sheet baseline은 즉시 채택하지만 새 값은 교차검증된 경우
   assert.equal(latest[0].verification, "cross-source");
 });
 
+test("기존 MAX 필드는 낮은 최신 검증값이 와도 최고값을 유지하고 동적 필드는 최신값을 쓴다", () => {
+  const acceptedPair = (field, value, suffix, observedAt) => [
+    observation({ field, value, sourceType: "sheet", sourceId: `sheet-${suffix}`, observedAt }),
+    observation({
+      field,
+      value,
+      sourceType: "fmkorea",
+      sourceId: `fmk-${suffix}`,
+      sourceUrl: `https://www.fmkorea.com/${suffix}`,
+      observedAt,
+    }),
+  ];
+  const inputs = [
+    ...acceptedPair("attackPower", 210.5, "attack-high", "2026-08-02T09:00:00.000Z"),
+    ...acceptedPair("attackPower", 210.5, "attack-high-latest", "2026-08-02T10:30:00.000Z"),
+    ...acceptedPair("attackPower", 180.25, "attack-low", "2026-08-02T10:00:00.000Z"),
+    ...acceptedPair("healthStat", 200.5, "health-high", "2026-08-02T09:00:00.000Z"),
+    ...acceptedPair("healthStat", 176.9, "health-latest", "2026-08-02T10:00:00.000Z"),
+  ];
+  const latest = resolveLatestAccepted(inputs);
+
+  assert.equal(latest.find(candidate => candidate.field === "attackPower").value, 210.5);
+  assert.equal(latest.find(candidate => candidate.field === "attackPower").observedAt, "2026-08-02T10:30:00.000Z");
+  assert.equal(latest.find(candidate => candidate.field === "healthStat").value, 176.9);
+  assert.equal(latest.find(candidate => candidate.field === "healthStat").observedAt, "2026-08-02T10:00:00.000Z");
+  assert.ok([
+    "level", "horseLevel", "weapon", "helmet", "armor", "shoes", "strength", "agility",
+    "vitality", "intelligence", "powerScore", "maxHealth", "attackPower",
+    "basicAttackDamage", "basicAttackSampleCount",
+  ].every(field => MONOTONIC_NUMERIC_FIELDS.has(field)));
+  assert.ok([
+    "healthStat", "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
+    "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
+    "moveSpeedBonusPct", "horseMaxHealth",
+  ].every(field => !MONOTONIC_NUMERIC_FIELDS.has(field)));
+});
+
 test("같은 최신 시각의 검증 결과가 충돌하면 그 값들은 버리고 직전 accepted를 유지한다", () => {
-  const baseline = observation({ observedAt: "2026-08-02T08:00:00.000Z" });
+  const baseline = observation({ field: "healthStat", observedAt: "2026-08-02T08:00:00.000Z" });
   const conflicting = [
     observation({
+      field: "healthStat",
       sourceType: "sheet",
       sourceId: "sheet-11",
       observedAt: "2026-08-02T10:00:00.000Z",
       value: 11,
     }),
     observation({
+      field: "healthStat",
       sourceType: "fmkorea",
       sourceId: "fmk-11",
       sourceUrl: "https://www.fmkorea.com/11",
@@ -338,12 +397,14 @@ test("같은 최신 시각의 검증 결과가 충돌하면 그 값들은 버리
       value: 11,
     }),
     observation({
+      field: "healthStat",
       sourceType: "sheet",
       sourceId: "sheet-12",
       observedAt: "2026-08-02T10:00:00.000Z",
       value: 12,
     }),
     observation({
+      field: "healthStat",
       sourceType: "broadcast",
       sourceId: "frame-12",
       sourceUrl: "https://play.sooplive.co.kr/testbj/12",

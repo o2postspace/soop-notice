@@ -51,6 +51,9 @@ test("공개 출력은 stale이 아닌 고유 90명 API만 받아 사이트와 �
   assert.match(text, /Math\.round\(member\.powerRankScore \* SAMGUK_PUBLIC_POWER_SCALE\)/);
   assert.match(text, /everyMinutes\(15\)/);
   assert.match(text, /LockService\.getScriptLock\(\)/);
+  assert.match(text, /healthStat: number\("healthStat", 1000000\)/);
+  assert.match(text, /horseMaxHealth: number\("horseMaxHealth", 1000000\)/);
+  assert.match(text, /samgukPublicBlank_\(member\.healthStat\), member\.activeGeneral/);
 });
 
 test("승인 제보는 HTTPS 상승값만 단일 시트 기준값으로 쓰며 교차검증으로 부풀리지 않는다", () => {
@@ -60,6 +63,10 @@ test("승인 제보는 HTTPS 상승값만 단일 시트 기준값으로 쓰며 �
   assert.match(text, /weapon: \{[^\n]+maximum: 15/);
   assert.match(text, /horseLevel: \{[^\n]+maximum: 80/);
   assert.match(text, /attackPower: \{[^\n]+maximum: 1000000/);
+  assert.match(text, /healthStat: \{[^\n]+integer: false, higherOnly: false/);
+  assert.match(text, /defense: \{[^\n]+integer: false, higherOnly: false/);
+  assert.match(text, /horseMaxHealth: \{[^\n]+higherOnly: false/);
+  assert.match(text, /config\.higherOnly === false && currentValue !== null && numericValue === currentValue/);
   assert.match(text, /"근거종류": "시트"/);
   assert.match(text, /"교차검증수": 1/);
   assert.match(text, /"검증상태": "기준값"/);
@@ -69,6 +76,7 @@ test("승인 제보는 HTTPS 상승값만 단일 시트 기준값으로 쓰며 �
   assert.match(text, /수식은 입력할 수 없습니다/);
   assert.match(text, /samgukPublicValidateLedgerMatch_/);
   assert.match(text, /samgukPublicValidateMasterObservation_/);
+  assert.match(text, /Object\.keys\(SAMGUK_PUBLIC_FIELD_CONFIG\)\.length/);
   assert.match(text, /approved_proposal_must_be_revoked/);
 });
 

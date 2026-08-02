@@ -12,6 +12,7 @@ const {
 const {
   ALLOWED_FIELDS,
   DEFAULT_CONSENSUS_WINDOW_MS,
+  MONOTONIC_NUMERIC_FIELDS,
   compactObservationQueue,
   dedupeObservations,
   normalizeObservation,
@@ -177,16 +178,13 @@ function compactQueuedObservations(payload, snapshots, queued, { now = Date.now(
   const observations = dedupeObservations(queued, { now });
   const previousState = currentSheetState(payload, now);
   const nextState = new Map(previousState);
-  const resolvedByWrite = new Set();
 
   for (const snapshot of snapshots) {
     for (const field of ALLOWED_FIELDS) {
       const key = observationTargetKey(snapshot.playerId, field);
-      const previousValue = previousState.get(key);
       const value = snapshot.fields?.[field];
       if (value === null || value === undefined || value === "") {
         nextState.delete(key);
-        if (previousState.has(key)) resolvedByWrite.add(key);
         continue;
       }
       const normalized = normalizeObservation({
@@ -199,9 +197,6 @@ function compactQueuedObservations(payload, snapshots, queued, { now = Date.now(
         collectedAt: new Date(now).toISOString(),
       }, { now });
       nextState.set(key, normalized.value);
-      if (!previousState.has(key) || observationValueKey(previousValue) !== observationValueKey(normalized.value)) {
-        resolvedByWrite.add(key);
-      }
     }
   }
 
@@ -221,14 +216,13 @@ function compactQueuedObservations(payload, snapshots, queued, { now = Date.now(
     }
     const sheetValue = observationValueKey(nextState.get(key));
     const matchesSheet = observation => observationValueKey(observation.value) === sheetValue;
-    if (resolvedByWrite.has(key)) {
-      for (const observation of group) {
-        (matchesSheet(observation) ? removed : retained).push(observation);
-      }
-      continue;
+    const monotonic = MONOTONIC_NUMERIC_FIELDS.has(group[0].field);
+    for (const observation of group) {
+      const resolved = monotonic
+        ? observation.value <= nextState.get(key)
+        : matchesSheet(observation);
+      (resolved ? removed : retained).push(observation);
     }
-    if (group.every(matchesSheet)) removed.push(...group);
-    else retained.push(...group);
   }
 
   return { retained, removed };

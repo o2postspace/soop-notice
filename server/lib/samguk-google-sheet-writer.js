@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const {
+  DECIMAL_NUMERIC_FIELDS,
   NUMERIC_FIELD_MAXIMUMS,
   acquireObservationQueueLock,
 } = require("./samguk-observations");
@@ -12,7 +13,7 @@ const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const GOOGLE_SHEETS_API_ROOT = "https://sheets.googleapis.com/v4/spreadsheets";
 const OBSERVATION_SHEET = "관측입력";
 const PARTICIPANT_SHEET = "참가자";
-const OBSERVATION_LAST_COLUMN = "AE";
+const OBSERVATION_LAST_COLUMN = "AP";
 const MAX_OBSERVATION_ROW = 5001;
 const MAX_SNAPSHOT_BATCH = 100;
 const MAX_TOKEN_BYTES = 32 * 1024;
@@ -40,6 +41,17 @@ const FIELD_HEADERS = Object.freeze({
   basicAttackSampleCount: "평타표본수",
   basicAttackTarget: "평타대상",
   combatConditions: "전투조건",
+  healthStat: "체력",
+  activeGeneral: "현재장수",
+  defense: "방어력",
+  attackPowerBonusPct: "공격력증가(%)",
+  damageReductionPct: "피해감소(%)",
+  criticalChancePct: "치명타확률(%)",
+  criticalDamagePct: "치명타피해(%)",
+  skillCooldownReductionPct: "스킬쿨타임감소(%)",
+  skillDamageBonusPct: "스킬피해증가(%)",
+  moveSpeedBonusPct: "이동속도증가(%)",
+  horseMaxHealth: "말최대체력",
 });
 const FIELD_NAMES = Object.freeze(Object.keys(FIELD_HEADERS));
 const EXPECTED_HEADERS = Object.freeze([
@@ -48,6 +60,8 @@ const EXPECTED_HEADERS = Object.freeze([
   "무력", "기민", "기력", "지모", "무력점수", "교차검증수", "검증상태",
   "증거해시", "수집배치", "기록자", "OCR신뢰도", "메모",
   "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각", "공격력",
+  "체력", "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
+  "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
 ]);
 const INPUT_TIME_COLUMN_INDEX = EXPECTED_HEADERS.indexOf("입력시각");
 const SOURCE_LABELS = Object.freeze({
@@ -111,7 +125,7 @@ function normalizeNumericField(field, value) {
   const maximum = NUMERIC_FIELD_MAXIMUMS[field];
   const isValidNumber = typeof value === "number" && Number.isFinite(value)
     && value >= 0 && value <= maximum;
-  const isValidInteger = ["powerScore", "basicAttackDamage"].includes(field) || Number.isSafeInteger(value);
+  const isValidInteger = DECIMAL_NUMERIC_FIELDS.has(field) || Number.isSafeInteger(value);
   if (!Number.isSafeInteger(maximum) || !isValidNumber || !isValidInteger) {
     fail("invalid_snapshot", `${field} 값이 올바르지 않습니다.`);
   }
@@ -171,8 +185,10 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
     const value = snapshot.fields[field];
     if (value === null) {
       fields[field] = "";
-    } else if (["horse", "basicAttackTarget", "combatConditions"].includes(field)) {
-      const maximum = field === "horse" ? 80 : field === "basicAttackTarget" ? 120 : 240;
+    } else if (["horse", "basicAttackTarget", "combatConditions", "activeGeneral"].includes(field)) {
+      const maximum = ["horse", "activeGeneral"].includes(field)
+        ? 80
+        : field === "basicAttackTarget" ? 120 : 240;
       fields[field] = safeText(value, maximum, field);
     } else {
       fields[field] = normalizeNumericField(field, value);

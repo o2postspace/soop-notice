@@ -78,6 +78,9 @@ const PAYLOAD_KEYS = [
 const RAW_MEMBER_KEYS = [
   "agility", "armor", "crew", "evidence", "helmet", "horse", "horseLevel", "intelligence", "job", "level",
   "attackPower", "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions", "maxHealth",
+  "healthStat", "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
+  "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
+  "moveSpeedBonusPct", "horseMaxHealth",
   "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
   "sourceType", "strength", "verificationStatus", "vitality", "weapon",
 ].sort();
@@ -197,16 +200,56 @@ test("현재현황의 최대체력과 검증된 평타 대표값은 선택형 �
   const row = [
     "촉", "테스트", "관우", "test_combat", "관우", "20", "적토마", "3", "5", "4", "4", "4",
     "40", "10", "20", "5", "2026-08-02 03:00:00", "https://play.sooplive.com/test", "확정",
-    "1,239", "110", "343.5", "4", "동일 훈련 대상", "일반 평타·비치명",
+    "1,239", "110.5", "343.5", "4", "동일 훈련 대상", "일반 평타·비치명",
   ];
   const member = parseMembersCsv(makeCsv(headers, [row])).members[0];
 
   assert.equal(member.maxHealth, 1239);
-  assert.equal(member.attackPower, 110);
+  assert.equal(member.attackPower, 110.5);
   assert.equal(member.basicAttackDamage, 343.5);
   assert.equal(member.basicAttackSampleCount, 4);
   assert.equal(member.basicAttackTarget, "동일 훈련 대상");
   assert.equal(member.combatConditions, "일반 평타·비치명");
+});
+
+test("현재현황의 동적 정보창 11개 필드를 소수·퍼센트 표기까지 읽는다", () => {
+  const headers = [
+    ...MEMBER_HEADERS,
+    "체력", "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
+    "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
+  ];
+  const row = [
+    "촉", "테스트", "관우", "test_dynamic", "관우", "20", "적토마", "3", "5", "4", "4", "4",
+    "40", "10", "20", "5", "2026-08-02 03:00:00", "https://play.sooplive.com/test", "확정",
+    "176.9", "관우", "88.25", "12.5%", "7.25", "18.5%", "150.75", "4.5%", "22.25%", "6.5", "1,900",
+  ];
+  const member = parseMembersCsv(makeCsv(headers, [row])).members[0];
+
+  assert.deepEqual({
+    healthStat: member.healthStat,
+    activeGeneral: member.activeGeneral,
+    defense: member.defense,
+    attackPowerBonusPct: member.attackPowerBonusPct,
+    damageReductionPct: member.damageReductionPct,
+    criticalChancePct: member.criticalChancePct,
+    criticalDamagePct: member.criticalDamagePct,
+    skillCooldownReductionPct: member.skillCooldownReductionPct,
+    skillDamageBonusPct: member.skillDamageBonusPct,
+    moveSpeedBonusPct: member.moveSpeedBonusPct,
+    horseMaxHealth: member.horseMaxHealth,
+  }, {
+    healthStat: 176.9,
+    activeGeneral: "관우",
+    defense: 88.25,
+    attackPowerBonusPct: 12.5,
+    damageReductionPct: 7.25,
+    criticalChancePct: 18.5,
+    criticalDamagePct: 150.75,
+    skillCooldownReductionPct: 4.5,
+    skillDamageBonusPct: 22.25,
+    moveSpeedBonusPct: 6.5,
+    horseMaxHealth: 1900,
+  });
 });
 
 test("새 검증상태 헤더를 verificationStatus와 호환 reviewStatus가 함께 읽는다", () => {

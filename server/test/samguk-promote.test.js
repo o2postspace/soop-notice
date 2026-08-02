@@ -35,6 +35,10 @@ function payload() {
       strength: 10, agility: 2, vitality: 3, intelligence: 4, powerScore: null,
       maxHealth: null, attackPower: null, basicAttackDamage: null, basicAttackSampleCount: null,
       basicAttackTarget: null, combatConditions: null,
+      healthStat: null, activeGeneral: null, defense: null, attackPowerBonusPct: null,
+      damageReductionPct: null, criticalChancePct: null, criticalDamagePct: null,
+      skillCooldownReductionPct: null, skillDamageBonusPct: null, moveSpeedBonusPct: null,
+      horseMaxHealth: null,
       observedAt: "2026-08-02T10:00:00.000Z",
     }],
   };
@@ -71,7 +75,10 @@ test("단독 후보는 버리고 Sheet와 일치한 최신 후보만 완전 스�
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].fields.strength, 11);
   assert.equal(snapshots[0].fields.weapon, 2);
-  assert.equal(Object.keys(snapshots[0].fields).length, 18);
+  assert.equal(Object.keys(snapshots[0].fields).length, 29);
+  assert.equal(snapshots[0].fields.healthStat, null);
+  assert.equal(snapshots[0].fields.activeGeneral, null);
+  assert.equal(snapshots[0].fields.horseMaxHealth, null);
   assert.equal(snapshots[0].sourceCount, 2);
   assert.equal(snapshots[0].verification, "cross-source");
   assert.ok(snapshots[0].sourceTypes.includes(snapshots[0].primarySourceType));
@@ -120,14 +127,38 @@ test("compaction은 반영된 값만 제거하고 충돌·미해결 관측은 �
     candidate("broadcast", 12, "unresolved-conflict"),
     { ...candidate("fmkorea", 20, "unknown-player"), playerId: "P999" },
   ], { now: FIXED_NOW });
-  assert.equal(unresolved.removed.length, 0);
-  assert.equal(unresolved.retained.length, 3);
+  assert.deepEqual(unresolved.removed.map(row => row.value), [10]);
+  assert.deepEqual(unresolved.retained.map(row => row.value), [12, 20]);
 
   const alreadyCurrent = compactQueuedObservations(payload(), [], [
     candidate("fmkorea", 10, "already-current"),
   ], { now: FIXED_NOW });
   assert.equal(alreadyCurrent.removed.length, 1);
   assert.equal(alreadyCurrent.retained.length, 0);
+});
+
+test("compaction은 MAX 필드의 현재값 이하를 제거하고 동적 필드는 같은 값만 제거한다", () => {
+  const current = payload();
+  current.members[0].healthStat = 200.5;
+  const compacted = compactQueuedObservations(current, [], [
+    candidate("fmkorea", 9, "strength-lower"),
+    candidate("broadcast", 10, "strength-equal"),
+    candidate("fmkorea", 11, "strength-higher"),
+    { ...candidate("fmkorea", 176.9, "health-lower"), field: "healthStat" },
+    { ...candidate("broadcast", 200.5, "health-equal"), field: "healthStat" },
+    { ...candidate("fmkorea", 210.25, "health-higher"), field: "healthStat" },
+  ], { now: FIXED_NOW });
+
+  assert.deepEqual(compacted.removed.map(row => [row.field, row.value]), [
+    ["strength", 9],
+    ["strength", 10],
+    ["healthStat", 200.5],
+  ]);
+  assert.deepEqual(compacted.retained.map(row => [row.field, row.value]), [
+    ["strength", 11],
+    ["healthStat", 176.9],
+    ["healthStat", 210.25],
+  ]);
 });
 
 test("주입 관측은 명시한 rewriteFn만 snapshot 완료 뒤 호출한다", async () => {
