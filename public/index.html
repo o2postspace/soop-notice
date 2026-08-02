@@ -3281,16 +3281,20 @@ async function loadAll() {
 
 function setupAutoRefresh() {
   const sel = document.getElementById("intervalSelect");
+  const refreshVisibleTab = function() {
+    if (currentTab === 'community') return;
+    if (currentTab === 'samguk' && window.loadSamgukData) {
+      window.loadSamgukData(true);
+      return;
+    }
+    loadAll();
+  };
   sel.addEventListener("change", () => {
     if (autoTimer) clearInterval(autoTimer);
     const sec = parseInt(sel.value);
-    if (sec > 0) autoTimer = setInterval(() => {
-      if (currentTab !== 'community') loadAll();
-    }, sec * 1000);
+    if (sec > 0) autoTimer = setInterval(refreshVisibleTab, sec * 1000);
   });
-  autoTimer = setInterval(() => {
-    if (currentTab !== 'community') loadAll();
-  }, 60000);
+  autoTimer = setInterval(refreshVisibleTab, 60000);
 }
 
 // ===================== 탭 전환 =====================
@@ -4353,6 +4357,16 @@ function communityUpdateHeaderControls(tab) {
 }
 
 async function communityRefreshCurrentView() {
+  if (currentTab === 'samguk') {
+    const button = document.getElementById('refreshBtn');
+    communitySetButtonBusy(button, true, '...');
+    try {
+      if (window.loadSamgukData) await window.loadSamgukData(true);
+    } finally {
+      communitySetButtonBusy(button, false);
+    }
+    return;
+  }
   if (currentTab !== 'community') return loadAll();
   const button = document.getElementById('refreshBtn');
   communitySetButtonBusy(button, true, '...');

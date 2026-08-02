@@ -513,6 +513,7 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
 
 test("현황판과 파워랭킹은 같은 시트 payload를 쓰고 화면 복귀 시 즉시 갱신한다", () => {
   const client = fs.readFileSync(path.join(__dirname, "../../public/samguk.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
   assert.match(client, /const REFRESH_INTERVAL_MS = 60 \* 1000/);
   assert.match(client, /function applyPayload\(data, mode\) \{[\s\S]*?mergeMembers\(data\.members\)/);
@@ -520,6 +521,9 @@ test("현황판과 파워랭킹은 같은 시트 payload를 쓰고 화면 복귀
   assert.match(client, /else renderSamguk\(\)/);
   assert.match(client, /setInterval\(function \(\) \{[\s\S]*?loadSamgukData\(true\)[\s\S]*?REFRESH_INTERVAL_MS/);
   assert.match(client, /document\.addEventListener\('visibilitychange',[\s\S]*?loadSamgukData\(true\)/);
+  assert.match(html, /currentTab === 'samguk' && window\.loadSamgukData/);
+  assert.match(html, /async function communityRefreshCurrentView\(\) \{\s*if \(currentTab === 'samguk'\)/);
+  assert.match(html, /await window\.loadSamgukData\(true\)/);
 });
 
 test("참가자나 영토가 일부만 계산되면 정상 시트로 채택하지 않는다", async () => {
