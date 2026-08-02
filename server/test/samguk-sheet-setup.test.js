@@ -90,11 +90,13 @@ test("setup은 출력 관리자-only와 입력 warning-only 보호, 드롭다운
   assert.match(text, /samgukProtectInputSheet_\(sheets\["게임정보"\], \["A2:F30"\]\)/);
 });
 
-test("webhook은 B2:B5001 첫 빈 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
+test("webhook은 A:Y 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
   const text = source(webhookPath);
   assert.doesNotThrow(() => new Function(text));
-  assert.match(text, /samgukFindFirstEmptyObservationRow_\(sheet\)/);
-  assert.match(text, /getRange\(2, 2, SAMGUK_MAX_OBSERVATION_ROW - 1, 1\)/);
+  assert.match(text, /samgukFindFirstEmptyObservationRow_\(sheet, headers\.length\)/);
+  assert.match(text, /getRange\(2, 1, SAMGUK_MAX_OBSERVATION_ROW - 1, columnCount\)/);
+  assert.match(text, /throw new Error\("target_row_conflict"\)/);
+  assert.match(text, /throw new Error\("write_verification_failed"\)/);
   assert.match(text, /throw new Error\("observation_sheet_full"\)/);
   assert.doesNotMatch(text, /targetRow\s*=\s*lastRow\s*\+\s*1/);
   assert.match(text, /observedAt > Date\.now\(\) \+ SAMGUK_MAX_CLOCK_SKEW_MS/);

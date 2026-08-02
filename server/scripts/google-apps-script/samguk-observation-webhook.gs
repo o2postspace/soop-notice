@@ -17,6 +17,19 @@ var SAMGUK_REQUIRED_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore"
 ];
+var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
+  level: 10000,
+  horseLevel: 999,
+  weapon: 999,
+  helmet: 999,
+  armor: 999,
+  shoes: 999,
+  strength: 1000000,
+  agility: 1000000,
+  vitality: 1000000,
+  intelligence: 1000000,
+  powerScore: 1000000
+};
 
 function doGet() {
   return samgukJsonResponse_({ ok: true, service: "samguk-observation-webhook", version: 1 });
@@ -130,26 +143,35 @@ function samgukAppendSnapshot_(snapshot) {
     if (headers.indexOf(header) < 0) throw new Error("missing_header:" + header);
   });
 
-  var targetRow = samgukFindFirstEmptyObservationRow_(sheet);
+  var targetRow = samgukFindFirstEmptyObservationRow_(sheet, headers.length);
+  var currentTarget = sheet.getRange(targetRow, 1, 1, headers.length).getDisplayValues()[0];
+  if (currentTarget.some(function(value) { return String(value || "").trim() !== ""; })) {
+    throw new Error("target_row_conflict");
+  }
   sheet.getRange(targetRow, 1, 1, values.length).setValues([values]);
   SpreadsheetApp.flush();
+  var written = sheet.getRange(targetRow, 1, 1, values.length).getValues()[0];
+  if (String(written[0] || "") !== snapshot.observationId
+      || String(written[1] || "") !== snapshot.playerId
+      || String(written[19] || "").toLowerCase() !== snapshot.evidenceHash.toLowerCase()) {
+    throw new Error("write_verification_failed");
+  }
   return samgukJsonResponse_({ ok: true, duplicate: false, appendedRow: targetRow });
 }
 
 /**
- * A열에는 구형 워크북의 빈 ID 수식이 남아 있을 수 있으므로 append 위치로 쓰지 않습니다.
- * player_id가 들어가는 B열의 2:5001 중 첫 빈 행만 사용해 현재현황 수식 범위를 벗어나지 않습니다.
+ * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:Y 전체가 비어 있는 첫 행만 사용합니다.
  */
-function samgukFindFirstEmptyObservationRow_(sheet) {
+function samgukFindFirstEmptyObservationRow_(sheet, columnCount) {
   if (sheet.getMaxRows() < SAMGUK_MAX_OBSERVATION_ROW) {
     sheet.insertRowsAfter(
       sheet.getMaxRows(),
       SAMGUK_MAX_OBSERVATION_ROW - sheet.getMaxRows()
     );
   }
-  var playerIds = sheet.getRange(2, 2, SAMGUK_MAX_OBSERVATION_ROW - 1, 1).getDisplayValues();
-  for (var index = 0; index < playerIds.length; index += 1) {
-    if (String(playerIds[index][0] || "").trim() === "") return index + 2;
+  var rows = sheet.getRange(2, 1, SAMGUK_MAX_OBSERVATION_ROW - 1, columnCount).getDisplayValues();
+  for (var index = 0; index < rows.length; index += 1) {
+    if (rows[index].every(function(value) { return String(value || "").trim() === ""; })) return index + 2;
   }
   throw new Error("observation_sheet_full");
 }
@@ -166,8 +188,16 @@ function samgukValidateSnapshot_(snapshot) {
   snapshot.sourceTypes.forEach(function(sourceType) {
     if (["sheet", "fmkorea", "broadcast"].indexOf(sourceType) < 0) throw new Error("invalid_source_types");
   });
+  if (snapshot.sourceTypes.filter(function(value, index, values) {
+    return values.indexOf(value) === index;
+  }).length !== snapshot.sourceTypes.length) throw new Error("duplicate_source_types");
   if (snapshot.sourceTypes.indexOf(snapshot.primarySourceType) < 0) throw new Error("primary_source_missing");
   if (!Number.isInteger(snapshot.sourceCount) || snapshot.sourceCount < 2 || snapshot.sourceCount > 10) throw new Error("invalid_source_count");
+  if (snapshot.verification === "cross-source" && snapshot.sourceTypes.length < 2) throw new Error("invalid_cross_source");
+  if (snapshot.verification === "broadcast-repeat"
+      && (snapshot.sourceTypes.length !== 1 || snapshot.sourceTypes[0] !== "broadcast")) {
+    throw new Error("invalid_broadcast_repeat");
+  }
   if (!snapshot.fields || typeof snapshot.fields !== "object" || Array.isArray(snapshot.fields)) throw new Error("invalid_fields");
   SAMGUK_REQUIRED_FIELDS.forEach(function(key) {
     if (!Object.prototype.hasOwnProperty.call(snapshot.fields, key)) throw new Error("incomplete_snapshot:" + key);
@@ -175,7 +205,9 @@ function samgukValidateSnapshot_(snapshot) {
     if (value === null) return;
     if (key === "horse") {
       if (typeof value !== "string" || value.length > 80) throw new Error("invalid_field:" + key);
-    } else if (typeof value !== "number" || !isFinite(value) || value < 0 || value > 1000000000) {
+    } else if (typeof value !== "number" || !isFinite(value) || value < 0
+        || value > SAMGUK_NUMERIC_FIELD_MAXIMUMS[key]
+        || (key !== "powerScore" && !Number.isInteger(value))) {
       throw new Error("invalid_field:" + key);
     }
   });
@@ -189,6 +221,7 @@ function samgukValidateSnapshot_(snapshot) {
   if (!snapshot.batchId || String(snapshot.batchId).length > 80) throw new Error("invalid_batch_id");
   var observedAt = Date.parse(snapshot.observedAt);
   if (!isFinite(observedAt)) throw new Error("invalid_observed_at");
+  if (new Date(observedAt).getUTCFullYear() < 2000) throw new Error("invalid_observed_at");
   if (observedAt > Date.now() + SAMGUK_MAX_CLOCK_SKEW_MS) throw new Error("future_observed_at");
   if (snapshot.ocrConfidence !== null && snapshot.ocrConfidence !== undefined
       && (typeof snapshot.ocrConfidence !== "number" || snapshot.ocrConfidence < 0 || snapshot.ocrConfidence > 1)) {

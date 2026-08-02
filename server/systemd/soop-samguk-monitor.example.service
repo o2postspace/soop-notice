@@ -1,30 +1,33 @@
 [Unit]
-Description=SOOPNOTICE local Samguk screen observer (example, disabled by default)
-After=network-online.target graphical-session.target
+Description=SOOPNOTICE Samguk 90-stream HLS observer (example, disabled by default)
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/home/msbaek/deploy/soop-notice/server
-ExecStart=/usr/bin/node /home/msbaek/deploy/soop-notice/server/workers/samguk-monitor.js
+ExecStart=/usr/bin/node /home/msbaek/deploy/soop-notice/server/workers/samguk-hls-monitor.js
 
 # 권리자/플랫폼 허용 범위를 확인한 뒤에만 1로 바꾼다.
-Environment=SAMGUK_MONITOR_ENABLED=0
-Environment=SAMGUK_MONITOR_CONFIG=%h/.config/soop-notice/samguk-monitor.json
-Environment=SAMGUK_MONITOR_STATE_DIR=%S/soop-notice/samguk-monitor
-Environment=SAMGUK_OBSERVATION_QUEUE_PATH=%S/soop-notice/samguk-monitor/observations.ndjson
-Environment=DISPLAY=:0.0
-Environment=XAUTHORITY=%h/.Xauthority
+Environment=SAMGUK_HLS_MONITOR_ENABLED=0
+Environment=SAMGUK_HLS_MONITOR_CONFIG=%h/.config/soop-notice/samguk-hls-monitor.json
+Environment=SAMGUK_HLS_MONITOR_STATE_DIR=%S/soop-notice/samguk-hls-monitor
+Environment=SAMGUK_OBSERVATION_QUEUE_PATH=%S/soop-notice/samguk-hls-monitor/observations.ndjson
 
 UMask=0077
-StateDirectory=soop-notice/samguk-monitor
+StateDirectory=soop-notice/samguk-hls-monitor
 StateDirectoryMode=0700
 Restart=on-failure
 RestartSec=10
+TimeoutStopSec=60
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
+PrivateTmp=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+TasksMax=192
+MemoryHigh=2G
+MemoryMax=4G
 
 [Install]
 WantedBy=default.target

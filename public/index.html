@@ -3460,19 +3460,28 @@ function samgukNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function samgukPositiveTotal(member, fields) {
-  const values = fields.map(function(field) { return samgukNumber(member[field]); }).filter(function(value) {
-    return value !== null && value > 0;
-  });
-  return values.length ? values.reduce(function(sum, value) { return sum + value; }, 0) : null;
+function samgukCompleteTotal(member, fields) {
+  const values = fields.map(function(field) { return samgukNumber(member[field]); });
+  return values.every(function(value) { return value !== null; })
+    ? values.reduce(function(sum, value) { return sum + value; }, 0)
+    : null;
 }
 
 function samgukGrowthScore(member) {
-  return samgukPositiveTotal(member, ['strength', 'agility', 'vitality', 'intelligence']);
+  return samgukCompleteTotal(member, ['strength', 'agility', 'vitality', 'intelligence']);
 }
 
 function samgukEquipmentTotal(member) {
-  return samgukPositiveTotal(member, ['horseLevel', 'weapon', 'helmet', 'armor', 'shoes']);
+  const fields = ['weapon', 'armor', 'shoes'];
+  if (['조조', '유비', '손권'].includes(String(member.job || '').trim())) fields.push('helmet');
+  return samgukCompleteTotal(member, fields);
+}
+
+function samgukPublicDataCoverage(member) {
+  const fields = ['horse', 'horseLevel', 'weapon', 'armor', 'shoes', 'strength', 'agility', 'vitality', 'intelligence'];
+  if (['조조', '유비', '손권'].includes(String(member.job || '').trim())) fields.push('helmet');
+  const known = fields.filter(function(field) { return hasSamgukValue(member[field]); }).length;
+  return { known: known, total: fields.length };
 }
 
 function samgukReviewBadge(member) {
@@ -3561,13 +3570,11 @@ function renderSamguk() {
   root.innerHTML = (window.samgukSourceNoteHtml || '') + nations.map(function(nation) {
     const meta = SAMGUK_NATIONS[nation];
     const members = SAMGUK_MEMBERS.filter(function(member) { return member.nation === nation; });
-    const growthScores = members.map(samgukGrowthScore).filter(function(value) {
-      return value !== null && value > 0;
-    });
+    const growthScores = members.map(samgukGrowthScore).filter(function(value) { return value !== null; });
     const growthTotal = growthScores.reduce(function(sum, value) { return sum + value; }, 0);
     const summary = growthScores.length
-      ? '기량 관측 ' + growthScores.length + '/30 · 합계 ' + growthTotal
-      : '기량 관측 전';
+      ? '기량 4종 완비 ' + growthScores.length + '/30 · 투자합 ' + growthTotal
+      : '기량 4종 완비 0/30';
     const cards = members.map(function(member) {
       const profileUrl = samgukProfileUrl(member.soopId);
       return '<article class="samguk-card" data-bjid="' + member.soopId + '">'
@@ -3613,15 +3620,16 @@ function renderSamgukPowerRanking() {
   const root = document.getElementById('samgukPowerRanking');
   if (!root) return;
 
-  const hasPowerScore = SAMGUK_MEMBERS.some(function(member) {
+  const powerScoreCoverage = SAMGUK_MEMBERS.filter(function(member) {
     const value = samgukNumber(member.powerScore);
-    return value !== null && value > 0;
-  });
+    return value !== null;
+  }).length;
+  const hasPowerScore = powerScoreCoverage === SAMGUK_MEMBERS.length && SAMGUK_MEMBERS.length > 0;
   const scoreField = hasPowerScore ? 'powerScore' : 'strength';
   const scoreLabel = hasPowerScore ? '무력점수' : '무력 스탯';
   const scoreOf = function(member) {
     const value = samgukNumber(member[scoreField]);
-    return value !== null && value > 0 ? value : null;
+    return value !== null && value >= 0 ? value : null;
   };
   const formatScore = function(value) {
     if (value === null || !Number.isFinite(value)) return '—';
@@ -3690,12 +3698,13 @@ function renderSamgukPowerRanking() {
 
   let html = '<div class="samguk-ranking-guide"><b>삼국지 ' + scoreLabel + ' 랭킹</b><br>';
   if (hasPowerScore) {
-    html += '기존 충동서버와 같이 시트의 별도 <b>무력점수</b>를 그대로 사용합니다. 무력 스탯과 점수 스케일은 섞지 않습니다.<br>';
+    html += '90명 모두 입력된 별도 <b>무력점수</b>를 그대로 사용합니다. 무력 스탯과 점수 스케일은 섞지 않습니다.<br>';
   } else {
-    html += '별도 무력점수가 입력되기 전까지 양수로 관측된 <b>무력 스탯</b> 최신값만 사용합니다. 다른 기량과 합산하지 않습니다.<br>';
+    html += '공개 Wiki에는 레벨·장비·말·각인을 한 숫자로 합치는 공식이 없어, 현재는 관측된 <b>무력 스탯</b> 최신값만 정렬합니다. 다른 기량과 합산하지 않습니다.<br>';
+    html += '현재 시트의 Lv는 캐릭터 레벨의 정의와 효과가 공개 확인되기 전까지 점수에서 제외합니다. 장비 강화는 최대 15강이지만 단계별 전투 상승량이 공개되지 않아 보조 지표로만 표시합니다.<br>';
   }
   html += '<span class="samguk-rank-coverage">관측 범위 ' + allRanked.length + '/' + SAMGUK_MEMBERS.length
-    + '명 · 국가 평균은 관측된 인원 기준 · 0과 빈값은 순위에서 제외</span><br>'
+    + '명 · 국가 평균은 관측된 인원 기준 · 0은 유효값, 빈값만 제외</span><br>'
     + escapeHtml(window.samgukDataNote || '시트·에펨코리아·방송 관측값 중 교차 확인된 최신값을 사용합니다.')
     + '</div>';
 
@@ -3735,8 +3744,8 @@ function renderSamgukPowerRanking() {
     html += '<div class="samguk-ranking-empty">' + scoreLabel + ' 데이터가 입력되면 순위가 표시됩니다.</div>';
   } else {
     html += '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table is-personal">'
-      + '<thead><tr><th style="width:40px">#</th><th>스트리머</th><th>장수</th><th class="col-level">Lv</th><th class="col-equip">장비</th><th>'
-      + scoreLabel + '</th><th>관측 근거</th><th class="col-crew">국가·소속</th></tr></thead><tbody>';
+      + '<thead><tr><th style="width:40px">#</th><th>스트리머</th><th>장수</th><th class="col-level">Lv</th><th>말</th><th class="col-equip">장비 강화</th><th>기량 원값</th><th>'
+      + scoreLabel + '</th><th>데이터·근거</th><th class="col-crew">국가·소속</th></tr></thead><tbody>';
     let previousScore = null;
     let sharedRank = 0;
     scopedRanked.forEach(function(entry, index) {
@@ -3750,15 +3759,27 @@ function renderSamgukPowerRanking() {
         '흉갑 ' + samgukValue(member.armor, '강'),
         '각갑 ' + samgukValue(member.shoes, '강'),
       ].join(' · ');
+      const equipmentTotal = samgukEquipmentTotal(member);
+      const growthTotal = samgukGrowthScore(member);
+      const coverage = samgukPublicDataCoverage(member);
+      const horse = samgukValue(member.horse) + ' · ' + samgukValue(member.horseLevel, '강');
+      const growth = [
+        '무 ' + samgukValue(member.strength),
+        '민 ' + samgukValue(member.agility),
+        '력 ' + samgukValue(member.vitality),
+        '모 ' + samgukValue(member.intelligence),
+      ].join(' · ');
       html += '<tr>'
         + '<td class="samguk-rank-num samguk-rank-' + sharedRank + '">' + sharedRank + '</td>'
         + '<td><img class="samguk-rank-profile" src="' + samgukProfileUrl(member.soopId) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
         + '<a class="samguk-rank-name" href="https://www.sooplive.com/' + encodeURIComponent(member.soopId) + '" target="_blank" rel="noopener">' + escapeHtml(member.name) + '</a></td>'
         + '<td>' + (member.job ? '<span class="samguk-job" style="background:' + meta.color + '">' + escapeHtml(member.job) + '</span>' : '—') + '</td>'
         + '<td class="col-level">Lv.' + samgukValue(member.level) + '</td>'
-        + '<td class="col-equip">' + equipment + '</td>'
+        + '<td>' + horse + '</td>'
+        + '<td class="col-equip">' + equipment + (equipmentTotal === null ? '' : '<br><span class="samguk-rank-coverage">착용 가능 장비 합 ' + equipmentTotal + '</span>') + '</td>'
+        + '<td>' + growth + (growthTotal === null ? '' : '<br><span class="samguk-rank-coverage">기량 투자합 ' + growthTotal + '</span>') + '</td>'
         + '<td><b class="samguk-rank-score">' + formatScore(entry.score) + '</b></td>'
-        + '<td>' + samgukObservationMeta(member) + '</td>'
+        + '<td><span class="samguk-rank-coverage">공개항목 ' + coverage.known + '/' + coverage.total + '</span><br>' + samgukObservationMeta(member) + '</td>'
         + '<td class="col-crew"><span class="samguk-rank-badge" style="background:' + meta.color + '">' + meta.label + '</span> ' + escapeHtml(member.crew) + '</td>'
         + '</tr>';
     });

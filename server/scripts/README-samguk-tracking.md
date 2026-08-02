@@ -44,10 +44,20 @@ JSON
 2. 소유자 계정으로 `setupSamgukSheet()`를 실행한다. 12개 운영 탭, 90명, 60개 영토, 수식, 드롭다운, 필터와 보호가 멱등 적용되며 구형 탭은 `백업_...`으로 숨김 보존된다.
 3. 추가 관리자는 Script Property `SAMGUK_SHEET_ADMIN_EMAILS`에 쉼표로 구분해 등록한다. 보호만 다시 설치할 때는 `reapplySamgukSheetProtections()`를 실행한다.
 4. Script Property에 `SAMGUK_WEBHOOK_SECRET`과 필요하면 `SAMGUK_SPREADSHEET_ID`를 저장한다.
-5. 웹 앱 `/exec` URL과 같은 secret을 서버의 `SAMGUK_SHEET_WEBHOOK_URL`, `SAMGUK_SHEET_WEBHOOK_SECRET`에 저장한다.
+5. 웹 앱 `/exec` URL과 같은 secret을 서버의 `SAMGUK_SHEET_WEBHOOK_URL`, `SAMGUK_SHEET_WEBHOOK_SECRET`에 저장한다. 평문 env 대신 `SAMGUK_SHEET_WEBHOOK_URL_PATH`, `SAMGUK_SHEET_WEBHOOK_SECRET_PATH`로 현재 사용자 소유의 0400/0600 일반 파일을 지정할 수 있으며 평문 env가 경로 설정보다 우선한다. Apps Script 응답 제한은 `SAMGUK_SHEET_WEBHOOK_TIMEOUT_MS`로 조정하며 기본 30초, 최대 60초다.
 6. 먼저 `SAMGUK_TRACKING_ENABLED=1`, `SAMGUK_TRACKING_WRITE_ENABLED=0`으로 dry-run을 확인한다.
 7. 정상일 때만 `SAMGUK_TRACKING_WRITE_ENABLED=1`로 전환한다.
 
+Apps Script를 배포하지 않는 단일 서버 운영에서는 전용 OAuth writer도 사용할 수 있다. OAuth 계정은 원장 소유자 또는 보호 관리자여야 하며 다른 writer와 병행하지 않는다.
+
+```bash
+python3 scripts/samguk-google-oauth.py \
+  --client-secret /보안/경로/client_secret.json \
+  --token /보안/경로/samguk-google-oauth.json
+```
+
+발급 파일과 상위 디렉터리는 각각 `0600`, `0700`이어야 한다. 서버에는 `SAMGUK_SHEET_WRITE_MODE=oauth`, `SAMGUK_GOOGLE_OAUTH_TOKEN_PATH`, `SAMGUK_SHEET_WRITER_LOCK_PATH`를 절대 경로로 지정한다. writer는 `관측입력!A:Y` 헤더·`참가자`·`Asia/Seoul` timezone을 확인하고, B열 첫 빈행 하나만 OS lock 안에서 기록한 뒤 전체 행을 재조회한다. OAuth 앱이 Testing 상태면 refresh token이 단기 만료될 수 있으므로 장기 무인 운영 전 Google OAuth publishing 상태를 확인한다.
+
 fallback 기준값이 바뀌면 `node scripts/generate-samguk-sheet-seed.js`로 설치 seed를 다시 생성하고 `--check`로 동기화를 검증한다. 공개 reader는 gviz `headers=1`로 첫 행을 고정하며 `현재현황` 90명, `영토현황` 60개, `게임정보` 1행 이상이 모두 정상일 때만 새 데이터를 채택한다.
 
-worker와 서버 cron의 `SAMGUK_OBSERVATION_QUEUE_PATH`는 반드시 같은 절대 경로여야 한다. 방송 모니터 설정과 권한 조건은 `../workers/README-samguk-monitor.md`를 따른다.
+worker와 서버 cron의 `SAMGUK_OBSERVATION_QUEUE_PATH`는 반드시 같은 절대 경로여야 한다. `SAMGUK_PROMOTION_AUDIT_PATH`도 queue와 다른 절대 경로로 지정한다. 반영 후 제거되는 원본 frame 근거는 해당 경로의 append-only NDJSON에 먼저 `fsync`되며, 모든 제거 대상을 확인한 뒤에만 queue를 압축한다. 기본 10MiB에 도달하면 원본 파일을 다시 쓰거나 지우지 않고 `.part-000001`, `.part-000002` 순서로 회전하며, 모든 segment는 `0600`으로 유지한다. 크기는 `SAMGUK_PROMOTION_AUDIT_SEGMENT_MAX_BYTES`로 조정할 수 있다. 방송 모니터 설정과 권한 조건은 `../workers/README-samguk-monitor.md`를 따른다.

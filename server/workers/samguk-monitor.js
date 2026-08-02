@@ -10,6 +10,8 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const {
   ALLOWED_FIELDS,
+  MIN_BROADCAST_CONFIDENCE,
+  PLAYER_ID_PATTERN,
   appendObservationQueue,
   normalizeObservation,
   sourceHostAllowed,
@@ -30,6 +32,11 @@ const BJ_ID_PATTERN = /^[A-Za-z0-9_]{1,30}$/;
 const DISPLAY_PATTERN = /^:\d+(?:\.\d+)?$/;
 const TEMPLATE_PATTERN = /\{([A-Za-z][A-Za-z0-9]*)\}/g;
 const TEMPLATE_KEYS = new Set(["input", "field", "playerId", "targetId", "roiId"]);
+const SOOP_LIVE_HEADERS = Object.freeze({
+  Referer: "https://www.sooplive.co.kr/",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  Accept: "application/json",
+});
 
 class SamgukMonitorError extends Error {
   constructor(code, message) {
@@ -130,7 +137,13 @@ function normalizeOcrConfig(input = {}) {
       64 * 1024,
       "ocr.maxOutputBytes",
     ),
-    minConfidence: numberInRange(input.minConfidence, 0.95, 0, 1, "ocr.minConfidence"),
+    minConfidence: numberInRange(
+      input.minConfidence,
+      MIN_BROADCAST_CONFIDENCE,
+      MIN_BROADCAST_CONFIDENCE,
+      1,
+      "ocr.minConfidence",
+    ),
   };
 }
 
@@ -176,7 +189,7 @@ function normalizeTarget(input, index, livePollMs) {
   return {
     id: nonemptyString(input.id, `target[${index}].id`, ID_PATTERN),
     enabled: input.enabled,
-    playerId: nonemptyString(input.playerId, `target[${index}].playerId`, ID_PATTERN),
+    playerId: nonemptyString(input.playerId, `target[${index}].playerId`, PLAYER_ID_PATTERN),
     bjId: nonemptyString(input.bjId, `target[${index}].bjId`, BJ_ID_PATTERN),
     sourceUrl: normalizeSourceUrl(input.sourceUrl),
     sampleIntervalMs: integerInRange(
@@ -367,11 +380,7 @@ function createSoopLiveChecker(options = {}) {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetchImpl(`https://chapi.sooplive.co.kr/api/${bjId}/station`, {
-        headers: {
-          Accept: "application/json",
-          Referer: "https://www.sooplive.co.kr/",
-          "User-Agent": "SOOPNOTICE-local-observer/1.0",
-        },
+        headers: SOOP_LIVE_HEADERS,
         signal: controller.signal,
       });
       if (!response.ok) throw new Error(`SOOP HTTP ${response.status}`);
@@ -579,6 +588,7 @@ module.exports = {
   DEFAULT_IDLE_POLL_MS,
   DEFAULT_LIVE_POLL_MS,
   MAX_CROP_RETENTION_MS,
+  SOOP_LIVE_HEADERS,
   SamgukMonitorError,
   abortableDelay,
   activeTargets,

@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "mode": "all-90",
+  "permissionConfirmed": false,
+  "hls": {
+    "cacheTtlMs": 60000,
+    "timeoutMs": 5000,
+    "maxResponseBytes": 262144,
+    "maxSegmentBytes": 8388608,
+    "maxBatchBytes": 33554432,
+    "maxCatchupSegments": 6
+  },
+  "ffmpeg": {
+    "path": "/usr/bin/ffmpeg",
+    "timeoutMs": 8000,
+    "maxInputBytes": 8388608,
+    "maxPngOutputBytes": 4194304
+  },
+  "scheduler": {
+    "idleIntervalMs": 60000,
+    "liveIntervalMs": 2000,
+    "burstIntervalMs": 500,
+    "burstDurationMs": 30000,
+    "normalConcurrency": 40,
+    "burstConcurrency": 3,
+    "jitterRatio": 0.08,
+    "backoffBaseMs": 5000,
+    "backoffMaxMs": 300000,
+    "taskLeaseMs": 120000,
+    "initialSpreadMs": 2000
+  },
+  "ocr": {
+    "enabled": false,
+    "profileId": "stats-panel-v1",
+    "baselineRefreshMs": 60000,
+    "timeoutMs": 15000,
+    "maxOutputBytes": 65536
+  }
+}
