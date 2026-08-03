@@ -49,12 +49,24 @@ test("설치용 generated seed는 현재 fallback의 참가자 90명과 영토 6
 test("setup은 14개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 설치한다", () => {
   const text = source(setupPath);
   assert.doesNotThrow(() => new Function(text));
+  const setupContext = {};
+  vm.runInNewContext(text, setupContext, { filename: setupPath });
   const orderMatch = text.match(/var SAMGUK_SETUP_SHEET_ORDER = (\[[\s\S]*?\]);/);
   assert.ok(orderMatch);
   const order = vm.runInNewContext(orderMatch[1]);
   assert.deepEqual(Array.from(order), [
     "사용법", "게임정보", "기준정보", "참가자", "방송모니터링", "관측입력",
     "현재현황", "장비현황", "무력랭킹", "외부참고", "영토입력", "영토현황", "OCR설정", "변경로그",
+  ]);
+  assert.equal(setupContext.SAMGUK_SETUP_HEADERS["관측입력"].length, 50);
+  assert.equal(setupContext.SAMGUK_SETUP_HEADERS["현재현황"].length, 55);
+  assert.deepEqual(Array.from(setupContext.SAMGUK_SETUP_HEADERS["관측입력"].slice(-8)), [
+    "무력보너스", "기민보너스", "기력보너스", "지모보너스",
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량",
+  ]);
+  assert.deepEqual(Array.from(setupContext.SAMGUK_SETUP_HEADERS["현재현황"].slice(-8)), [
+    "무력보너스", "기민보너스", "기력보너스", "지모보너스",
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량",
   ]);
   assert.match(text, /spreadsheet\.rename\("SOOPNOTICE 삼국지 운영원장"\)/);
   assert.match(text, /백업_" \+ timestamp \+ "_" \+ originalName/);
@@ -65,6 +77,8 @@ test("setup은 14개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   assert.match(text, /sheet\.hideSheet\(\)/);
   assert.match(text, /SAMGUK_SETUP_SEED\.members\.length !== 90/);
   assert.match(text, /SAMGUK_SETUP_SEED\.territories\.length !== 60/);
+  assert.match(text, /var memberSeedDate = String\(member\.observedAt \|\| SAMGUK_SETUP_SEED\.updatedAt\)/);
+  assert.match(text, /"INIT-" \+ memberSeedDate \+ "-" \+ String\(index \+ 1\)\.padStart\(3, "0"\)/);
   assert.match(text, /samgukInstallCurrentFormulas_/);
   assert.match(text, /samgukMaxAcceptedValueFormula_/);
   assert.match(text, /var monotonicColumns =/);
@@ -77,13 +91,35 @@ test("setup은 14개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   assert.match(text, /33: "AA", 36: "AE"/);
   assert.match(text, /37: "AF", 38: "AG", 39: "AH", 40: "AI", 41: "AJ"/);
   assert.match(text, /42: "AK", 43: "AL", 44: "AM", 45: "AN", 46: "AO", 47: "AP"/);
-  assert.match(text, /filter: "A1:AP5001"/);
-  assert.match(text, /filter: "A1:AU91"/);
-  assert.match(text, /"OCR설정": \{ rows: 30,[^\n]+filter: "A1:K30"/);
+  assert.match(text, /48: "AQ", 49: "AR", 50: "AS", 51: "AT", 52: "AU", 53: "AV"/);
+  assert.match(text, /54: "AW", 55: "AX"/);
+  assert.match(text, /new Array\(55\)\.fill\(""\)/);
+  assert.match(text, /getRange\(2, 1, 90, 55\)\.setValues\(rows\)/);
+  let currentFormulaWrite;
+  setupContext.samgukInstallCurrentFormulas_({
+    getRange: (...args) => ({
+      setValues: rows => { currentFormulaWrite = { args, rows }; },
+    }),
+  });
+  assert.deepEqual(currentFormulaWrite.args, [2, 1, 90, 55]);
+  assert.equal(currentFormulaWrite.rows.length, 90);
+  assert.match(currentFormulaWrite.rows[0][47], /INDEX\(관측입력!\$AQ:\$AQ,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][48], /INDEX\(관측입력!\$AR:\$AR,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][49], /INDEX\(관측입력!\$AS:\$AS,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][50], /INDEX\(관측입력!\$AT:\$AT,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][51], /INDEX\(관측입력!\$AU:\$AU,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][52], /INDEX\(관측입력!\$AV:\$AV,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][53], /INDEX\(관측입력!\$AW:\$AW,\$AD2\)/);
+  assert.match(currentFormulaWrite.rows[0][54], /INDEX\(관측입력!\$AX:\$AX,\$AD2\)/);
+  assert.match(text, /filter: "A1:AX5001"/);
+  assert.match(text, /filter: "A1:BC91"/);
+  assert.match(text, /"OCR설정": \{ rows: 40,[^\n]+filter: "A1:K40"/);
   assert.match(text, /\["attackPower", "공격력"\]/);
   assert.match(text, /\["healthStat", "체력"\], \["activeGeneral", "현재장수"\]/);
   assert.match(text, /\["horseMaxHealth", "말최대체력"\]/);
-  assert.match(text, /samgukSeedRowsByCompositeKey_\(sheet, rows, \[1, 2\], 30\)/);
+  assert.match(text, /\["strengthBonus", "무력보너스"\]/);
+  assert.match(text, /\["skillHasteIncrease", "절기가속증가량"\]/);
+  assert.match(text, /samgukSeedRowsByCompositeKey_\(sheet, rows, \[1, 2\], 40\)/);
   assert.match(text, /MAX\(FILTER\(/);
   assert.match(text, /RANK\.EQ/);
   assert.match(text, /setProperty\("SAMGUK_SETUP_VERSION"/);
@@ -91,7 +127,7 @@ test("setup은 14개 운영 탭, seed, 수식과 멱등 백업 전략을 함께 
   assert.doesNotMatch(text, /"OBS-"&TEXT|"TERR-"&TEXT/);
 });
 
-test("OCR설정은 기존 키와 attackPower·동적 정보창 11개 키를 빈 ROI로 seed한다", () => {
+test("OCR설정은 기존 키와 정보창·기량창 19개 동적 키를 빈 ROI로 seed한다", () => {
   const context = {};
   vm.runInNewContext(source(setupPath), context, { filename: setupPath });
   let captured;
@@ -100,15 +136,17 @@ test("OCR설정은 기존 키와 attackPower·동적 정보창 11개 키를 빈 
   };
   context.samgukSeedOcr_({});
 
-  assert.equal(captured.rows.length, 26);
+  assert.equal(captured.rows.length, 34);
   assert.deepEqual(Array.from(captured.keyColumns), [1, 2]);
-  assert.equal(captured.maxRow, 30);
+  assert.equal(captured.maxRow, 40);
   assert.deepEqual(Array.from(captured.rows, row => String(row[10]).replace("OCR key: ", "")), [
     "level", "horse", "horse_level", "weapon", "helmet", "armor", "shoes", "strength",
     "agility", "vitality", "intelligence", "powerScore", "maxHealth", "basicAttackDamage",
     "attackPower", "healthStat", "activeGeneral", "defense", "attackPowerBonusPct",
     "damageReductionPct", "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct",
-    "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
+    "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth", "strengthBonus",
+    "agilityBonus", "vitalityBonus", "intelligenceBonus", "attackPowerIncrease",
+    "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
   ]);
   assert.ok(captured.rows.every(row => Array.from(row.slice(2, 6)).every(value => value === "")));
   assert.ok(captured.rows.every(row => row[8] === "N"));
@@ -133,20 +171,23 @@ test("setup은 출력 관리자-only와 입력 warning-only 보호, 드롭다운
   assert.match(text, /getRange\("AH2:AH5001"\), 1000000/);
   assert.match(text, /getRange\("AI2:AO5001"\), 1000/);
   assert.match(text, /getRange\("AP2:AP5001"\), 1000000/);
+  assert.match(text, /getRange\("AQ2:AX5001"\), 1000000/);
+  assert.match(text, /getRange\("AQ2:AX5001"\)\.setNumberFormat\("0\.##"\)/);
+  assert.match(text, /getRange\("AV2:BC91"\)\.setNumberFormat\("0\.##"\)/);
   assert.doesNotMatch(text, /getRange\("H2:L5001"\), 999/);
   assert.match(text, /setFrozenRows/);
   assert.match(text, /setFrozenColumns/);
   assert.match(text, /createFilter\(\)/);
-  assert.match(text, /\["B2:Q5001", "X2:AC5001", "AE2:AP5001"\]/);
+  assert.match(text, /\["B2:Q5001", "X2:AC5001", "AE2:AX5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["장비현황"\], \["C2:R91"\]\)/);
   assert.match(text, /\["B2:O5001", "S2:S5001"\]/);
   assert.match(text, /samgukProtectInputSheet_\(sheets\["게임정보"\], \["A2:F30"\]\)/);
-  assert.match(text, /getRange\("I2:I30"\)/);
-  assert.match(text, /getRange\("C2:F30"\), 10000/);
-  assert.match(text, /samgukProtectInputSheet_\(sheets\["OCR설정"\], \["C2:K30"\]\)/);
+  assert.match(text, /getRange\("I2:I40"\)/);
+  assert.match(text, /getRange\("C2:F40"\), 10000/);
+  assert.match(text, /samgukProtectInputSheet_\(sheets\["OCR설정"\], \["C2:K40"\]\)/);
 });
 
-test("webhook은 A:AP 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
+test("webhook은 A:AX 전체가 빈 첫 행만 쓰고 미래 관측시각을 400 분류로 거부한다", () => {
   const text = source(webhookPath);
   assert.doesNotThrow(() => new Function(text));
   assert.match(text, /samgukFindFirstEmptyObservationRow_\(sheet, headers\.length\)/);

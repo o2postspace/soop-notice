@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { createCandidateFrameArchive } = require("../lib/samguk-candidate-frame-archive");
 const { createSamgukFfmpegFrame } = require("../lib/samguk-ffmpeg-frame");
 const {
   DEFAULT_CONFIRMATION_WINDOW_MS,
@@ -531,6 +532,13 @@ function createRuntime(config, options = {}) {
       queuePath: options.queuePath,
       baselines: options.baselines,
       baselineOverlays: options.baselineOverlays || [],
+      ...(typeof options.archiveCandidateFrame === "function"
+        && typeof options.readCandidateFrame === "function"
+        ? {
+          archiveCandidateFrame: options.archiveCandidateFrame,
+          readCandidateFrame: options.readCandidateFrame,
+        }
+        : {}),
     } : {}),
     signal: options.signal,
   });
@@ -616,6 +624,7 @@ async function main(options = {}) {
   let baselineRefreshTimer = null;
   let baselineRefreshPromise = null;
   let baselineRefreshGeneration = 0;
+  let frameArchiveCleanupTimer = null;
   try {
     const stateDir = path.resolve(env.SAMGUK_HLS_MONITOR_STATE_DIR || defaultStateDir(env));
     const queuePath = path.resolve(
@@ -642,6 +651,10 @@ async function main(options = {}) {
       }
     }
     fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    const frameArchive = config.ocr.enabled
+      ? (options.frameArchiveFactory || createCandidateFrameArchive)({ stateDir, clock })
+      : null;
+    if (frameArchive) await frameArchive.cleanup(clock(), true);
     const runtime = (options.runtimeFactory || createRuntime)(config, {
       targets,
       queuePath,
@@ -650,7 +663,20 @@ async function main(options = {}) {
       signal: controller.signal,
       fetchImpl: options.fetchImpl,
       clock,
+      ...(frameArchive ? {
+        archiveCandidateFrame: frameArchive.archive,
+        readCandidateFrame: frameArchive.read,
+      } : {}),
     });
+    if (frameArchive) {
+      const cleanupArchive = () => {
+        Promise.resolve(frameArchive.cleanup(clock())).catch(() => {
+          logger.warn?.("[samguk-hls-monitor] candidate_frame_cleanup_failed");
+        });
+      };
+      frameArchiveCleanupTimer = setInterval(cleanupArchive, 60_000);
+      frameArchiveCleanupTimer.unref?.();
+    }
     const heartbeatMs = options.heartbeatMs || 30_000;
     heartbeat = setInterval(() => {
       logger.log?.(`[samguk-hls-monitor] ${JSON.stringify(safeHeartbeat(
@@ -698,6 +724,7 @@ async function main(options = {}) {
     controller.abort();
     if (heartbeat) clearInterval(heartbeat);
     if (baselineRefreshTimer) clearInterval(baselineRefreshTimer);
+    if (frameArchiveCleanupTimer) clearInterval(frameArchiveCleanupTimer);
     baselineRefreshGeneration += 1;
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);

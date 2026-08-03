@@ -449,6 +449,8 @@ test("OCR main은 최신 baseline을 받은 뒤 같은 AbortSignal로 runtime을
     assert.deepEqual(runtimeOptions.baselines, [{ playerId: "P001", field: "level", value: 10 }]);
     assert.deepEqual(runtimeOptions.baselineOverlays, []);
     assert.equal(runtimeOptions.signal instanceof AbortSignal, true);
+    assert.equal(typeof runtimeOptions.archiveCandidateFrame, "function");
+    assert.equal(typeof runtimeOptions.readCandidateFrame, "function");
   } finally {
     fs.rmSync(stateDir, { recursive: true, force: true });
   }

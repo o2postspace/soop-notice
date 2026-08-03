@@ -76,7 +76,7 @@ test("top-level과 result extra key, 중복·미허용 field를 frame 전체 오
   }))));
 });
 
-test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 24개다", () => {
+test("panel이 보이지 않으면 빈 결과만 허용하고 results는 전체 OCR field 수까지다", () => {
   const complete = parseBroadcastBatchOutput(JSON.stringify(batch({
     results: BATCH_FIELDS.map((field, index) => ({
       field,
@@ -84,11 +84,13 @@ test("panel이 보이지 않으면 빈 결과만 허용하고 results는 최대 
       confidence: 0.99,
     })),
   })));
-  assert.equal(MAX_BATCH_RESULTS, 24);
-  assert.equal(complete.results.length, 24);
+  assert.equal(MAX_BATCH_RESULTS, BATCH_FIELDS.length);
+  assert.equal(complete.results.length, BATCH_FIELDS.length);
   assert.ok(BATCH_FIELDS.includes("maxHealth"));
   assert.ok(BATCH_FIELDS.includes("attackPower"));
   assert.ok(BATCH_FIELDS.includes("horseMaxHealth"));
+  assert.ok(BATCH_FIELDS.includes("strengthBonus"));
+  assert.ok(BATCH_FIELDS.includes("skillHasteIncrease"));
 
   const hidden = parseBroadcastBatchOutput(JSON.stringify(batch({ panelVisible: false, results: [] })));
   assert.deepEqual(Array.from(hidden.results), []);

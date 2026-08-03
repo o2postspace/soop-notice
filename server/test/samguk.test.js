@@ -81,6 +81,8 @@ const RAW_MEMBER_KEYS = [
   "healthStat", "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
   "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
   "moveSpeedBonusPct", "horseMaxHealth",
+  "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
+  "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
   "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
   "sourceType", "strength", "verificationStatus", "vitality", "weapon",
 ].sort();
@@ -212,16 +214,19 @@ test("현재현황의 최대체력과 검증된 평타 대표값은 선택형 �
   assert.equal(member.combatConditions, "일반 평타·비치명");
 });
 
-test("현재현황의 동적 정보창 11개 필드를 소수·퍼센트 표기까지 읽는다", () => {
+test("현재현황의 동적 정보창·기량 19개 필드를 소수·퍼센트 표기까지 읽는다", () => {
   const headers = [
     ...MEMBER_HEADERS,
     "체력", "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
     "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
+    "무력보너스", "기민보너스", "기력보너스", "지모보너스",
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량",
   ];
   const row = [
     "촉", "테스트", "관우", "test_dynamic", "관우", "20", "적토마", "3", "5", "4", "4", "4",
     "40", "10", "20", "5", "2026-08-02 03:00:00", "https://play.sooplive.com/test", "확정",
     "176.9", "관우", "88.25", "12.5%", "7.25", "18.5%", "150.75", "4.5%", "22.25%", "6.5", "1,900",
+    "24.4", "0", "12.2", "9.1", "42.7", "0", "366", "20",
   ];
   const member = parseMembersCsv(makeCsv(headers, [row])).members[0];
 
@@ -237,6 +242,14 @@ test("현재현황의 동적 정보창 11개 필드를 소수·퍼센트 표기�
     skillDamageBonusPct: member.skillDamageBonusPct,
     moveSpeedBonusPct: member.moveSpeedBonusPct,
     horseMaxHealth: member.horseMaxHealth,
+    strengthBonus: member.strengthBonus,
+    agilityBonus: member.agilityBonus,
+    vitalityBonus: member.vitalityBonus,
+    intelligenceBonus: member.intelligenceBonus,
+    attackPowerIncrease: member.attackPowerIncrease,
+    moveSpeedIncrease: member.moveSpeedIncrease,
+    healthIncrease: member.healthIncrease,
+    skillHasteIncrease: member.skillHasteIncrease,
   }, {
     healthStat: 176.9,
     activeGeneral: "관우",
@@ -249,6 +262,14 @@ test("현재현황의 동적 정보창 11개 필드를 소수·퍼센트 표기�
     skillDamageBonusPct: 22.25,
     moveSpeedBonusPct: 6.5,
     horseMaxHealth: 1900,
+    strengthBonus: 24.4,
+    agilityBonus: 0,
+    vitalityBonus: 12.2,
+    intelligenceBonus: 9.1,
+    attackPowerIncrease: 42.7,
+    moveSpeedIncrease: 0,
+    healthIncrease: 366,
+    skillHasteIncrease: 20,
   });
 });
 
@@ -334,7 +355,7 @@ test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 pa
   assert.ok(state.urls.every(url => new URL(url).pathname.includes(`/d/${DEFAULT_SHEET_ID}/`)));
   assert.ok(state.urls.every(url => new URL(url).searchParams.get("headers") === "1"));
   assert.ok(state.urls.every(url => !url.includes("vercel.app")));
-  assert.equal(payload.members[0].powerVersion, "v1.1");
+  assert.equal(payload.members[0].powerVersion, "v1.5");
   assert.equal(payload.members[0].powerStatus, "insufficient");
   assert.equal(payload.members[0].powerCoverage, 80);
   assert.deepEqual(payload.members[0].engravings, []);
@@ -511,11 +532,59 @@ test("fallback 최신 스냅샷은 기량 랭킹 품질 기준을 만족한다",
   assert.ok(snapshot.members.every(member => Object.hasOwn(member, "sourceCount")));
   assert.ok(snapshot.members.every(member => Object.hasOwn(member, "verificationStatus")));
   assert.equal(snapshot.members.some(member => numericFields.some(field => member[field] === 0)), false);
-  assert.equal(snapshot.members.filter(member => member.strength > 0).length, 24);
-  assert.equal(snapshot.members.filter(member => growthScore(member) > 0).length, 30);
-  assert.equal(snapshot.members.reduce((sum, member) => sum + growthScore(member), 0), 373);
+  assert.equal(snapshot.members.filter(member => member.strength > 0).length, 25);
+  assert.equal(snapshot.members.filter(member => growthScore(member) > 0).length, 31);
+  assert.equal(snapshot.members.reduce((sum, member) => sum + growthScore(member), 0), 549);
   assert.equal(growthScore(snapshot.members.find(member => member.name === "조경훈")), 86);
   assert.equal(growthScore(snapshot.members.find(member => member.name === "감스트")), 50);
+  const pyowoo = snapshot.members.find(member => member.name === "표우");
+  assert.deepEqual({ strength: pyowoo.strength, intelligence: pyowoo.intelligence }, {
+    strength: 100,
+    intelligence: 76,
+  });
+});
+
+test("파워 v1.5는 같은 강화라도 5단계 말 등급 보너스를 반영한다", () => {
+  const common = {
+    job: "천강",
+    level: 10,
+    strength: 10,
+    agility: 10,
+    vitality: 10,
+    intelligence: 10,
+    weapon: 1,
+    helmet: null,
+    armor: 1,
+    shoes: 1,
+    horseLevel: 1,
+    engravings: Array.from({ length: 9 }, () => ({ state: "empty" })),
+    sourceCount: 2,
+    sourceType: "sheet+broadcast",
+    verificationStatus: "cross-verified",
+    observedAt: "2026-08-03T00:00:00.000Z",
+    equipmentSourceCount: 2,
+    equipmentSourceType: "sheet+broadcast",
+    equipmentObservedAt: "2026-08-03T00:00:00.000Z",
+  };
+  const [ordinary, redHare] = enrichMembersWithPowerIndex([
+    { ...common, name: "일반마", soopId: "ordinary_horse", horse: "백룡마" },
+    { ...common, name: "적토마", soopId: "red_hare", horse: "적 토마" },
+  ]);
+
+  assert.equal(redHare.powerVersion, "v1.5");
+  assert.deepEqual({
+    horse: redHare.powerComponents.horse.horse,
+    isRedHare: redHare.powerComponents.horse.isRedHare,
+    baseBonus: redHare.powerComponents.horse.baseBonus,
+    scoringCap: redHare.powerComponents.horse.scoringCap,
+  }, {
+    horse: "적토마",
+    isRedHare: true,
+    baseBonus: 35,
+    scoringCap: 80,
+  });
+  assert.equal(ordinary.powerComponents.horse.baseBonus, 17.5);
+  assert.equal(redHare.powerIndex - ordinary.powerIndex, 2.625);
 });
 
 test("삼국지 카드의 기량합계는 네 기량이 모두 있을 때만 사용한다", () => {
@@ -552,7 +621,11 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
   assert.match(html, /최대 HP/);
   assert.match(html, /공격력/);
   assert.match(html, /평타/);
-  assert.match(html, /파워 v1 미반영/);
+  assert.match(html, /파워 v1\.5 미반영/);
+  assert.match(html, /군주 두갑은 15% 추가 보너스/);
+  assert.match(html, /담운마·금표마·백룡마·현풍마·적토마 5등급/);
+  assert.match(html, /합산환산.*component\.abilityScore.*\/100/);
+  assert.match(html, /component\.horse \? samgukTextValue\(component\.horse\) \+ ' 등급 \+'/);
   assert.match(html, /function samgukTextValue\(value, suffix\)/);
   const componentFunction = html.match(/function componentCell\(member, key\) \{[\s\S]*?\n  \}/)?.[0] || "";
   assert.match(componentFunction, /samgukTextValue/);
@@ -568,6 +641,8 @@ test("현황판과 파워랭킹은 같은 시트 payload를 쓰고 화면 복귀
 
   assert.match(client, /const REFRESH_INTERVAL_MS = 60 \* 1000/);
   assert.match(client, /function applyPayload\(data, mode\) \{[\s\S]*?mergeMembers\(data\.members\)/);
+  assert.match(client, /strengthBonus: cleanValue\(pick\(row, \['strengthBonus', 'strength_bonus', '무력보너스'\]\)\)/);
+  assert.match(client, /'strengthBonus', 'agilityBonus', 'vitalityBonus', 'intelligenceBonus',[\s\S]*?'skillHasteIncrease'/);
   assert.match(client, /currentSamgukTab === 'ranking'\) renderSamgukPowerRanking\(\)/);
   assert.match(client, /else renderSamguk\(\)/);
   assert.match(client, /setInterval\(function \(\) \{[\s\S]*?loadSamgukData\(true\)[\s\S]*?REFRESH_INTERVAL_MS/);

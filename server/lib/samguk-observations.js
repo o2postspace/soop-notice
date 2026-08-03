@@ -32,6 +32,14 @@ const ALLOWED_FIELDS = Object.freeze([
   "skillDamageBonusPct",
   "moveSpeedBonusPct",
   "horseMaxHealth",
+  "strengthBonus",
+  "agilityBonus",
+  "vitalityBonus",
+  "intelligenceBonus",
+  "attackPowerIncrease",
+  "moveSpeedIncrease",
+  "healthIncrease",
+  "skillHasteIncrease",
 ]);
 const SOURCE_TYPES = Object.freeze(["sheet", "gamcom", "fmkorea", "broadcast"]);
 const MIN_BROADCAST_CONFIDENCE = 0.95;
@@ -70,6 +78,14 @@ const NUMERIC_FIELD_MAXIMUMS = Object.freeze({
   skillDamageBonusPct: 1_000,
   moveSpeedBonusPct: 1_000,
   horseMaxHealth: 1_000_000,
+  strengthBonus: 1_000_000,
+  agilityBonus: 1_000_000,
+  vitalityBonus: 1_000_000,
+  intelligenceBonus: 1_000_000,
+  attackPowerIncrease: 1_000_000,
+  moveSpeedIncrease: 1_000_000,
+  healthIncrease: 1_000_000,
+  skillHasteIncrease: 1_000_000,
 });
 const DECIMAL_NUMERIC_FIELDS = new Set([
   "powerScore",
@@ -84,6 +100,14 @@ const DECIMAL_NUMERIC_FIELDS = new Set([
   "skillCooldownReductionPct",
   "skillDamageBonusPct",
   "moveSpeedBonusPct",
+  "strengthBonus",
+  "agilityBonus",
+  "vitalityBonus",
+  "intelligenceBonus",
+  "attackPowerIncrease",
+  "moveSpeedIncrease",
+  "healthIncrease",
+  "skillHasteIncrease",
 ]);
 const MONOTONIC_NUMERIC_FIELDS = new Set([
   "level",

@@ -39,6 +39,8 @@ function payload() {
       damageReductionPct: null, criticalChancePct: null, criticalDamagePct: null,
       skillCooldownReductionPct: null, skillDamageBonusPct: null, moveSpeedBonusPct: null,
       horseMaxHealth: null,
+      strengthBonus: null, agilityBonus: null, vitalityBonus: null, intelligenceBonus: null,
+      attackPowerIncrease: null, moveSpeedIncrease: null, healthIncrease: null, skillHasteIncrease: null,
       observedAt: "2026-08-02T10:00:00.000Z",
     }],
   };
@@ -75,10 +77,29 @@ test("단독 후보는 버리고 Sheet와 일치한 최신 후보만 완전 스�
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].fields.strength, 11);
   assert.equal(snapshots[0].fields.weapon, 2);
-  assert.equal(Object.keys(snapshots[0].fields).length, 29);
+  assert.equal(Object.keys(snapshots[0].fields).length, 37);
   assert.equal(snapshots[0].fields.healthStat, null);
   assert.equal(snapshots[0].fields.activeGeneral, null);
   assert.equal(snapshots[0].fields.horseMaxHealth, null);
+  assert.deepEqual({
+    strengthBonus: snapshots[0].fields.strengthBonus,
+    agilityBonus: snapshots[0].fields.agilityBonus,
+    vitalityBonus: snapshots[0].fields.vitalityBonus,
+    intelligenceBonus: snapshots[0].fields.intelligenceBonus,
+    attackPowerIncrease: snapshots[0].fields.attackPowerIncrease,
+    moveSpeedIncrease: snapshots[0].fields.moveSpeedIncrease,
+    healthIncrease: snapshots[0].fields.healthIncrease,
+    skillHasteIncrease: snapshots[0].fields.skillHasteIncrease,
+  }, {
+    strengthBonus: null,
+    agilityBonus: null,
+    vitalityBonus: null,
+    intelligenceBonus: null,
+    attackPowerIncrease: null,
+    moveSpeedIncrease: null,
+    healthIncrease: null,
+    skillHasteIncrease: null,
+  });
   assert.equal(snapshots[0].sourceCount, 2);
   assert.equal(snapshots[0].verification, "cross-source");
   assert.ok(snapshots[0].sourceTypes.includes(snapshots[0].primarySourceType));

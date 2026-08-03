@@ -12,11 +12,11 @@
 
 `Google Sheet 기준값 + Gamcom 보조자료 + FMK 구조화 입력 + 방송 ROI OCR → 관측입력 → 현재현황 + 장비현황 → /api/samguk → 파워랭킹`
 
-파워 v1은 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%의 고정 가중치를 합산한다. 결측 구성요소에는 가중치를 재분배하거나 0점을 넣지 않고 가능한 0~100 범위를 유지하며, 화면 순위는 우리 시트에서 실제 확인된 구성요소의 하한점수로 정렬하고 범위 중앙값은 추정치로 함께 표시한다. 수집률 85%는 순위 포함 기준이 아니라 신뢰도 플래그다. `confirmed`는 수집률 100%, 현재현황·장비현황 교차검증, 레벨·기량 비교 표본 임계치가 모두 충족될 때만 사용하며, 나머지는 `provisional` 또는 `insufficient(수집 중·참고)`로 표시한다. 최대체력·정보창 체력·공격력·방어력·전투 비율·말 최대체력·평타피해는 비교 보조 관측이며 파워 v1 점수에는 넣지 않는다. 장비현황 빈칸은 미관측이며 미장착 슬롯은 `없음`, 일반 장수의 두갑 슬롯은 `해당없음`으로 명시한다.
+파워 v1.5는 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%의 고정 가중치를 합산한다. 기량은 무력·기민·기력·지모의 실제 합계를 고정 600점 기준으로 선형 환산해 참가자 분포가 바뀌어도 같은 원값의 점수가 흔들리지 않는다. 결측일 때만 항목별 하·상한 범위를 유지한다. 장비는 무기 60%·흉갑 30%·각갑 10%를 공통 적용하고 군주 두갑 15%를 추가 보너스로 더한다. 결측 구성요소에는 가중치를 재분배하거나 0점을 넣지 않고 가능한 0~100 범위를 유지하며, 화면 순위는 우리 시트에서 실제 확인된 구성요소의 하한점수로 정렬하고 범위 중앙값은 추정치로 함께 표시한다. 수집률 85%는 순위 포함 기준이 아니라 신뢰도 플래그다. `confirmed`는 수집률 100%, 현재현황·장비현황 교차검증, 레벨·기량 비교 표본 임계치가 모두 충족될 때만 사용하며, 나머지는 `provisional` 또는 `insufficient(수집 중·참고)`로 표시한다. 최대체력·정보창 체력·공격력·방어력·전투 비율·말 최대체력·평타피해는 비교 보조 관측이며 파워 v1.5 점수에는 넣지 않는다. 장비현황 빈칸은 미관측이며 미장착 슬롯은 `없음`, 일반 장수의 두갑 슬롯은 `해당없음`으로 명시한다.
 
 ## FMK 관측 입력
 
-게시물 자동 크롤링 대신 확인한 게시물 URL과 값을 구조화해 넣는다. 같은 입력은 hash로 중복 제거된다.
+확인한 게시물 URL과 값은 아래처럼 직접 구조화해 넣을 수 있다. 자동 monitor는 5분에 한 번 `강` 검색 결과 한 페이지만 읽고, 최근 글 중 `참가자명 + 명확한 장비 슬롯 + N강`이 제목 또는 본문에 함께 적힌 경우만 같은 queue에 `fmkorea` 관측으로 넣는다. 실패·도전·가정·질문·부정, 슬롯이 모호한 `방어구` 표현은 버리고 문서번호 cache로 재요청을 막는다. FMK 한 출처만으로는 승격되지 않으며 기존 Sheet·방송 관측과 값이 일치해야 반영된다. HTTP 429/430은 `Retry-After`와 연속 제한 횟수를 state에 보존하고 10분부터 지수 backoff해 최대 1시간 동안 재요청하지 않는다.
 
 ```bash
 node scripts/samguk-submit-observation.js <<'JSON'
@@ -32,7 +32,15 @@ node scripts/samguk-submit-observation.js <<'JSON'
 JSON
 ```
 
-지원 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `powerScore`, `maxHealth`, `attackPower`, `basicAttackDamage`, `basicAttackSampleCount`, `basicAttackTarget`, `combatConditions`, `healthStat`, `activeGeneral`, `defense`, `attackPowerBonusPct`, `damageReductionPct`, `criticalChancePct`, `criticalDamagePct`, `skillCooldownReductionPct`, `skillDamageBonusPct`, `moveSpeedBonusPct`, `horseMaxHealth`다. 정보창 비율은 `5%=5`인 percentage-point로 저장한다. `attackPower`는 정보창 공격력이고 `basicAttackDamage`는 동일 대상·동일 조건의 비치명 기본공격 표본 대표값이다. 평타 관측은 `basicAttackSampleCount`, `basicAttackTarget`, `combatConditions`를 함께 기록한다. 적토마는 확인된 정확값인 `horseMaxHealth=1700 → horseLevel=0`, `1900 → 1`만 사용하며 중간값이나 이후 단계를 외삽하지 않는다.
+서버 cron에서 켤 때는 HLS worker와 동일한 `SAMGUK_OBSERVATION_QUEUE_PATH`를 지정하고 `SAMGUK_FMKOREA_MONITOR_ENABLED=1`을 설정한다. 필요하면 `SAMGUK_FMKOREA_STATE_PATH`와 `{ "P001": ["검증된 별칭"] }` 형식의 `SAMGUK_FMKOREA_ALIASES_PATH`를 지정한다. 한 실행은 검색 1페이지만 읽고 상세 확인 대상은 최대 6개이며, 최소 실행 간격은 5분이다. 수동 1회 실행은 다음과 같다.
+
+```bash
+node scripts/samguk-fmkorea-gear-monitor.js \
+  --queue /절대/경로/observations.ndjson \
+  --state /절대/경로/fmkorea-state.json
+```
+
+지원 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `powerScore`, `maxHealth`, `attackPower`, `basicAttackDamage`, `basicAttackSampleCount`, `basicAttackTarget`, `combatConditions`, `healthStat`, `activeGeneral`, `defense`, `attackPowerBonusPct`, `damageReductionPct`, `criticalChancePct`, `criticalDamagePct`, `skillCooldownReductionPct`, `skillDamageBonusPct`, `moveSpeedBonusPct`, `horseMaxHealth`, `strengthBonus`, `agilityBonus`, `vitalityBonus`, `intelligenceBonus`, `attackPowerIncrease`, `moveSpeedIncrease`, `healthIncrease`, `skillHasteIncrease`다. 정보창 비율은 `5%=5`인 percentage-point로 저장한다. `attackPower`는 정보창 공격력이고 `basicAttackDamage`는 동일 대상·동일 조건의 비치명 기본공격 표본 대표값이다. 평타 관측은 `basicAttackSampleCount`, `basicAttackTarget`, `combatConditions`를 함께 기록한다. 적토마는 확인된 정확값인 `horseMaxHealth=1700 → horseLevel=0`, `1900 → 1`만 사용하며 중간값이나 이후 단계를 외삽하지 않는다.
 
 ## Google Sheet 연결
 
@@ -57,14 +65,14 @@ JSON
 
 ### 공개 현황·제보 시트
 
-`installSamgukPublicSheet()`를 소유자 계정으로 한 번 실행하면 별도 공개 Spreadsheet를 생성하고 즉시 정상 API 90명을 채운 뒤 `syncSamgukPublicSheet()` 15분 트리거와 설치형 `handleSamgukPublicEdit()` 트리거를 설치한다. 설치 결과의 URL을 공개 링크로 사용한다.
+`installSamgukPublicSheet()`를 소유자 계정으로 한 번 실행하면 별도 공개 Spreadsheet를 생성하고 즉시 캐시를 우회한 정상 API 90명을 채운 뒤 `syncSamgukPublicSheet()` 5분 트리거와 설치형 `handleSamgukPublicEdit()` 트리거를 설치한다. 설치 결과의 URL을 공개 링크로 사용한다. 레벨·강화·무/민/기/지·최대체력·공격력처럼 누적되는 수치는 운영원장의 확인된 최고값을 사용하고, 장비·장수 변경으로 내려갈 수 있는 동적 정보창 수치는 최신 관측값을 사용한다.
 
 - 일반 액세스는 `링크가 있는 모든 사용자: 뷰어`이며 편집자의 권한 재공유는 끈다.
 - 편집 요청을 승인한 Google 계정은 `수정제안`의 `player_id`, `field_key`, 제안값·관측시각·출처·HTTPS 근거·설명만 수정할 수 있다.
 - 출력·상태·승인원장·코드표는 보호하고, 수식 입력은 제거한다.
 - 운영자가 처리상태를 `승인`으로 바꾼 상승값만 `관측입력`에 `시트`·교차검증수 1·`기준값`으로 기록한다. 공개 사본 자체는 독립 교차검증 출처로 세지 않는다.
 - 잘못 승인한 행은 처리상태를 `철회`로 바꾼다. 운영원장의 원행을 삭제하지 않고 검증상태를 `철회`로 바꿔 단조 최고값 계산에서 제외한다.
-- 공개 표시 점수는 사이트 파워 v1.1 하한점수에 125를 곱한 정수이며 파워 산식 자체는 바꾸지 않는다.
+- 공개 표시 점수는 사이트 파워 v1.5 하한점수에 125를 곱한 정수다. 기량은 네 수치의 실제 합계를 고정 600점 기준으로 선형 환산한다. 장비는 무기 60%·흉갑 30%·각갑 10%를 공통 적용하고 군주 두갑 15%를 추가한다. 말은 담운마 0, 금표마 8.75, 백룡마 17.5, 현풍마 26.25, 적토마 35의 등급 기본점수에 강화점수를 더한다.
 
 Apps Script를 배포하지 않는 단일 서버 운영에서는 전용 OAuth writer도 사용할 수 있다. OAuth 계정은 원장 소유자 또는 보호 관리자여야 하며 다른 writer와 병행하지 않는다.
 
@@ -74,7 +82,7 @@ python3 scripts/samguk-google-oauth.py \
   --token /보안/경로/samguk-google-oauth.json
 ```
 
-발급 파일과 상위 디렉터리는 각각 `0600`, `0700`이어야 한다. 서버에는 `SAMGUK_SHEET_WRITE_MODE=oauth`, `SAMGUK_GOOGLE_OAUTH_TOKEN_PATH`, `SAMGUK_SHEET_WRITER_LOCK_PATH`를 절대 경로로 지정한다. writer는 `관측입력!A:AP` 헤더·`참가자`·`Asia/Seoul` timezone을 확인하고, A:AP가 모두 빈 첫 행 하나만 OS lock 안에서 기록한 뒤 전체 행을 재조회한다. HUD 최대체력·평타 관측은 `관측입력!Y:AC`에서 `현재현황!AE:AI`로, 공격력은 `관측입력!AE`에서 `현재현황!AJ`로, 정보창·말 최대체력은 `관측입력!AF:AP`에서 `현재현황!AK:AU`로 전달된다. OAuth 앱이 Testing 상태면 refresh token이 단기 만료될 수 있으므로 장기 무인 운영 전 Google OAuth publishing 상태를 확인한다.
+발급 파일과 상위 디렉터리는 각각 `0600`, `0700`이어야 한다. 서버에는 `SAMGUK_SHEET_WRITE_MODE=oauth`, `SAMGUK_GOOGLE_OAUTH_TOKEN_PATH`, `SAMGUK_SHEET_WRITER_LOCK_PATH`를 절대 경로로 지정한다. writer는 `관측입력!A:AX` 헤더·`참가자`·`Asia/Seoul` timezone을 확인하고, A:AX가 모두 빈 첫 행 하나만 OS lock 안에서 기록한 뒤 전체 행을 재조회한다. HUD 최대체력·평타 관측은 `관측입력!Y:AC`에서 `현재현황!AE:AI`로, 공격력은 `관측입력!AE`에서 `현재현황!AJ`로, 정보창·말 최대체력은 `관측입력!AF:AP`에서 `현재현황!AK:AU`로, 기량 보너스·증가량은 `관측입력!AQ:AX`에서 `현재현황!AV:BC`로 전달된다. OAuth 앱이 Testing 상태면 refresh token이 단기 만료될 수 있으므로 장기 무인 운영 전 Google OAuth publishing 상태를 확인한다.
 
 fallback 기준값이 바뀌면 `node scripts/generate-samguk-sheet-seed.js`로 설치 seed를 다시 생성하고 `--check`로 동기화를 검증한다. 공개 reader는 gviz `headers=1`로 첫 행을 고정하며 `현재현황` 90명, `영토현황` 60개, `게임정보` 1행 이상이 모두 정상일 때만 새 데이터를 채택한다.
 

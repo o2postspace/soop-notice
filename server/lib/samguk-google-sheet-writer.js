@@ -13,7 +13,7 @@ const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const GOOGLE_SHEETS_API_ROOT = "https://sheets.googleapis.com/v4/spreadsheets";
 const OBSERVATION_SHEET = "관측입력";
 const PARTICIPANT_SHEET = "참가자";
-const OBSERVATION_LAST_COLUMN = "AP";
+const OBSERVATION_LAST_COLUMN = "AX";
 const MAX_OBSERVATION_ROW = 5001;
 const MAX_SNAPSHOT_BATCH = 100;
 const MAX_TOKEN_BYTES = 32 * 1024;
@@ -52,6 +52,14 @@ const FIELD_HEADERS = Object.freeze({
   skillDamageBonusPct: "스킬피해증가(%)",
   moveSpeedBonusPct: "이동속도증가(%)",
   horseMaxHealth: "말최대체력",
+  strengthBonus: "무력보너스",
+  agilityBonus: "기민보너스",
+  vitalityBonus: "기력보너스",
+  intelligenceBonus: "지모보너스",
+  attackPowerIncrease: "공격력증가량",
+  moveSpeedIncrease: "이동속도증가량",
+  healthIncrease: "체력증가량",
+  skillHasteIncrease: "절기가속증가량",
 });
 const FIELD_NAMES = Object.freeze(Object.keys(FIELD_HEADERS));
 const EXPECTED_HEADERS = Object.freeze([
@@ -62,6 +70,8 @@ const EXPECTED_HEADERS = Object.freeze([
   "최대체력", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "입력시각", "공격력",
   "체력", "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
   "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
+  "무력보너스", "기민보너스", "기력보너스", "지모보너스",
+  "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량",
 ]);
 const INPUT_TIME_COLUMN_INDEX = EXPECTED_HEADERS.indexOf("입력시각");
 const SOURCE_LABELS = Object.freeze({

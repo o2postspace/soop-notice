@@ -10,6 +10,31 @@ const PANEL_WIDTHS = Object.freeze([10, 13, 16, 19, 22, 25, 28, 31]);
 const PANEL_HEIGHTS = Object.freeze([12, 14, 16, 18, 20, 22, 24]);
 const MIN_WIDE_PANEL_WIDTH = 19;
 
+// 실제 SOOP 화면의 정보/강화 overlay는 거의 전 화면이 어두워 기존 bright title이나
+// panel boundary 조건을 만족하지 않는다. 로딩/사망 dim과 겹치지 않는 texture와 title
+// 위치를 함께 요구해 이 분기만 제한적으로 허용한다.
+const DARK_OVERLAY_LIMITS = Object.freeze({
+  minOverallMean: 28,
+  maxOverallMean: 58,
+  minLumaStdDev: 20,
+  maxLumaStdDev: 63,
+  minOverallDarkRatio: 0.76,
+  maxOverallDarkRatio: 0.955,
+  minColumnDeltaMean: 5,
+  maxColumnDeltaMean: 21,
+  minEdgeRatio: 0.11,
+  maxEdgeRatio: 0.26,
+  minSmoothRatio: 0.4,
+  maxSmoothRatio: 0.7,
+  maxTitleMean: 36,
+  minTitleDarkRatio: 0.93,
+  minTitleContrast: 20,
+  minTitleX: 18,
+  minTitleRight: 34,
+  minTitleY: 4,
+  maxTitleY: 12,
+});
+
 const DEFAULT_THRESHOLDS = Object.freeze({
   darkPixelMax: 64,
   edgeDelta: 20,
@@ -373,6 +398,30 @@ function findPanelPattern(metrics, thresholds) {
   return best;
 }
 
+function isDarkOverlayCandidate(metrics, title) {
+  if (!title) return false;
+  const limits = DARK_OVERLAY_LIMITS;
+  return metrics.overallMean >= limits.minOverallMean
+    && metrics.overallMean <= limits.maxOverallMean
+    && metrics.lumaStdDev >= limits.minLumaStdDev
+    && metrics.lumaStdDev <= limits.maxLumaStdDev
+    && metrics.overallDarkRatio >= limits.minOverallDarkRatio
+    && metrics.overallDarkRatio <= limits.maxOverallDarkRatio
+    && metrics.columnDeltaMean >= limits.minColumnDeltaMean
+    && metrics.columnDeltaMean <= limits.maxColumnDeltaMean
+    && metrics.edgeRatio >= limits.minEdgeRatio
+    && metrics.edgeRatio <= limits.maxEdgeRatio
+    && metrics.smoothRatio >= limits.minSmoothRatio
+    && metrics.smoothRatio <= limits.maxSmoothRatio
+    && title.mean <= limits.maxTitleMean
+    && title.darkRatio >= limits.minTitleDarkRatio
+    && title.contrast >= limits.minTitleContrast
+    && title.x >= limits.minTitleX
+    && title.x + title.width >= limits.minTitleRight
+    && title.y >= limits.minTitleY
+    && title.y <= limits.maxTitleY;
+}
+
 function frameMetrics(bytes, thresholds) {
   const integralSize = (FRAME_WIDTH + 1) * (FRAME_HEIGHT + 1);
   const lumaIntegral = new Float64Array(integralSize);
@@ -497,7 +546,14 @@ function analyzeWithThresholds(frame, thresholds) {
     && metrics.smoothRatio >= thresholds.minBrightSmoothRatio
     && title?.contrast >= thresholds.minTitleContrast;
   const panelCandidate = panel !== null;
-  const detectedKind = panelCandidate ? "panel" : titleCandidate ? "text_panel" : null;
+  const darkOverlayCandidate = isDarkOverlayCandidate(metrics, title);
+  const detectedKind = panelCandidate
+    ? "panel"
+    : titleCandidate
+      ? "text_panel"
+      : darkOverlayCandidate
+        ? "dark_overlay"
+        : null;
   let reason = detectedKind ? "candidate" : "no_local_ui_pattern";
   if (metrics.overallMean < thresholds.minOverallMean
     || metrics.overallDarkRatio > thresholds.maxOverallDarkRatio) {

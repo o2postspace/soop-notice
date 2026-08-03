@@ -970,6 +970,109 @@ test("SD 후보와 같은 HD media sequence부터 OCR하고 숨김 두 frame이�
   assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.earlyBurstEnds, 1);
 });
 
+test("SD 후보 순간의 HD frame을 즉시 보존하고 sequence가 달라도 저장 segment에서 OCR한다", async () => {
+  const fetchQualities = [];
+  const archived = [];
+  const archiveBodies = new Map();
+  const loaded = [];
+  const pngDecoded = [];
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      fetchQualities.push(quality);
+      if (quality === "SD") return [batchSegment(301, "sd-candidate")];
+      return [
+        batchSegment(900, "hd-before"),
+        batchSegment(901, "hd-candidate"),
+      ];
+    },
+    async decodeGrayFrame(segment) {
+      const label = segment.toString();
+      if (label === "sd-candidate") return grayFrameBatch([1]);
+      if (label === "hd-candidate") return grayFrameBatch([2]);
+      return grayFrameBatch([]);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(segment, options) {
+      pngDecoded.push([segment.toString(), options.sampleIndex]);
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([options.sampleIndex])]);
+    },
+    async runOcr() {
+      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+    },
+    async archiveCandidateFrame(png, context) {
+      archived.push({ png, context });
+      const reference = `candidate-${archived.length}.png`;
+      archiveBodies.set(reference, png);
+      return reference;
+    },
+    async readCandidateFrame(reference) {
+      loaded.push(reference);
+      return archiveBodies.get(reference);
+    },
+    queuePath: "/tmp/test-prefetched-candidate.ndjson",
+  });
+
+  const normal = await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  assert.equal(normal.uiCandidate, true);
+  assert.deepEqual(fetchQualities, ["SD", "HD"]);
+  assert.equal(archived.length, 2);
+
+  const burst = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  assert.equal(burst.ocr.sequenceMissed, false);
+  assert.equal(burst.ocr.frames.length, 2);
+  assert.deepEqual(fetchQualities, ["SD", "HD"]);
+  assert.deepEqual(pngDecoded, [
+    ["hd-candidate", 2],
+    ["hd-candidate", 3],
+  ]);
+  assert.deepEqual(loaded, ["candidate-1.png", "candidate-2.png"]);
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.candidateFramePrefetches, 1);
+  assert.equal(stats.candidateFramesArchived, 2);
+  assert.equal(stats.candidateFramesLoaded, 2);
+  assert.equal(stats.candidateFramesPending, 0);
+  assert.equal(stats.candidateFrameCaptureErrors, 0);
+  assert.equal(stats.ocrRuns, 2);
+});
+
+test("보존 frame 읽기 실패 뒤에도 pending을 유지해 다음 burst에서 재시도한다", async () => {
+  let readCalls = 0;
+  const png = Buffer.concat([PNG_SIGNATURE, Buffer.from([7])]);
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      return url === "memory:SD"
+        ? [batchSegment(10, "sd-candidate")]
+        : [batchSegment(99, "hd-candidate")];
+    },
+    async decodeGrayFrame(segment) {
+      return grayFrameBatch(segment.toString() === "sd-candidate" ? [1] : [2]);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame() { return png; },
+    async archiveCandidateFrame() { return "candidate-retry.png"; },
+    async readCandidateFrame() {
+      readCalls += 1;
+      if (readCalls === 1) throw errorWithCode("upstream_error");
+      return png;
+    },
+    async runOcr() {
+      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+    },
+    queuePath: "/tmp/test-prefetched-retry.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  await assert.rejects(
+    fixture.monitor.executeTask({ lane: "burst", target: target() }),
+    error => error.code === "upstream_error",
+  );
+  assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.candidateFramesPending, 2);
+  const retried = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  assert.equal(retried.ocr.frames.length, 2);
+  assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.candidateFramesPending, 0);
+});
+
 test("HD가 SD 후보 sequence보다 늦게 도착하면 이전 구간은 건너뛰고 같은 sequence를 기다린다", async () => {
   let hdCall = 0;
   let ocrRuns = 0;

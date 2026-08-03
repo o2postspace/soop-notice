@@ -8,7 +8,7 @@
  * - 원문에 갱신시각이 없으므로 외부수집시각과 별도로 표시합니다.
  */
 
-var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.4";
+var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.5";
 var SAMGUK_GAMCOM_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 var SAMGUK_GAMCOM_REFERENCE_SHEET = "외부참고";
 var SAMGUK_GAMCOM_CURRENT_SHEET = "현재현황";
@@ -35,7 +35,9 @@ var SAMGUK_GAMCOM_SNAPSHOT_FIELDS = [
   "maxHealth", "attackPower", "basicAttackDamage", "basicAttackSampleCount",
   "basicAttackTarget", "combatConditions", "healthStat", "activeGeneral", "defense",
   "attackPowerBonusPct", "damageReductionPct", "criticalChancePct", "criticalDamagePct",
-  "skillCooldownReductionPct", "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth"
+  "skillCooldownReductionPct", "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
+  "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
+  "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease"
 ];
 var SAMGUK_GAMCOM_FIELD_HEADERS = {
   level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
@@ -47,7 +49,11 @@ var SAMGUK_GAMCOM_FIELD_HEADERS = {
     defense: "방어력", attackPowerBonusPct: "공격력증가(%)", damageReductionPct: "피해감소(%)",
     criticalChancePct: "치명타확률(%)", criticalDamagePct: "치명타피해(%)",
     skillCooldownReductionPct: "스킬쿨타임감소(%)", skillDamageBonusPct: "스킬피해증가(%)",
-    moveSpeedBonusPct: "이동속도증가(%)", horseMaxHealth: "말최대체력"
+    moveSpeedBonusPct: "이동속도증가(%)", horseMaxHealth: "말최대체력",
+    strengthBonus: "무력보너스", agilityBonus: "기민보너스",
+    vitalityBonus: "기력보너스", intelligenceBonus: "지모보너스",
+    attackPowerIncrease: "공격력증가량", moveSpeedIncrease: "이동속도증가량",
+    healthIncrease: "체력증가량", skillHasteIncrease: "절기가속증가량"
 };
 var SAMGUK_GAMCOM_NUMERIC_FIELDS = [
   "horseLevel", "weapon", "helmet", "armor", "shoes",

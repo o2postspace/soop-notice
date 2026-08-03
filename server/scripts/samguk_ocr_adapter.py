@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import base64
 import logging
 import math
 import os
@@ -44,10 +45,16 @@ MAX_PIXELS = 4096 * 2160
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PROFILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 INTEGER_RE = re.compile(r"^(\d{1,3}(?:,\d{3})*|\d{1,9})(?:\([+-]?\d+(?:\.\d+)?\))?$")
+QUANTITY_VALUE_RE = re.compile(
+    r"^(\d{1,3}(?:,\d{3})*|\d{1,9})(?:\(([+-]?\d+(?:\.\d+)?)\))?$",
+)
 DECIMAL_RE = re.compile(r"^\+?(\d{1,3}(?:,\d{3})*|\d{1,9})(?:\.(\d{1,4}))?$")
 PERCENT_RE = re.compile(r"^([+-]?\d{1,6}(?:\.\d{1,4})?)%$")
 ENHANCEMENT_RE = re.compile(r"(?:\(\s*)?\+\s*(\d{1,2})(?:\s*\))?|(?<!\d)(\d{1,2})\s*강")
 ENHANCEMENT_PAREN_RE = re.compile(r"\((\d{1,2})\)$")
+ENHANCEMENT_STAGE_RE = re.compile(
+    r"(?<!\d)(\d{1,2})단(?:계|게|제)?(?:→|->|=>|[〉>])?(\d{1,2})단(?:계|게|제)?",
+)
 HORSE_STAGE_RE = re.compile(r"(?<!\d)(\d{1,2})단계")
 HEALTH_RATIO_RE = re.compile(
     r"^\(?\s*(\d{1,3}(?:,\d{3})*|\d{1,7})\s*/\s*"
@@ -77,6 +84,18 @@ STAT_FIELDS = {
     "기민": "agility",
     "기력": "vitality",
     "지모": "intelligence",
+}
+STAT_BONUS_FIELDS = {
+    "strength": "strengthBonus",
+    "agility": "agilityBonus",
+    "vitality": "vitalityBonus",
+    "intelligence": "intelligenceBonus",
+}
+QUANTITY_DERIVED_FIELDS = {
+    "공격력증가량": "attackPowerIncrease",
+    "이동속도증가량": "moveSpeedIncrease",
+    "체력증가량": "healthIncrease",
+    "절기가속증가량": "skillHasteIncrease",
 }
 GEAR_FIELDS = {
     "무기": "weapon",
@@ -122,6 +141,7 @@ INFO_FIELD_ROWS = (
 )
 INFO_FIELD_ROW_INDEX = {field: row for field, row, _kind in INFO_FIELD_ROWS}
 FLEXIBLE_INFO_FIELDS = ("skillDamageBonusPct", "moveSpeedBonusPct")
+INFO_AFFILIATION_VALUES = ("위나라", "촉나라", "오나라")
 RED_HARE_HEALTH_LEVELS = {1700: 0, 1900: 1}
 ENHANCEMENT_MARKERS = (
     "장비강화", "강화성공확률", "단계하락확률", "강화비용", "강화하기",
@@ -129,6 +149,18 @@ ENHANCEMENT_MARKERS = (
 HORSE_PANEL_HEADERS = ("군마영",)
 HORSE_PANEL_TABS = ("장착", "강화", "합성")
 HUD_COMBAT_PROFILE = "hud-combat-v1"
+# 2026-08-03 실제 강화창의 각갑 아이콘(16x24 grayscale). 강화창 제목과
+# 3-scale 단계 합의가 동시에 성립할 때만 이 template을 사용한다.
+SHOES_ICON_TEMPLATE_WIDTH = 16
+SHOES_ICON_TEMPLATE_HEIGHT = 24
+SHOES_ICON_TEMPLATE_B64 = (
+    "HyAgICAgISEgISAhISAfHiAhISEjLSw4LyghISEgIB8gICAhITJQSToiHyEgICAeICAfHyY2SUlELB8hHyAfHh8g"
+    "ICI8PT1SQ1EnISAgHx4fHyAkOjg6YTlOHx8gHx8eHx8fJ0Q7Sls9SS8iIB8fHh8fHiw6O1NVOE0sISAfHx0fHx8i"
+    "My9KRCwyHx4fHx4dHx8eK04rIiEpTz8hHx8eHB4fHyA0KBogIUcwIR8fHhseHh8dOC0fHx0vKR4fHh0bHh4eHTUp"
+    "HR8eNTAeHh4dGx4eHiA9JiAeHywxIB4eHRweHhw4PCEfHh4zOh0dHh0cHR0dHh4dHh0dJycdHR0dGxwcHBwcHBwc"
+    "HBscHBwcHBoaGRoaGhoZGRkZGRkZGRkYKSgoKCgoKCgoKCgoKCcnKD09PT09PT0+Pj49PTw9OzweHR4eHx4eHx8f"
+    "Hh4dGyEpLSUgHx8fHyAgHx4fIyonGBolKiooKCYmJygrLSgcFRsXFhYbIyksLCgiHBcVFhYZ"
+)
 
 
 class AdapterError(Exception):
@@ -485,6 +517,50 @@ def _active_general_consensus(
     return value, max(token.confidence, min(score for _value, score in votes))
 
 
+def _aligned_health_label_quality(affiliation: Token, health_label: Token) -> Optional[float]:
+    """소속 바로 아래 체력 라벨인지 확인하고 위치 정렬 품질만 반환한다."""
+    step = health_label.cy - affiliation.cy
+    label_height = max(affiliation.height, health_label.height)
+    if not (0.80 * label_height <= step <= 4.0 * label_height):
+        return None
+    horizontal_error = abs(health_label.cx - affiliation.cx) / (2.0 * label_height)
+    if horizontal_error > 1.0:
+        return None
+    return max(0.0, 1.0 - horizontal_error)
+
+
+def _relative_consistency(values: Sequence[float], center: float, tolerance: float) -> float:
+    if not values or center <= 0 or tolerance <= 0:
+        return 0.0
+    worst_error = max(abs(value - center) for value in values) / (center * tolerance)
+    return max(0.0, 1.0 - min(1.0, worst_error))
+
+
+def _information_structure_confidence(
+    health_geometry_quality: float,
+    anchor_steps: Sequence[float],
+    refined_step: float,
+    value_geometry_qualities: Sequence[float],
+    anchor_count: int,
+) -> float:
+    """OCR label score와 별개인 행/열 구조 품질을 결과 confidence 상한으로 만든다.
+
+    작은 회색 라벨의 OCR score가 낮아도 구조 판별에는 참여할 수 있다. 대신
+    anchor 간격이나 값 열 배치가 흔들린 후보는 선명한 숫자라도 0.95 쓰기
+    기준을 넘지 못하도록 0.90~0.99 범위의 보수적인 상한을 적용한다.
+    """
+    anchor_geometry_quality = _relative_consistency(anchor_steps, refined_step, 0.35)
+    value_geometry_quality = min(value_geometry_qualities, default=0.0)
+    anchor_coverage = min(1.0, max(0, anchor_count) / 4.0)
+    covered_anchor_quality = anchor_geometry_quality * (0.85 + 0.15 * anchor_coverage)
+    geometry_quality = min(
+        max(0.0, min(1.0, health_geometry_quality)),
+        covered_anchor_quality,
+        value_geometry_quality,
+    )
+    return round(0.90 + 0.09 * geometry_quality, 5)
+
+
 def _information_panel(
     image: Any,
     normalized: Sequence[tuple[Token, str]],
@@ -492,16 +568,80 @@ def _information_panel(
 ) -> tuple[bool, list[dict[str, Any]]]:
     """구조가 고정된 캐릭터 정보창의 우측 값 열을 읽는다.
 
-    공격력/방어력처럼 작은 회색 라벨은 OCR이 자주 깨진다. 그래서 ``소속``과
-    바로 아래 ``체력`` 행으로 간격을 정하고, 최소 두 개의 정확한 보조 라벨과
-    네 개의 백분율 값이 같은 열에 있을 때만 행 기반 추출을 허용한다.
+    공격력/방어력처럼 작은 회색 라벨은 OCR이 자주 깨진다. 우선 ``소속``과
+    바로 아래 ``체력`` 행으로 간격을 정한다. 축소 화면에서 ``체력`` 라벨만
+    깨진 경우에는 ``정보`` 제목·나라 값·두 개 이상의 통계 라벨로 행 간격을
+    복원한다. 네 개의 백분율 값이 같은 열에 있을 때만 추출을 허용한다.
     """
     candidates: list[tuple[tuple[int, int, float], list[dict[str, Any]]]] = []
     affiliations = [token for token, text in normalized if text == "소속"]
     health_labels = [token for token, text in normalized if text == "체력"]
 
+    info_titles = [token for token, text in normalized if text == "정보"]
+    affiliation_values = [
+        token for token, text in normalized if text in INFO_AFFILIATION_VALUES
+    ]
+
     for affiliation in affiliations:
-        for health_label in health_labels:
+        candidate_health_labels = [
+            (health_label, quality)
+            for health_label in health_labels
+            if (quality := _aligned_health_label_quality(affiliation, health_label)) is not None
+        ]
+        if not candidate_health_labels:
+            title = next((
+                token for token in info_titles
+                if token.cy < affiliation.cy
+                and 0.5 * affiliation.height <= affiliation.cy - token.cy <= 8.0 * affiliation.height
+                and abs(token.cx - affiliation.cx) <= 12.0 * affiliation.height
+            ), None)
+            country = next((
+                token for token in affiliation_values
+                if token.x0 > affiliation.x1
+                and abs(token.cy - affiliation.cy) <= 1.2 * max(token.height, affiliation.height)
+                and token.cx - affiliation.cx <= 20.0 * affiliation.height
+            ), None)
+            inferred_steps = []
+            if title is not None and country is not None:
+                for token, text in normalized:
+                    field = INFO_LABEL_FIELDS.get(text)
+                    if field is None or field in FLEXIBLE_INFO_FIELDS:
+                        continue
+                    row = INFO_FIELD_ROW_INDEX[field]
+                    if row < 1 or token.cy <= affiliation.cy:
+                        continue
+                    step = (token.cy - affiliation.cy) / (row + 1)
+                    if 0.65 * affiliation.height <= step <= 5.0 * affiliation.height:
+                        inferred_steps.append(step)
+            if len(inferred_steps) >= 2:
+                inferred_steps.sort()
+                middle = len(inferred_steps) // 2
+                inferred_step = inferred_steps[middle] if len(inferred_steps) % 2 else (
+                    inferred_steps[middle - 1] + inferred_steps[middle]
+                ) / 2
+                consistent_steps = [
+                    step for step in inferred_steps
+                    if 0.75 * inferred_step <= step <= 1.35 * inferred_step
+                ]
+                if len(consistent_steps) >= 2:
+                    inference_quality = _relative_consistency(
+                        consistent_steps, inferred_step, 0.35,
+                    )
+                    half_height = affiliation.height / 2
+                    health_cy = affiliation.cy + inferred_step
+                    candidate_health_labels.append((
+                        Token(
+                            "체력",
+                            min(affiliation.confidence, title.confidence, country.confidence),
+                            affiliation.x0,
+                            health_cy - half_height,
+                            affiliation.x1,
+                            health_cy + half_height,
+                        ),
+                        inference_quality,
+                    ))
+
+        for health_label, health_geometry_quality in candidate_health_labels:
             step = health_label.cy - affiliation.cy
             label_height = max(affiliation.height, health_label.height)
             # 저해상도 frame에서는 두 detector bbox가 조금 겹쳐 중심 간격이
@@ -531,7 +671,10 @@ def _information_panel(
             _, health_value_token, health_value = max(health_values, key=lambda item: item[0])
             value_right = health_value_token.x1
             value_x_min = health_label.x1 + step
-            structural_confidence = min(affiliation.confidence, health_label.confidence)
+            health_value_geometry_quality = 1.0 - min(
+                1.0,
+                abs(health_value_token.cy - health_label.cy) / row_tolerance,
+            )
 
             anchor_fields: set[str] = set()
             anchor_steps: list[float] = []
@@ -615,10 +758,11 @@ def _information_panel(
             values: dict[str, tuple[Any, float]] = {
                 "healthStat": (health_value, health_value_token.confidence),
             }
+            value_geometry_qualities = [health_value_geometry_quality]
             for field, row, kind in INFO_FIELD_ROWS[1:]:
                 row = field_rows[field]
                 target_y = health_label.cy + row * refined_step
-                row_candidates: list[tuple[float, Token, Any]] = []
+                row_candidates: list[tuple[float, Token, Any, float]] = []
                 for token, _text in normalized:
                     if token.x0 < value_x_min:
                         continue
@@ -637,15 +781,21 @@ def _information_panel(
                     if parsed is None:
                         continue
                     distance = y_distance + right_distance * 0.20 - token.confidence * 0.01
-                    row_candidates.append((distance, token, parsed))
+                    y_quality = 1.0 - min(1.0, y_distance / row_tolerance)
+                    right_quality = 1.0 - min(1.0, right_distance / (3.0 * refined_step))
+                    geometry_quality = 0.75 * y_quality + 0.25 * right_quality
+                    row_candidates.append((distance, token, parsed, geometry_quality))
                 if row_candidates:
-                    _, value_token, value = min(row_candidates, key=lambda item: item[0])
+                    _, value_token, value, geometry_quality = min(
+                        row_candidates, key=lambda item: item[0],
+                    )
                     value_confidence = value_token.confidence
                     if field == "activeGeneral":
                         value, value_confidence = _active_general_consensus(
                             image, value_token, value, line_reader,
                         )
                     values[field] = (value, value_confidence)
+                    value_geometry_qualities.append(geometry_quality)
 
             percent_count = sum(
                 field in values for field, _row, kind in INFO_FIELD_ROWS if kind == "percent"
@@ -656,11 +806,18 @@ def _information_panel(
             if len(anchor_fields) < 2 or percent_count < 4 or numeric_count < 6:
                 continue
 
+            structural_confidence = _information_structure_confidence(
+                health_geometry_quality,
+                anchor_steps,
+                refined_step,
+                value_geometry_qualities,
+                len(anchor_fields),
+            )
             results = [
                 {
                     "field": field,
                     "value": values[field][0],
-                    "confidence": min(structural_confidence, values[field][1]),
+                    "confidence": min(values[field][1], structural_confidence),
                 }
                 for field, _row, _kind in INFO_FIELD_ROWS
                 if field in values
@@ -695,6 +852,117 @@ def _neighbor_value(label: Token, tokens: Sequence[Token]) -> Optional[tuple[int
         return None
     _, value, confidence = min(candidates)
     return value, confidence
+
+
+def _quantity_value(text: str) -> Optional[tuple[int, Optional[int | float]]]:
+    match = QUANTITY_VALUE_RE.fullmatch(compact_text(text))
+    if not match:
+        return None
+    base = int(match.group(1).replace(",", ""))
+    bonus: Optional[int | float] = None
+    if match.group(2) is not None:
+        parsed = float(match.group(2))
+        if parsed >= 0:
+            bonus = int(parsed) if parsed.is_integer() else parsed
+    return base, bonus
+
+
+def _neighbor_parsed_value(
+    label: Token,
+    tokens: Sequence[Token],
+    parser: Callable[[str], Any],
+    max_below_factor: float = 3.2,
+) -> Optional[tuple[Any, float]]:
+    candidates = []
+    for value_token in tokens:
+        value = parser(value_token.text)
+        if value is None or value_token is label:
+            continue
+        below = (
+            value_token.y0 >= label.y0
+            and value_token.y0 - label.y1 <= max_below_factor * label.height
+        )
+        aligned = abs(value_token.cx - label.cx) <= max(3.0 * label.height, label.width)
+        right = value_token.x0 >= label.x1 - label.height and value_token.x0 - label.x1 <= 12 * label.height
+        same_line = abs(value_token.cy - label.cy) <= 1.1 * max(label.height, value_token.height)
+        if below and aligned:
+            distance = max(0.0, value_token.y0 - label.y1) + abs(value_token.cx - label.cx) * 0.25
+        elif right and same_line:
+            distance = max(0.0, value_token.x0 - label.x1) + abs(value_token.cy - label.cy)
+        else:
+            continue
+        candidates.append((distance, value, min(label.confidence, value_token.confidence)))
+    if not candidates:
+        return None
+    _, value, confidence = min(candidates)
+    return value, confidence
+
+
+def _enhancement_stage_value(text: str) -> Optional[tuple[int, int]]:
+    match = ENHANCEMENT_STAGE_RE.search(compact_text(text))
+    if not match:
+        return None
+    current, target = int(match.group(1)), int(match.group(2))
+    if not (0 <= current <= 15 and target == current + 1 and target <= 15):
+        return None
+    return current, target
+
+
+def _enhancement_stage_consensus(
+    image: Any,
+    header: Token,
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> Optional[int]:
+    height, width = image.shape[:2]
+    unit = header.height
+    x0 = max(0, int(header.cx - 3.5 * unit))
+    x1 = min(width, int(header.cx + 3.5 * unit))
+    y0 = max(0, int(header.y1 + 2.0 * unit))
+    y1 = min(height, int(header.y1 + 4.0 * unit))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    crop = image[y0:y1, x0:x1]
+    votes = []
+    for scale in (1, 2, 4):
+        text, score = line_reader(crop, scale)
+        value = _enhancement_stage_value(text)
+        if value is None or not 0 <= score <= 1:
+            return None
+        votes.append(value)
+    return votes[0][0] if len(set(votes)) == 1 else None
+
+
+def _shoes_icon_similarity(image: Any, header: Token) -> float:
+    try:
+        import cv2
+        import numpy as np
+        height, width = image.shape[:2]
+        unit = header.height
+        x0 = max(0, int(header.cx - 0.64 * unit))
+        x1 = min(width, int(header.cx + 0.89 * unit))
+        y0 = max(0, int(header.y0 + 6.36 * unit))
+        y1 = min(height, int(header.y0 + 8.56 * unit))
+        if x1 <= x0 or y1 <= y0:
+            return 0.0
+        crop = image[y0:y1, x0:x1]
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
+        resized = cv2.resize(
+            gray,
+            (SHOES_ICON_TEMPLATE_WIDTH, SHOES_ICON_TEMPLATE_HEIGHT),
+            interpolation=cv2.INTER_AREA,
+        ).astype(np.float64)
+        template_bytes = base64.b64decode(SHOES_ICON_TEMPLATE_B64, validate=True)
+        template = np.frombuffer(template_bytes, dtype=np.uint8).reshape(
+            SHOES_ICON_TEMPLATE_HEIGHT, SHOES_ICON_TEMPLATE_WIDTH,
+        ).astype(np.float64)
+        resized -= resized.mean()
+        template -= template.mean()
+        denominator = float(np.linalg.norm(resized) * np.linalg.norm(template))
+        if denominator <= 1e-9:
+            return 0.0
+        return max(-1.0, min(1.0, float(np.sum(resized * template) / denominator)))
+    except Exception:
+        return 0.0
 
 
 def _enhancement_value(text: str) -> Optional[int]:
@@ -880,12 +1148,31 @@ def parse_panel(
     results: list[dict[str, Any]] = list(info_results)
     if stat_panel:
         for label, field in stat_labels:
-            match = _neighbor_value(label, tokens)
+            match = _neighbor_parsed_value(label, tokens, _quantity_value, max_below_factor=1.8)
             if match is not None and field not in {item["field"] for item in results}:
-                value, confidence = match
+                (value, bonus), confidence = match
                 results.append({"field": field, "value": value, "confidence": confidence})
+                bonus_field = STAT_BONUS_FIELDS[field]
+                if bonus is not None and bonus_field not in {item["field"] for item in results}:
+                    results.append({"field": bonus_field, "value": bonus, "confidence": confidence})
         # title + exact label/value 구조는 panel 판별에만 사용한다.
         # 숫자 confidence는 잘못 읽은 값도 반복될 수 있어 절대 상향하지 않는다.
+
+        derived_labels = [
+            (label, QUANTITY_DERIVED_FIELDS[text])
+            for label, text in normalized if text in QUANTITY_DERIVED_FIELDS
+        ]
+        full_derived_structure = len({field for _label, field in derived_labels}) == 4
+        for label, field in derived_labels:
+            match = _neighbor_parsed_value(label, tokens, _decimal_value)
+            if match is None or field in {item["field"] for item in results}:
+                continue
+            value, confidence = match
+            if full_derived_structure and confidence >= 0.85:
+                # 네 사분면의 exact label/value 구조는 작은 글자 raw score와 독립된
+                # 위치 근거다. 상향은 자동쓰기 최소치 부근(0.96)으로만 제한한다.
+                confidence = max(confidence, min(0.96, max(title.confidence for title in quantity_titles)))
+            results.append({"field": field, "value": value, "confidence": confidence})
 
     for title, text in normalized:
         combined = COMBINED_GEAR_TITLE_RE.fullmatch(text)
@@ -933,6 +1220,21 @@ def parse_panel(
     # 작은 단계 제목이 detector에서 빠져도 성공/하락/button/비용의 네 구조가
     # 동시에 있으면 강화 panel로 볼 수 있다. 장비 종류가 없으면 값은 비운다.
     enhancement_panel = marker_count >= 3 and (has_stage or marker_count >= 4)
+    enhancement_headers = [token for token, text in normalized if text == "장비강화"]
+    if enhancement_panel and enhancement_headers and "shoes" not in {item["field"] for item in results}:
+        header = max(enhancement_headers, key=lambda token: token.confidence)
+        current_stage = _enhancement_stage_consensus(image, header, line_reader)
+        icon_similarity = _shoes_icon_similarity(image, header)
+        if current_stage is not None and icon_similarity >= 0.82:
+            structural_confidence = min(
+                header.confidence,
+                0.95 + 0.04 * min(1.0, (icon_similarity - 0.82) / 0.18),
+            )
+            results.append({
+                "field": "shoes",
+                "value": current_stage,
+                "confidence": structural_confidence,
+            })
     panel_visible = info_panel or stat_panel or enhancement_panel or horse_panel or hud_visible or bool(results)
     order = {name: index for index, name in enumerate(
         (
@@ -942,6 +1244,8 @@ def parse_panel(
             "moveSpeedBonusPct", "horseMaxHealth", "horse", "horseLevel",
             "weapon", "helmet", "armor", "shoes",
             "strength", "agility", "vitality", "intelligence",
+            "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
+            "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
         )
     )}
     results.sort(key=lambda item: order.get(item["field"], len(order)))

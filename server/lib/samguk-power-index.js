@@ -1,11 +1,16 @@
 "use strict";
 
-const POWER_INDEX_VERSION = "v1.1";
+const POWER_INDEX_VERSION = "v1.5";
 const POWER_WEIGHTS = Object.freeze({
   stats: 30,
   gear: 35,
   engravings: 20,
   horse: 15,
+});
+const GEAR_INTERNAL_WEIGHTS = Object.freeze({
+  general: Object.freeze({ weapon: 0.60, armor: 0.30, shoes: 0.10 }),
+  // 군주 두갑은 일반 장비의 흉갑 가중치를 나눠 갖지 않고 추가 장비 보너스로 더한다.
+  ruler: Object.freeze({ weapon: 0.60, helmet: 0.15, armor: 0.30, shoes: 0.10 }),
 });
 const FIELD_STATES = Object.freeze({
   OBSERVED: "observed",
@@ -21,8 +26,32 @@ const POWER_STATUSES = Object.freeze({
 const RULER_JOBS = new Set(["조조", "유비", "손권"]);
 const STAT_FIELDS = Object.freeze(["strength", "agility", "vitality", "intelligence"]);
 const STATS_INTERNAL_WEIGHTS = Object.freeze({ level: 0.40, abilities: 0.60 });
+// 기량은 참가자 분포에 따라 점수가 흔들리지 않도록 네 수치의 실제 합계를
+// 고정 기준으로 선형 환산한다. 현재 공개 범위(최고 506)에 성장 여유를 둔다.
+const ABILITY_TOTAL_CAP = 600;
 const GEAR_MAX_LEVEL = 15;
 const HORSE_MAX_LEVEL = 80;
+// 공개 자료로 확인된 말 강화 허용 범위는 유지한다. 적토마 희귀도는 별도
+// 기본점수로만 반영해 다른 말의 강화 효율을 근거 없이 바꾸지 않는다.
+const HORSE_SCORING_LEVEL_CAP = HORSE_MAX_LEVEL;
+const RED_HARE_BASE_BONUS = 35;
+const HORSE_GRADE_BONUSES = Object.freeze({
+  "담운마": 0,
+  "금표마": 8.75,
+  "백룡마": 17.5,
+  "현풍마": 26.25,
+  "적토마": RED_HARE_BASE_BONUS,
+});
+const HORSE_NAME_ALIASES = new Map([
+  ["담운마", "담운마"],
+  ["금표마", "금표마"],
+  ["백룡마", "백룡마"],
+  ["현풍마", "현풍마"],
+  ["적토마", "적토마"],
+  ["적토", "적토마"],
+  ["赤兔馬", "적토마"],
+  ["赤兎馬", "적토마"],
+]);
 const ENGRAVING_PRIOR_N = 10;
 const GENERAL_ENGRAVING_SLOTS = 9;
 const RULER_ENGRAVING_SLOTS = 12;
@@ -42,6 +71,16 @@ function isRecord(value) {
 
 function normalizeJob(value) {
   return String(value || "").normalize("NFKC").trim();
+}
+
+function normalizeHorseName(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") fail("horse는 문자열이어야 합니다.");
+  const normalized = value.normalize("NFKC").trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+  if (normalized.length > 80) fail("horse 문자열은 80자 이하여야 합니다.", RangeError);
+  const alias = normalized.replace(/[\s._\-·ㆍ]+/g, "");
+  return HORSE_NAME_ALIASES.get(alias) || normalized;
 }
 
 function isRuler(member) {
@@ -155,6 +194,7 @@ function normalizeMember(member) {
     level: requiredField(member.level, "level"),
     stats,
     gear,
+    horse: normalizeHorseName(member.horse),
     horseLevel: requiredField(member.horseLevel, "horseLevel", HORSE_MAX_LEVEL),
     engravings: normalizeEngravings(member, ruler),
   });
@@ -227,37 +267,45 @@ function makeComponent(weight, lower, upper, coverage, details = {}) {
 function calculateStats(member, context) {
   const levelKnown = isKnown(member.level);
   const levelPercentile = levelKnown ? percentileRank(member.level.value, context.levels) : null;
-  const total = completeStatTotal(member);
-  const abilitiesKnown = total !== null;
-  const abilitiesPercentile = abilitiesKnown ? percentileRank(total, context.statTotals) : null;
+  const completeTotal = completeStatTotal(member);
+  const knownStats = STAT_FIELDS.filter(field => isKnown(member.stats[field]));
+  const knownTotal = knownStats.reduce((sum, field) => sum + member.stats[field].value, 0);
+  const abilitiesKnown = completeTotal !== null;
+  const abilityLower = 100 * Math.min(knownTotal, ABILITY_TOTAL_CAP) / ABILITY_TOTAL_CAP;
+  const abilityUpper = abilitiesKnown
+    ? abilityLower
+    : 100;
   const levelLower = levelKnown ? levelPercentile : 0;
   const levelUpper = levelKnown ? levelPercentile : 100;
   const abilityWeight = STATS_INTERNAL_WEIGHTS.abilities / STAT_FIELDS.length;
   const statPercentiles = {};
-  let lower = STATS_INTERNAL_WEIGHTS.level * levelLower;
-  let upper = STATS_INTERNAL_WEIGHTS.level * levelUpper;
+  let lower = STATS_INTERNAL_WEIGHTS.level * levelLower
+    + STATS_INTERNAL_WEIGHTS.abilities * abilityLower;
+  let upper = STATS_INTERNAL_WEIGHTS.level * levelUpper
+    + STATS_INTERNAL_WEIGHTS.abilities * abilityUpper;
   let coverageWeight = levelKnown ? STATS_INTERNAL_WEIGHTS.level : 0;
   for (const field of STAT_FIELDS) {
     const known = isKnown(member.stats[field]);
     const percentile = known ? percentileRank(member.stats[field].value, context.statValues[field]) : null;
     statPercentiles[field] = known ? round(percentile) : null;
-    lower += abilityWeight * (known ? percentile : 0);
-    upper += abilityWeight * (known ? percentile : 100);
     if (known) coverageWeight += abilityWeight;
   }
   const coverage = 100 * coverageWeight;
   return makeComponent(POWER_WEIGHTS.stats, lower, upper, coverage, {
     level: levelKnown ? round(member.level.value) : null,
     levelPercentile: levelKnown ? round(levelPercentile) : null,
-    abilityTotal: abilitiesKnown ? round(total) : null,
-    abilityPercentile: abilitiesKnown ? round(abilitiesPercentile) : null,
+    abilityTotal: round(knownTotal),
+    abilityComplete: abilitiesKnown,
+    abilityScore: round(abilityLower),
+    abilityCap: ABILITY_TOTAL_CAP,
+    abilityPercentile: null,
     statPercentiles: Object.freeze(statPercentiles),
   });
 }
 
 function normalizedLevel(field, maximum) {
   if (!isKnown(field)) return Object.freeze({ lower: 0, upper: 100, coverage: 0 });
-  const score = 100 * field.value / maximum;
+  const score = 100 * Math.min(field.value, maximum) / maximum;
   return Object.freeze({ lower: score, upper: score, coverage: 100 });
 }
 
@@ -273,28 +321,33 @@ function calculateGear(member) {
   const weapon = normalizedLevel(member.gear.weapon, GEAR_MAX_LEVEL);
   const armor = normalizedLevel(member.gear.armor, GEAR_MAX_LEVEL);
   const shoes = normalizedLevel(member.gear.shoes, GEAR_MAX_LEVEL);
+  const weights = member.ruler ? GEAR_INTERNAL_WEIGHTS.ruler : GEAR_INTERNAL_WEIGHTS.general;
   const parts = [
-    { weight: 0.50, ...weapon },
-    { weight: member.ruler ? 0.15 : 0.30, ...armor },
-    { weight: 0.20, ...shoes },
+    { weight: weights.weapon, ...weapon },
+    { weight: weights.armor, ...armor },
+    { weight: weights.shoes, ...shoes },
   ];
   let helmet = null;
   if (member.ruler) {
     helmet = normalizedLevel(member.gear.helmet, GEAR_MAX_LEVEL);
-    parts.push({ weight: 0.15, ...helmet });
+    parts.push({ weight: weights.helmet, ...helmet });
   }
   const total = weightedParts(parts);
+  const totalWeight = parts.reduce((sum, part) => sum + part.weight, 0);
   return makeComponent(
     POWER_WEIGHTS.gear,
     total.lower,
     total.upper,
-    total.coverage,
+    total.coverage / totalWeight,
     {
       weapon: round((weapon.lower + weapon.upper) / 2),
+      helmet: helmet ? round((helmet.lower + helmet.upper) / 2) : null,
+      armor: round((armor.lower + armor.upper) / 2),
       defense: round(member.ruler
         ? ((armor.lower + armor.upper) + (helmet.lower + helmet.upper)) / 4
         : (armor.lower + armor.upper) / 2),
       shoes: round((shoes.lower + shoes.upper) / 2),
+      weights,
     },
   );
 }
@@ -344,9 +397,25 @@ function calculateEngravings(member, context) {
 }
 
 function calculateHorse(member) {
-  const level = normalizedLevel(member.horseLevel, HORSE_MAX_LEVEL);
-  return makeComponent(POWER_WEIGHTS.horse, level.lower, level.upper, level.coverage, {
+  const level = normalizedLevel(member.horseLevel, HORSE_SCORING_LEVEL_CAP);
+  const isRedHare = member.horse === "적토마";
+  const gradeNames = Object.keys(HORSE_GRADE_BONUSES);
+  const gradeIndex = gradeNames.indexOf(member.horse);
+  const baseBonus = gradeIndex >= 0 ? HORSE_GRADE_BONUSES[member.horse] : 0;
+  const lower = Math.min(100, level.lower + baseBonus);
+  const upper = Math.min(100, level.upper + baseBonus);
+  return makeComponent(POWER_WEIGHTS.horse, lower, upper, level.coverage, {
+    horse: member.horse,
+    isRedHare,
+    gradeRank: gradeIndex >= 0 ? gradeIndex + 1 : null,
+    gradeCount: gradeNames.length,
+    baseBonus,
     level: isKnown(member.horseLevel) ? round(member.horseLevel.value) : null,
+    scoringLevel: isKnown(member.horseLevel)
+      ? round(Math.min(member.horseLevel.value, HORSE_SCORING_LEVEL_CAP))
+      : null,
+    scoringCap: HORSE_SCORING_LEVEL_CAP,
+    enhancementScore: round((level.lower + level.upper) / 2),
   });
 }
 
@@ -407,15 +476,21 @@ function calculateRosterPowerIndexes(roster) {
 }
 
 module.exports = {
+  ABILITY_TOTAL_CAP,
   ENGRAVING_PRIOR_N,
   FIELD_STATES,
+  GEAR_INTERNAL_WEIGHTS,
   GEAR_MAX_LEVEL,
   HORSE_MAX_LEVEL,
+  HORSE_SCORING_LEVEL_CAP,
+  HORSE_GRADE_BONUSES,
   POWER_INDEX_VERSION,
   POWER_STATUSES,
   POWER_WEIGHTS,
+  RED_HARE_BASE_BONUS,
   STATS_INTERNAL_WEIGHTS,
   calculatePowerIndex,
   calculateRosterPowerIndexes,
   createPowerIndexContext,
+  normalizeHorseName,
 };

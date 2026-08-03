@@ -71,6 +71,14 @@ function snapshot(overrides = {}) {
       skillDamageBonusPct: 22.25,
       moveSpeedBonusPct: 6.5,
       horseMaxHealth: 1900,
+      strengthBonus: 24.4,
+      agilityBonus: 0,
+      vitalityBonus: 12.2,
+      intelligenceBonus: 9.1,
+      attackPowerIncrease: 42.7,
+      moveSpeedIncrease: 0,
+      healthIncrease: 366,
+      skillHasteIncrease: 20,
     },
     observedAt: "2026-08-02T06:00:00.000Z",
     verification: "broadcast-repeat",
@@ -317,7 +325,7 @@ test("appendSnapshots는 90개를 한 lock과 한 상태 조회로 분류한 뒤
   assert.equal(batchData.length, 89);
   assert.deepEqual(
     batchData.map(item => item.range),
-    Array.from({ length: 89 }, (_value, index) => `'관측입력'!A${index + 4}:AP${index + 4}`),
+    Array.from({ length: 89 }, (_value, index) => `'관측입력'!A${index + 4}:AX${index + 4}`),
   );
   assert.ok(batchData.every(item => item.majorDimension === "ROWS" && item.values.length === 1));
   assert.deepEqual(readbackRanges, batchData.map(item => item.range));
@@ -422,7 +430,7 @@ test("appendSnapshots는 기존 ID 충돌이나 공간 부족이면 batchUpdate 
   assert.equal(fullWrites, 0);
 });
 
-test("OAuth writer는 첫 A:AP 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {
+test("OAuth writer는 첫 A:AX 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const indexRows = Array.from({ length: 90 }, (_value, index) => [
     `OBS-SEED-${String(index + 1).padStart(4, "0")}`,
@@ -454,9 +462,9 @@ test("OAuth writer는 첫 A:AP 완전 빈행만 정확히 쓰고 전체 행을 �
       }
       if (init.method === "PUT") {
         writtenRow = JSON.parse(init.body).values[0];
-        return response({ updatedRows: 1, updatedRange: "관측입력!A92:AP92" });
+        return response({ updatedRows: 1, updatedRange: "관측입력!A92:AX92" });
       }
-      if (url.includes("A92%3AAP92")) return response({ values: [writtenRow] });
+      if (url.includes("A92%3AAX92")) return response({ values: [writtenRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
@@ -467,9 +475,9 @@ test("OAuth writer는 첫 A:AP 완전 빈행만 정확히 쓰고 전체 행을 �
     appendedRow: 92,
   });
   assert.equal(released, 1);
-  assert.equal(OBSERVATION_LAST_COLUMN, "AP");
+  assert.equal(OBSERVATION_LAST_COLUMN, "AX");
   assert.equal(writtenRow.length, EXPECTED_HEADERS.length);
-  assert.equal(EXPECTED_HEADERS.length, 42);
+  assert.equal(EXPECTED_HEADERS.length, 50);
   assert.equal(writtenRow[0], "OBS-CROSS-1234567890ABCDEF");
   assert.equal(writtenRow[1], "P001");
   assert.equal(writtenRow[22], 95);
@@ -482,6 +490,7 @@ test("OAuth writer는 첫 A:AP 완전 빈행만 정확히 쓰고 전체 행을 �
   assert.equal(writtenRow[30], 110);
   assert.deepEqual(writtenRow.slice(31), [
     176.9, "조조", 88.25, 12.5, 7.25, 18.5, 150.75, 4.5, 22.25, 6.5, 1900,
+    24.4, 0, 12.2, 9.1, 42.7, 0, 366, 20,
   ]);
   assert.equal(requests.filter(item => item.method === "PUT").length, 1);
 });
@@ -503,7 +512,7 @@ test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다"
         { values: [["OBS-CROSS-1234567890ABCDEF", "P001"]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AAP2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAX2")) return response({ values: [expectedRow] });
       assert.notEqual(init.method, "PUT");
       throw new Error(`unexpected request: ${url}`);
     },
@@ -519,7 +528,7 @@ test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다"
   });
 });
 
-test("첫 완전 빈 A:AP 행만 고르고 쓰기 직전 부분 점유를 다시 확인한다", async (t) => {
+test("첫 완전 빈 A:AX 행만 고르고 쓰기 직전 부분 점유를 다시 확인한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const partialRow = Array(EXPECTED_HEADERS.length).fill("");
   partialRow[23] = "수동 메모";
@@ -545,13 +554,13 @@ test("첫 완전 빈 A:AP 행만 고르고 쓰기 직전 부분 점유를 다시
         { values: [partialRow, []] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A3%3AAP3") && init.method !== "PUT") {
+      if (url.includes("A3%3AAX3") && init.method !== "PUT") {
         return response({ values: [writtenRow] });
       }
       if (init.method === "PUT") {
         putCalls += 1;
         writtenRow = JSON.parse(init.body).values[0];
-        return response({ updatedRows: 1, updatedRange: "관측입력!A3:AP3" });
+        return response({ updatedRows: 1, updatedRange: "관측입력!A3:AX3" });
       }
       throw new Error(`unexpected request: ${url}`);
     },
@@ -563,7 +572,7 @@ test("첫 완전 빈 A:AP 행만 고르고 쓰기 직전 부분 점유를 다시
     appendedRow: 3,
   });
   assert.equal(putCalls, 1);
-  assert.ok(requestedUrls.some(url => url.includes("A2%3AAP5001")));
+  assert.ok(requestedUrls.some(url => url.includes("A2%3AAX5001")));
   assert.ok(requestedUrls.some(url => url.includes("valueRenderOption=FORMULA")));
 
   let racePutCalls = 0;
@@ -586,7 +595,7 @@ test("첫 완전 빈 A:AP 행만 고르고 쓰기 직전 부분 점유를 다시
         { values: [[]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AAP2") && init.method !== "PUT") {
+      if (url.includes("A2%3AAX2") && init.method !== "PUT") {
         return response({ values: [partialRow] });
       }
       if (init.method === "PUT") racePutCalls += 1;
@@ -628,7 +637,7 @@ test("비JSON 429·5xx는 최대 3회 안에서 재시도하고 성공 응답만
         { values: [[snapshot().observationId, "P001"]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AAP2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAX2")) return response({ values: [expectedRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
@@ -695,7 +704,7 @@ test("401은 access token을 한 번만 새로 받고 요청을 다시 인증한
         { values: [[snapshot().observationId, "P001"]] },
         { values: [["P001"]] },
       ] });
-      if (url.includes("A2%3AAP2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAX2")) return response({ values: [expectedRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
