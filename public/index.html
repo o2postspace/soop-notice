@@ -3760,16 +3760,21 @@ function renderSamgukPowerRanking() {
     if (!component) return '—';
     let detail = '';
     if (key === 'stats') {
-      detail = 'Lv ' + samgukTextValue(component.level) + ' · 무 ' + samgukTextValue(member.strength)
+      detail = 'Lv ' + samgukTextValue(component.level) + ' · 기량합 ' + samgukTextValue(component.abilityTotal)
+        + ' · 합산환산 ' + samgukTextValue(component.abilityScore) + '/100'
+        + ' · 무 ' + samgukTextValue(member.strength)
         + ' · 민 ' + samgukTextValue(member.agility) + ' · 력 ' + samgukTextValue(member.vitality)
         + ' · 모 ' + samgukTextValue(member.intelligence);
     } else if (key === 'gear') {
-      detail = '무기 ' + samgukTextValue(member.weapon, '강') + ' · 흉갑 ' + samgukTextValue(member.armor, '강')
+      detail = '무기 ' + samgukTextValue(member.weapon, '강')
+        + (hasSamgukValue(member.helmet) ? ' · 두갑 ' + samgukTextValue(member.helmet, '강') : '')
+        + ' · 흉갑 ' + samgukTextValue(member.armor, '강')
         + ' · 각갑 ' + samgukTextValue(member.shoes, '강');
     } else if (key === 'engravings') {
       detail = '장착 ' + samgukTextValue(component.filledSlots) + '/' + samgukTextValue(component.eligibleSlots);
     } else if (key === 'horse') {
-      detail = '강화 ' + samgukTextValue(component.level) + '/80';
+      detail = (component.horse ? samgukTextValue(component.horse) + ' 등급 +' + samgukTextValue(component.baseBonus) + ' · ' : '')
+        + '강화 ' + samgukTextValue(component.scoringLevel) + '/' + samgukTextValue(component.scoringCap);
     }
     return '<b>' + formatScore(component.score) + '</b><br><span class="samguk-rank-coverage">'
       + escapeHtml(detail) + ' · ' + formatCoverage(component.coverage) + '</span>';
@@ -3810,13 +3815,23 @@ function renderSamgukPowerRanking() {
       metric('절기증', member.skillDamageBonusPct, '%'),
       metric('이속', member.moveSpeedBonusPct, '%'),
     ].filter(Boolean);
-    const groups = [primary, character, rates, skillRates].filter(function(group) { return group.length; });
-    if (!groups.length) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1 미반영</span>';
+    const quantity = [
+      metric('무력+', member.strengthBonus),
+      metric('기민+', member.agilityBonus),
+      metric('기력+', member.vitalityBonus),
+      metric('지모+', member.intelligenceBonus),
+      metric('공증량', member.attackPowerIncrease),
+      metric('이속량', member.moveSpeedIncrease),
+      metric('체증량', member.healthIncrease),
+      metric('절기가속', member.skillHasteIncrease),
+    ].filter(Boolean);
+    const groups = [primary, character, rates, skillRates, quantity].filter(function(group) { return group.length; });
+    if (!groups.length) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1.5 미반영</span>';
     const lines = groups.map(function(group, index) {
       const value = escapeHtml(group.join(' · '));
       return index === 0 ? '<b>' + value + '</b>' : '<span class="samguk-rank-coverage">' + value + '</span>';
     });
-    lines[lines.length - 1] += ' <span class="samguk-rank-coverage">· 파워 v1 미반영</span>';
+    lines[lines.length - 1] += ' <span class="samguk-rank-coverage">· 파워 v1.5 미반영</span>';
     return lines.join('<br>');
   }
 
@@ -3869,14 +3884,15 @@ function renderSamgukPowerRanking() {
     return section;
   }
 
-  let html = '<div class="samguk-ranking-guide"><b>파워 v1.1 · 표시단위 ×' + POWER_DISPLAY_MULTIPLIER + '</b> · '
+  let html = '<div class="samguk-ranking-guide"><b>파워 v1.5 · 표시단위 ×' + POWER_DISPLAY_MULTIPLIER + '</b> · '
     + '<b>레벨·기량 30%</b> · <b>장비 강화 35%</b> · <b>각인 20%</b> · <b>말 강화 15%</b> · 확인된 구성요소의 하한점수로 정렬<br>'
     + escapeHtml(populationText) + ' · '
     + '<span class="samguk-rank-coverage">' + escapeHtml(scopeLabel) + ' · 현재 순위 ' + ranked.length + '명 · 품질 확정 '
     + confirmedCount + '명 · 잠정 ' + provisionalCount + '명 · 수집 중 ' + collecting.length + '명</span>'
     + '<details class="samguk-power-method"><summary>산식 기준</summary><span>'
     + '확인되지 않은 빈칸은 관측된 0으로 바꾸거나 임의 가중치로 확대하지 않습니다. '
-    + '최대 HP·평타 관측은 파워 v1 미반영이며, 주문서 재고는 아직 사용하지 않은 자원이므로 제외합니다.'
+    + '기량은 무력·기민·기력·지모 실제 합계를 고정 600점 기준으로 선형 반영합니다. 장비는 무기 60%·흉갑 30%·각갑 10%이며 군주 두갑은 15% 추가 보너스입니다. 말은 담운마·금표마·백룡마·현풍마·적토마 5등급과 강화를 함께 반영합니다. '
+    + '최대 HP·평타·정보창 동적 수치는 파워 v1.5 미반영이며, 주문서 재고는 아직 사용하지 않은 자원이므로 제외합니다.'
     + '</span></details>'
     + '</div>';
 
@@ -5126,7 +5142,7 @@ document.addEventListener('click', function(e) {
   if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
 });
 </script>
-<script src="/samguk.js?v=20260803b"></script>
+<script src="/samguk.js?v=20260803d"></script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

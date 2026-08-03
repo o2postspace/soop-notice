@@ -41,7 +41,7 @@ test("공개 시트 설치기는 출력·제안·승인원장을 분리하고 �
 
 test("공개 출력은 stale이 아닌 고유 90명 API만 받아 사이트와 같은 점수를 125배 표시한다", () => {
   const text = source();
-  assert.match(text, /SAMGUK_PUBLIC_API_URL = "https:\/\/api\.soopnotice\.com\/api\/samguk"/);
+  assert.match(text, /SAMGUK_PUBLIC_API_URL = "https:\/\/api\.soopnotice\.com\/api\/samguk\?refresh=1"/);
   assert.match(text, /SAMGUK_PUBLIC_EXPECTED_MEMBER_COUNT = 90/);
   assert.match(text, /payload\.stale !== false/);
   assert.match(text, /payload\.members\.length !== SAMGUK_PUBLIC_EXPECTED_MEMBER_COUNT/);
@@ -49,7 +49,10 @@ test("공개 출력은 stale이 아닌 고유 90명 API만 받아 사이트와 �
   assert.match(text, /Object\.keys\(seen\)\.length !== SAMGUK_PUBLIC_EXPECTED_MEMBER_COUNT/);
   assert.match(text, /SAMGUK_PUBLIC_POWER_SCALE = 125/);
   assert.match(text, /Math\.round\(member\.powerRankScore \* SAMGUK_PUBLIC_POWER_SCALE\)/);
-  assert.match(text, /everyMinutes\(15\)/);
+  assert.match(text, /SAMGUK_PUBLIC_SYNC_INTERVAL_MINUTES = 5/);
+  assert.match(text, /everyMinutes\(SAMGUK_PUBLIC_SYNC_INTERVAL_MINUTES\)/);
+  assert.match(text, /레벨·강화·무\/민\/기\/지·최대체력·공격력은 확인된 최고값/);
+  assert.match(text, /동적 정보창 수치는 최신 관측값/);
   assert.match(text, /LockService\.getScriptLock\(\)/);
   assert.match(text, /healthStat: number\("healthStat", 1000000\)/);
   assert.match(text, /horseMaxHealth: number\("horseMaxHealth", 1000000\)/);

@@ -202,15 +202,17 @@ test("Gamcom RSC text에서 30명 세력 데이터를 정규화한다", () => {
   });
 });
 
-test("Node와 Apps Script의 Gamcom 완전 스냅샷 계약은 같은 29개 필드다", () => {
+test("Node와 Apps Script의 Gamcom 완전 스냅샷 계약은 같은 37개 필드다", () => {
   const context = loadGamcomAppsScript();
   const appsScriptFields = Array.from(context.SAMGUK_GAMCOM_SNAPSHOT_FIELDS);
 
-  assert.equal(SNAPSHOT_FIELDS.length, 29);
+  assert.equal(SNAPSHOT_FIELDS.length, 37);
   assert.deepEqual(appsScriptFields, Array.from(SNAPSHOT_FIELDS));
   assert.ok(SNAPSHOT_FIELDS.includes("maxHealth"));
   assert.ok(SNAPSHOT_FIELDS.includes("attackPower"));
   assert.ok(SNAPSHOT_FIELDS.includes("horseMaxHealth"));
+  assert.ok(SNAPSHOT_FIELDS.includes("strengthBonus"));
+  assert.ok(SNAPSHOT_FIELDS.includes("skillHasteIncrease"));
 });
 
 test("HTML의 self.__next_f.push 조각에서도 RSC rows를 추출한다", () => {
@@ -536,7 +538,7 @@ test("변경된 최댓값만 시트+Gamcom 기준값 스냅샷으로 만든다",
 
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].playerId, "P001");
-  assert.equal(Object.keys(snapshots[0].fields).length, 29);
+  assert.equal(Object.keys(snapshots[0].fields).length, 37);
   assert.equal(snapshots[0].fields.weapon, 9);
   assert.equal(snapshots[0].fields.maxHealth, 1575);
   assert.equal(snapshots[0].fields.attackPower, 110);

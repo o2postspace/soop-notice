@@ -4,6 +4,11 @@ const fetchNotices = require("./fetch-notices");
 const parseHot = require("./parse-hot");
 const cleanupCommunity = require("./cleanup-community");
 const {
+  DEFAULT_MIN_INTERVAL_MS: DEFAULT_FMKOREA_MIN_INTERVAL_MS,
+  loadAliasesByPlayerFile,
+  runFmkoreaGearMonitor,
+} = require("../lib/samguk-fmkorea-gear-monitor");
+const {
   DEFAULT_QUEUE_PATH: DEFAULT_SAMGUK_QUEUE_PATH,
   promote: promoteSamgukObservations,
 } = require("../scripts/samguk-promote-observations");
@@ -32,16 +37,42 @@ function samgukTrackingConfig(env = process.env) {
   });
 }
 
+function samgukFmkoreaConfig(env = process.env, tracking = samgukTrackingConfig(env)) {
+  const enabled = env.SAMGUK_FMKOREA_MONITOR_ENABLED === "1";
+  const stateValue = String(env.SAMGUK_FMKOREA_STATE_PATH || "").trim();
+  const aliasValue = String(env.SAMGUK_FMKOREA_ALIASES_PATH || "").trim();
+  const aliasPath = aliasValue
+    ? (path.isAbsolute(aliasValue) ? aliasValue : path.resolve(__dirname, "..", aliasValue))
+    : null;
+  const intervalValue = Number(env.SAMGUK_FMKOREA_MIN_INTERVAL_MS);
+  return Object.freeze({
+    enabled,
+    queuePath: tracking.queuePath,
+    statePath: stateValue
+      ? (path.isAbsolute(stateValue) ? stateValue : path.resolve(__dirname, "..", stateValue))
+      : path.join(path.dirname(tracking.queuePath), "fmkorea-gear-monitor-state.json"),
+    minIntervalMs: Number.isSafeInteger(intervalValue)
+      && intervalValue >= DEFAULT_FMKOREA_MIN_INTERVAL_MS
+      && intervalValue <= 60 * 60_000
+      ? intervalValue
+      : DEFAULT_FMKOREA_MIN_INTERVAL_MS,
+    aliasesByPlayer: enabled && aliasPath ? loadAliasesByPlayerFile(aliasPath) : {},
+  });
+}
+
 function createRunner({
   fetchNoticesFn = fetchNotices,
   parseHotFn = parseHot,
   promoteSamgukFn = promoteSamgukObservations,
+  fmkoreaMonitorFn = runFmkoreaGearMonitor,
   samgukTracking = samgukTrackingConfig(),
+  samgukFmkorea = samgukFmkoreaConfig(process.env, samgukTracking),
   logger = console,
 } = {}) {
   const fetchRuns = new Map();
   let parseRun = null;
   let samgukPromotionRun = null;
+  let samgukFmkoreaRun = null;
 
   function runFetch(mode) {
     if (fetchRuns.has(mode)) return fetchRuns.get(mode);
@@ -96,6 +127,35 @@ function createRunner({
     return samgukPromotionRun;
   }
 
+  function runSamgukFmkoreaMonitor() {
+    if (!samgukFmkorea.enabled) return Promise.resolve(null);
+    if (samgukFmkoreaRun) return samgukFmkoreaRun;
+
+    samgukFmkoreaRun = Promise.resolve()
+      .then(() => fmkoreaMonitorFn({
+        queuePath: samgukFmkorea.queuePath,
+        statePath: samgukFmkorea.statePath,
+        minIntervalMs: samgukFmkorea.minIntervalMs,
+        aliasesByPlayer: samgukFmkorea.aliasesByPlayer,
+      }))
+      .then((result) => {
+        if (result && typeof logger.info === "function") {
+          logger.info(
+            `[cron] samguk fmkorea: ${result.skipped ? "skipped" : "collected"}`
+            + ` searched=${result.searched ?? 0} fetched=${result.fetched ?? 0}`
+            + ` queued=${result.inserted ?? 0} errors=${result.errors?.length ?? 0}`,
+          );
+        }
+        return result;
+      })
+      .catch((error) => {
+        logger.error("[cron] samguk fmkorea failed:", error.message);
+        return null;
+      })
+      .finally(() => { samgukFmkoreaRun = null; });
+    return samgukFmkoreaRun;
+  }
+
   async function runCycle({ includeRest = false } = {}) {
     const fetchTasks = [runFetch("popular")];
     if (includeRest) fetchTasks.push(runFetch("rest"));
@@ -103,7 +163,13 @@ function createRunner({
     await runParse();
   }
 
-  return { runCycle, runSamgukPromotion, samgukTracking };
+  return {
+    runCycle,
+    runSamgukFmkoreaMonitor,
+    runSamgukPromotion,
+    samgukFmkorea,
+    samgukTracking,
+  };
 }
 
 function start() {
@@ -115,7 +181,7 @@ function start() {
     if (stopped) return;
     const includeRest = new Date().getMinutes() % 30 === 0;
     void runner.runCycle({ includeRest });
-    void runner.runSamgukPromotion();
+    void runner.runSamgukFmkoreaMonitor().then(() => runner.runSamgukPromotion());
   });
   const cleanupTask = cron.schedule("17 4 * * *", () => {
     if (stopped) return;
@@ -126,12 +192,13 @@ function start() {
 
   // 재기동 직후에도 전체 공지를 먼저 갱신하고 캘린더를 백필한다.
   void runner.runCycle({ includeRest: true });
-  void runner.runSamgukPromotion();
+  void runner.runSamgukFmkoreaMonitor().then(() => runner.runSamgukPromotion());
 
   const trackingMode = runner.samgukTracking.enabled
     ? (runner.samgukTracking.write ? "write" : "dry-run")
     : "disabled";
-  console.log(`[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, samguk=${trackingMode}, bootstrap enabled`);
+  const fmkoreaMode = runner.samgukFmkorea.enabled ? "collect" : "disabled";
+  console.log(`[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, samguk=${trackingMode}, fmkorea=${fmkoreaMode}, bootstrap enabled`);
 
   return () => {
     if (stopped) return;
@@ -143,4 +210,4 @@ function start() {
   };
 }
 
-module.exports = { start, createRunner, samgukTrackingConfig };
+module.exports = { start, createRunner, samgukFmkoreaConfig, samgukTrackingConfig };

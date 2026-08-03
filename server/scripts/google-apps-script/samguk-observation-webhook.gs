@@ -19,7 +19,9 @@ var SAMGUK_REQUIRED_FIELDS = [
   "attackPower", "basicAttackDamage", "basicAttackSampleCount", "basicAttackTarget", "combatConditions",
   "healthStat", "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
   "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
-  "moveSpeedBonusPct", "horseMaxHealth"
+  "moveSpeedBonusPct", "horseMaxHealth", "strengthBonus", "agilityBonus", "vitalityBonus",
+  "intelligenceBonus", "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease",
+  "skillHasteIncrease"
 ];
 var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   level: 10000,
@@ -46,13 +48,23 @@ var SAMGUK_NUMERIC_FIELD_MAXIMUMS = {
   skillCooldownReductionPct: 1000,
   skillDamageBonusPct: 1000,
   moveSpeedBonusPct: 1000,
-  horseMaxHealth: 1000000
+  horseMaxHealth: 1000000,
+  strengthBonus: 1000000,
+  agilityBonus: 1000000,
+  vitalityBonus: 1000000,
+  intelligenceBonus: 1000000,
+  attackPowerIncrease: 1000000,
+  moveSpeedIncrease: 1000000,
+  healthIncrease: 1000000,
+  skillHasteIncrease: 1000000
 };
 var SAMGUK_DECIMAL_NUMERIC_FIELDS = [
   "powerScore", "attackPower", "basicAttackDamage", "healthStat", "defense",
   "attackPowerBonusPct", "damageReductionPct",
   "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
-  "moveSpeedBonusPct"
+  "moveSpeedBonusPct", "strengthBonus", "agilityBonus", "vitalityBonus",
+  "intelligenceBonus", "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease",
+  "skillHasteIncrease"
 ];
 
 function doGet() {
@@ -143,7 +155,11 @@ function samgukAppendSnapshot_(snapshot) {
     defense: "방어력", attackPowerBonusPct: "공격력증가(%)", damageReductionPct: "피해감소(%)",
     criticalChancePct: "치명타확률(%)", criticalDamagePct: "치명타피해(%)",
     skillCooldownReductionPct: "스킬쿨타임감소(%)", skillDamageBonusPct: "스킬피해증가(%)",
-    moveSpeedBonusPct: "이동속도증가(%)", horseMaxHealth: "말최대체력"
+    moveSpeedBonusPct: "이동속도증가(%)", horseMaxHealth: "말최대체력",
+    strengthBonus: "무력보너스", agilityBonus: "기민보너스",
+    vitalityBonus: "기력보너스", intelligenceBonus: "지모보너스",
+    attackPowerIncrease: "공격력증가량", moveSpeedIncrease: "이동속도증가량",
+    healthIncrease: "체력증가량", skillHasteIncrease: "절기가속증가량"
   };
   var record = {
     observation_id: snapshot.observationId,
@@ -193,7 +209,7 @@ function samgukAppendSnapshot_(snapshot) {
 }
 
 /**
- * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 A:AP 전체가 비어 있는 첫 행만 사용합니다.
+ * 부분 작성 행이나 구형 수식이 남은 행을 덮지 않도록 전체 행이 비어 있는 첫 행만 사용합니다.
  */
 function samgukFindFirstEmptyObservationRow_(sheet, columnCount) {
   if (sheet.getMaxRows() < SAMGUK_MAX_OBSERVATION_ROW) {

@@ -388,6 +388,14 @@ function enrichMembersWithPowerIndex(members) {
     skillDamageBonusPct: member.skillDamageBonusPct ?? null,
     moveSpeedBonusPct: member.moveSpeedBonusPct ?? null,
     horseMaxHealth: member.horseMaxHealth ?? null,
+    strengthBonus: member.strengthBonus ?? null,
+    agilityBonus: member.agilityBonus ?? null,
+    vitalityBonus: member.vitalityBonus ?? null,
+    intelligenceBonus: member.intelligenceBonus ?? null,
+    attackPowerIncrease: member.attackPowerIncrease ?? null,
+    moveSpeedIncrease: member.moveSpeedIncrease ?? null,
+    healthIncrease: member.healthIncrease ?? null,
+    skillHasteIncrease: member.skillHasteIncrease ?? null,
     engravings: Array.isArray(member.engravings) ? member.engravings : [],
     equipmentObservedAt: member.equipmentObservedAt || null,
     equipmentEvidence: member.equipmentEvidence || null,
@@ -493,6 +501,14 @@ function parseMembersCsv(text) {
     skillDamageBonusPct: { aliases: ["스킬피해증가(%)", "스킬피해증가율", "skillDamageBonusPct"], required: false },
     moveSpeedBonusPct: { aliases: ["이동속도증가(%)", "이동속도증가율", "moveSpeedBonusPct"], required: false },
     horseMaxHealth: { aliases: ["말최대체력", "말체력", "horseMaxHealth"], required: false },
+    strengthBonus: { aliases: ["무력보너스", "strengthBonus"], required: false },
+    agilityBonus: { aliases: ["기민보너스", "agilityBonus"], required: false },
+    vitalityBonus: { aliases: ["기력보너스", "vitalityBonus"], required: false },
+    intelligenceBonus: { aliases: ["지모보너스", "intelligenceBonus"], required: false },
+    attackPowerIncrease: { aliases: ["공격력증가량", "attackPowerIncrease"], required: false },
+    moveSpeedIncrease: { aliases: ["이동속도증가량", "moveSpeedIncrease"], required: false },
+    healthIncrease: { aliases: ["체력증가량", "healthIncrease"], required: false },
+    skillHasteIncrease: { aliases: ["절기가속증가량", "skillHasteIncrease"], required: false },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["최근근거", "근거", "근거(URL/타임코드)"], required: true },
     reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
@@ -577,6 +593,30 @@ function parseMembersCsv(text) {
       ),
       horseMaxHealth: nullableNumber(
         cell(row, columns.horseMaxHealth), "말최대체력", rowNumber, warnings, 1_000_000,
+      ),
+      strengthBonus: nullableNumber(
+        cell(row, columns.strengthBonus), "무력보너스", rowNumber, warnings, 1_000_000,
+      ),
+      agilityBonus: nullableNumber(
+        cell(row, columns.agilityBonus), "기민보너스", rowNumber, warnings, 1_000_000,
+      ),
+      vitalityBonus: nullableNumber(
+        cell(row, columns.vitalityBonus), "기력보너스", rowNumber, warnings, 1_000_000,
+      ),
+      intelligenceBonus: nullableNumber(
+        cell(row, columns.intelligenceBonus), "지모보너스", rowNumber, warnings, 1_000_000,
+      ),
+      attackPowerIncrease: nullableNumber(
+        cell(row, columns.attackPowerIncrease), "공격력증가량", rowNumber, warnings, 1_000_000,
+      ),
+      moveSpeedIncrease: nullableNumber(
+        cell(row, columns.moveSpeedIncrease), "이동속도증가량", rowNumber, warnings, 1_000_000,
+      ),
+      healthIncrease: nullableNumber(
+        cell(row, columns.healthIncrease), "체력증가량", rowNumber, warnings, 1_000_000,
+      ),
+      skillHasteIncrease: nullableNumber(
+        cell(row, columns.skillHasteIncrease), "절기가속증가량", rowNumber, warnings, 1_000_000,
       ),
       sourceType: normalizeSourceType(cell(row, columns.sourceType)),
       sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),

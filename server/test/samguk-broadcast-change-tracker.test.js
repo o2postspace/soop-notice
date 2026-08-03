@@ -375,7 +375,7 @@ test("observeBatch는 중복 key와 섞인 frame 근거를 상태 변경 없이 
   assert.equal(tracker.getState("P001", "agility"), null);
 });
 
-test("observeBatch는 최대 24건과 key capacity를 batch 전체에 선적용한다", () => {
+test("observeBatch는 전체 OCR field 수와 key capacity를 batch 전체에 선적용한다", () => {
   const tracker = createBroadcastChangeTracker({
     maxKeys: 2,
     baselines: [{ playerId: "P001", field: "strength", value: 10 }],
@@ -403,7 +403,7 @@ test("observeBatch는 최대 24건과 key capacity를 batch 전체에 선적용�
   }));
   const maximumTracker = createBroadcastChangeTracker();
   assert.deepEqual(maximumTracker.observeBatch(maximumBatch, { now: BASE_TIME }), []);
-  assert.equal(maximumTracker.size, 24);
+  assert.equal(maximumTracker.size, BATCH_FIELDS.length);
   maximumBatch.push(observation({
     playerId: "P002",
     field: "level",
@@ -539,8 +539,8 @@ test("TTL cleanup은 만료 후보와 stable 없는 key만 제거한다", () => 
   assert.equal(tracker.getState("P001", "level").stableValue, 1);
 });
 
-test("최대 key 상한은 90*24이고 초과 시 기존 상태를 보존한다", () => {
-  assert.equal(MAX_TRACKED_KEYS, 2160);
+test("최대 key 상한은 90*전체 OCR field 수이고 초과 시 기존 상태를 보존한다", () => {
+  assert.equal(MAX_TRACKED_KEYS, 90 * BATCH_FIELDS.length);
   const tracker = createBroadcastChangeTracker({ maxKeys: 2 });
   tracker.setStable({ playerId: "P001", field: "level", value: 1 }, { now: BASE_TIME });
   tracker.setStable({ playerId: "P001", field: "strength", value: 10 }, { now: BASE_TIME });

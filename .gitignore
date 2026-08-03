@@ -7,3 +7,4 @@ node_modules/
 __pycache__/
 *.pyc
 server/data/samguk-observations.ndjson
+server/data/fmkorea-gear-monitor-state.json

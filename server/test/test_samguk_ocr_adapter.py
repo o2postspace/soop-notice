@@ -1,4 +1,5 @@
 import importlib.util
+import base64
 import struct
 from pathlib import Path
 import subprocess
@@ -34,7 +35,7 @@ class AdapterParserTest(unittest.TestCase):
     def setUp(self):
         self.image = np.zeros((540, 960, 3), dtype=np.uint8)
 
-    def test_quantity_panel_uses_base_values_not_parenthesized_adjustments(self):
+    def test_quantity_panel_separates_base_values_and_positive_bonuses(self):
         tokens = [
             token("기량", 1, 440, 50, 490, 72),
             token("무력", .89, 300, 170, 330, 190), token("40 (+18)", .99, 295, 195, 345, 215),
@@ -46,8 +47,37 @@ class AdapterParserTest(unittest.TestCase):
         self.assertTrue(visible)
         self.assertEqual({item["field"]: item["value"] for item in results}, {
             "strength": 40, "agility": 85, "vitality": 100, "intelligence": 65,
+            "strengthBonus": 18, "vitalityBonus": 35,
         })
         self.assertEqual(next(item for item in results if item["field"] == "strength")["confidence"], .89)
+
+    def test_quantity_panel_extracts_all_displayed_increase_amounts(self):
+        tokens = [
+            token("기량", .999, 440, 40, 490, 65),
+            token("무력", .99, 280, 120, 320, 145), token("61 (+24.4)", .98, 270, 150, 340, 175),
+            token("기민", .99, 650, 120, 690, 145),
+            token("기력", .99, 280, 300, 320, 325), token("61 (+12.2)", .97, 270, 330, 340, 355),
+            token("지모", .99, 650, 300, 690, 325), token("91 (+9.1)", .98, 640, 330, 710, 355),
+            token("공격력 증가량", .97, 260, 190, 360, 215), token("42.7", .999, 290, 220, 330, 245),
+            token("이동속도 증가량", .96, 620, 190, 730, 215), token("0", .94, 665, 220, 680, 245),
+            token("체력 증가량", .87, 270, 370, 350, 395), token("366", .999, 292, 400, 330, 425),
+            token("절기가속 증가량", .91, 620, 370, 730, 395), token("20", .999, 665, 400, 690, 425),
+        ]
+        visible, results = adapter.parse_panel(self.image, tokens, lambda _crop, _scale: ("", 0))
+        self.assertTrue(visible)
+        values = {item["field"]: item["value"] for item in results}
+        self.assertEqual(values["strength"], 61)
+        self.assertNotIn("agility", values)
+        self.assertEqual(values["strengthBonus"], 24.4)
+        self.assertEqual(values["vitalityBonus"], 12.2)
+        self.assertEqual(values["intelligenceBonus"], 9.1)
+        self.assertEqual(values["attackPowerIncrease"], 42.7)
+        self.assertEqual(values["moveSpeedIncrease"], 0)
+        self.assertEqual(values["healthIncrease"], 366)
+        self.assertEqual(values["skillHasteIncrease"], 20)
+        self.assertGreaterEqual(next(
+            item for item in results if item["field"] == "healthIncrease"
+        )["confidence"], .95)
 
     def test_quantity_confidence_floor_requires_all_four_pairs(self):
         tokens = [
@@ -178,7 +208,91 @@ class AdapterParserTest(unittest.TestCase):
             "moveSpeedBonusPct": 0,
         })
         active_general = next(item for item in results if item["field"] == "activeGeneral")
-        self.assertEqual(active_general["confidence"], .98)
+        self.assertEqual(active_general["confidence"], .985)
+
+    def test_information_panel_infers_health_row_with_unrelated_tooltip_health_label(self):
+        image = np.zeros((720, 960, 3), dtype=np.uint8)
+
+        def row(text, score, row_index, x0=825, x1=880):
+            cy = 120 + row_index * 42
+            return token(text, score, x0, cy - 9, x1, cy + 9)
+
+        def label(text, score, row_index, x1=680):
+            cy = 120 + row_index * 42
+            return token(text, score, 500, cy - 9, x1, cy + 9)
+
+        tokens = [
+            token("정보", .96, 620, 20, 670, 42),
+            token("소속", .91, 500, 69, 540, 87),
+            token("위나라", .97, 825, 69, 880, 87),
+            # 체력 라벨은 축소 화면에서 사라졌지만 값 열은 선명하다.
+            row("176.9", .999, 0),
+            label("현재 영군", .94, 1), row("영객 (하후돈)", .97, 1, 760),
+            label("공격력", .93, 3), row("55.3", .998, 3),
+            label("방어력", .92, 4), row("4", .999, 4),
+            label("공격력 증가량", .93, 5), row("+5%", .998, 5),
+            label("받는 피해 감소", .93, 6), row("0%", .999, 6),
+            label("치명타 확률", .93, 7), row("15%", .998, 7),
+            label("치명타 데미지", .93, 8), row("120%", .999, 8),
+            label("절기 대기시간 감소", .93, 9), row("8%", .998, 9),
+            label("절기 피해량 증가량", .93, 10), row("0%", .999, 10),
+            label("이동속도 증가량", .93, 11), row("0%", .999, 11),
+            # 정보창과 정렬되지 않은 tooltip 체력 라벨이 있어도 fallback을 막지 않는다.
+            token("체력", .999, 120, 620, 160, 640),
+            token("153.9", .999, 330, 620, 390, 640),
+        ]
+        visible, results = adapter.parse_panel(
+            image,
+            tokens,
+            lambda _crop, _scale: ("(하후돈)", .98),
+        )
+        self.assertTrue(visible)
+        values = {item["field"]: item["value"] for item in results}
+        self.assertEqual(values["healthStat"], 176.9)
+        self.assertEqual(values["attackPower"], 55.3)
+        self.assertEqual(values["criticalDamagePct"], 120)
+        self.assertNotIn(153.9, values.values())
+        # 낮은 label score 자체로 선명한 숫자를 깎지 않고, 강한 행/열 구조가
+        # 0.99 상한을 제공한다.
+        confidences = {item["field"]: item["confidence"] for item in results}
+        self.assertEqual(confidences["healthStat"], .99)
+        self.assertEqual(confidences["attackPower"], .99)
+        self.assertGreaterEqual(min(item["confidence"] for item in results), .97)
+
+    def test_information_panel_caps_raw_confidence_when_anchor_geometry_is_weak(self):
+        image = np.zeros((720, 960, 3), dtype=np.uint8)
+
+        def row(text, row_index, x0=825, x1=880):
+            cy = 120 + row_index * 42
+            return token(text, .999, x0, cy - 9, x1, cy + 9)
+
+        tokens = [
+            token("소속", .70, 500, 69, 540, 87),
+            token("체력", .71, 500, 111, 540, 129),
+            row("176.9", 0),
+            row("영객 (하후돈)", 1, 760),
+            # 두 anchor가 각각 35px/49px 간격을 주장한다. 중앙값은 올바른
+            # 42px이라 값은 읽히지만 구조 합의가 약해 쓰기 기준을 넘지 않는다.
+            token("공격력", .72, 500, 216, 570, 234),
+            token("받는 피해 감소", .73, 500, 405, 650, 423),
+            row("55.3", 3),
+            row("4", 4),
+            row("+5%", 5),
+            row("0%", 6),
+            row("15%", 7),
+            row("120%", 8),
+            row("8%", 9),
+            row("0%", 10),
+            row("0%", 11),
+        ]
+        visible, results = adapter.parse_panel(
+            image,
+            tokens,
+            lambda _crop, _scale: ("", 0),
+        )
+        self.assertTrue(visible)
+        self.assertEqual({item["field"]: item["value"] for item in results}["attackPower"], 55.3)
+        self.assertLess(max(item["confidence"] for item in results), .95)
 
     def test_legacy_information_panel_allows_missing_general_and_rejects_tooltip_attack(self):
         image = np.zeros((1520, 1032, 3), dtype=np.uint8)
@@ -284,6 +398,43 @@ class AdapterParserTest(unittest.TestCase):
         visible, results = adapter.parse_panel(self.image, tokens, lambda _crop, _scale: ("", 0))
         self.assertTrue(visible)
         self.assertEqual(results, [])
+
+    def test_enhancement_screen_writes_current_stage_only_for_strict_shoes_icon_match(self):
+        header = token("장비 강화", .979, 400, 40, 480, 60)
+        image = self.image.copy()
+        template = np.frombuffer(
+            base64.b64decode(adapter.SHOES_ICON_TEMPLATE_B64), dtype=np.uint8,
+        ).reshape(adapter.SHOES_ICON_TEMPLATE_HEIGHT, adapter.SHOES_ICON_TEMPLATE_WIDTH)
+        x0 = int(header.cx - .64 * header.height)
+        x1 = int(header.cx + .89 * header.height)
+        y0 = int(header.y0 + 6.36 * header.height)
+        y1 = int(header.y0 + 8.56 * header.height)
+        ys = np.minimum(
+            adapter.SHOES_ICON_TEMPLATE_HEIGHT - 1,
+            (np.arange(y1 - y0) * adapter.SHOES_ICON_TEMPLATE_HEIGHT / (y1 - y0)).astype(int),
+        )
+        xs = np.minimum(
+            adapter.SHOES_ICON_TEMPLATE_WIDTH - 1,
+            (np.arange(x1 - x0) * adapter.SHOES_ICON_TEMPLATE_WIDTH / (x1 - x0)).astype(int),
+        )
+        expanded = template[ys[:, None], xs[None, :]]
+        image[y0:y1, x0:x1] = expanded[:, :, None]
+        tokens = [
+            header,
+            token("강화 성공 확률", .93, 250, 220, 350, 245),
+            token("단계 하락 확률", .94, 520, 220, 620, 245),
+            token("강화하기", .99, 390, 310, 470, 340),
+            token("강화 비용", .99, 600, 360, 680, 385),
+        ]
+        visible, results = adapter.parse_panel(
+            image,
+            tokens,
+            lambda _crop, _scale: ("3단계 → 4단계", .75),
+        )
+        self.assertTrue(visible)
+        self.assertEqual(results[0]["field"], "shoes")
+        self.assertEqual(results[0]["value"], 3)
+        self.assertGreaterEqual(results[0]["confidence"], .95)
 
         without_stage = [item for item in tokens if "단계 →" not in item.text]
         visible, results = adapter.parse_panel(self.image, without_stage, lambda _crop, _scale: ("", 0))

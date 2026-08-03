@@ -1,6 +1,6 @@
 # 삼국지 90개 방송 HLS 관측 worker
 
-운영 경로는 `samguk-hls-monitor.js`다. Chrome 탭 90개를 재생하지 않고 공개 LIVE의 SD HLS 최근 segment를 cursor로 이어 읽는다. 평소에는 48×27 gray frame으로 UI 여부만 판별하고, 정보·장비 UI 후보가 잡힌 방송만 같은 media sequence의 HD 960×540 구간부터 OCR burst로 전환한다.
+운영 경로는 `samguk-hls-monitor.js`다. Chrome 탭 90개를 재생하지 않고 공개 LIVE의 SD HLS 최근 segment를 cursor로 이어 읽는다. 평소에는 48×27 gray frame으로 UI 여부만 판별하고, 정보·장비 UI 후보가 잡힌 방송만 그 순간의 HD 960×540 후보 frame을 즉시 보존한 뒤 OCR burst로 전환한다.
 
 - 운영 `all-90` target: fallback roster의 P001~P090 정확히 90명(부분집합이면 시작 거부)
 - LIVE 확인 뒤 SD 판별 주기: 2초, segment 내부는 0.25초 간격 8 frame
@@ -13,7 +13,7 @@
 - 같은 segment: 다시 decode하지 않으며 cursor 이후 구간만 요청
 - 같은 값: 서로 다른 화면 2장이 0.95 이상으로 일치할 때만 queue 기록
 
-고정 ROI는 사용하지 않는다. 정보창과 장비 tooltip 위치가 매번 달라질 수 있으므로 OCR adapter가 960×540 전체 frame에서 panel과 항목을 찾고 여러 필드를 한 번에 반환한다. SD 후보가 잡힌 정확한 media sequence와 0.25초 sample index를 HD에도 그대로 적용하고, 인접 frame까지 같은 값이어야 관측 queue에 넣는다.
+고정 ROI는 사용하지 않는다. 정보창과 장비 tooltip 위치가 매번 달라질 수 있으므로 OCR adapter가 960×540 전체 frame에서 panel과 항목을 찾고 여러 필드를 한 번에 반환한다. SD 후보 직후 HD 후보 frame을 최대 2장 0600 파일로 잠시 보존해 화면이 닫힌 뒤에도 OCR하고, 서로 다른 HLS segment에서 같은 값이 확인돼야 관측 queue에 넣는다. 보존 frame은 기본 30분 뒤 자동 삭제된다.
 
 ## 활성화 조건
 
@@ -71,9 +71,9 @@ heartbeat에는 `mode`, `totalTargetCount`, `enabledCount`, `disabledCount`, 정
 }
 ```
 
-허용 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `maxHealth`, `attackPower`, `healthStat`, `activeGeneral`, `defense`, `attackPowerBonusPct`, `damageReductionPct`, `criticalChancePct`, `criticalDamagePct`, `skillCooldownReductionPct`, `skillDamageBonusPct`, `moveSpeedBonusPct`, `horseMaxHealth`다. `powerScore`는 OCR 원본으로 받지 않고 검증된 값에서 계산한다. adapter 인자 template은 `{profileId}`, `{playerId}`, `{targetId}`, `{bjId}`, `{observedAt}`만 지원한다.
+허용 필드는 `level`, `horse`, `horseLevel`, `weapon`, `helmet`, `armor`, `shoes`, `strength`, `agility`, `vitality`, `intelligence`, `maxHealth`, `attackPower`, `healthStat`, `activeGeneral`, `defense`, `attackPowerBonusPct`, `damageReductionPct`, `criticalChancePct`, `criticalDamagePct`, `skillCooldownReductionPct`, `skillDamageBonusPct`, `moveSpeedBonusPct`, `horseMaxHealth`, `strengthBonus`, `agilityBonus`, `vitalityBonus`, `intelligenceBonus`, `attackPowerIncrease`, `moveSpeedIncrease`, `healthIncrease`, `skillHasteIncrease`다. `powerScore`는 OCR 원본으로 받지 않고 검증된 값에서 계산한다. adapter 인자 template은 `{profileId}`, `{playerId}`, `{targetId}`, `{bjId}`, `{observedAt}`만 지원한다.
 
-현재 adapter는 군마영 강화 단계, 장비 강화 4종, 기량 4종, 플레이어/말 HUD 최대체력과 정보창 전투 스탯을 실측 fixture로 검증한다. 정보창에서는 체력·현재 장수·공격력·방어력과 공격력 증가, 피해 감소, 치명타 확률/피해, 절기 대기시간 감소/피해 증가, 이동속도 증가를 구조 기반으로 한 번에 읽는다. 군마영은 `군마영` 제목, `장착·강화·합성` 탭 중 2개 이상, `강화하기` 버튼을 함께 확인하고 목표 단계 화살표가 아닌 현재 `N단계`만 `horseLevel`로 출력한다. HUD의 말 최대체력은 플레이어 최대체력과 분리하며, 실측이 확인된 적토마 `1700=0강`, `1900=1강`만 말 이름·강화값으로 변환하고 다른 값은 외삽하지 않는다. OCR raw confidence는 구조 합의로 상향하지 않으며, 3-scale 값이 다르면 0.95 미만으로 제한한다. `level`은 실제 방송 positive fixture를 확보하기 전까지 출력하지 않는다.
+현재 adapter는 군마영 강화 단계, 장비 강화 4종, 기량 4종과 보너스·증가량, 플레이어/말 HUD 최대체력과 정보창 전투 스탯을 실측 fixture로 검증한다. 정보창에서는 체력·현재 장수·공격력·방어력과 공격력 증가, 피해 감소, 치명타 확률/피해, 절기 대기시간 감소/피해 증가, 이동속도 증가를 구조 기반으로 한 번에 읽는다. 강화창은 현재 단계→다음 단계의 연속값을 3개 배율로 합의하고 실제 장비 icon template까지 일치할 때만 장비 종류와 현재 강화를 출력한다. 군마영은 `군마영` 제목, `장착·강화·합성` 탭 중 2개 이상, `강화하기` 버튼을 함께 확인하고 목표 단계 화살표가 아닌 현재 `N단계`만 `horseLevel`로 출력한다. HUD의 말 최대체력은 플레이어 최대체력과 분리하며, 실측이 확인된 적토마 `1700=0강`, `1900=1강`만 말 이름·강화값으로 변환하고 다른 값은 외삽하지 않는다. 구조 합의와 실제 fixture가 있는 패널만 0.95 자동쓰기 기준을 넘을 수 있으며, 값 합의가 깨지면 쓰지 않는다. `level`은 실제 방송 positive fixture를 확보하기 전까지 출력하지 않는다.
 
 adapter 의존성은 `scripts/requirements-samguk-ocr.lock.txt`의 검증된 전체 pin으로 별도 venv에 설치한다. `requirements-samguk-ocr.txt`는 direct dependency 갱신용이다. detector·classifier·Korean recognizer ONNX 파일은 `--model-dir` 아래에 미리 두며 운영 중 다운로드하지 않는다. whole-frame에서 알려진 panel 구조를 찾고, 장비 tooltip은 발견된 종류 label 기준 상대 위치를 다시 읽으므로 고정 ROI를 사용하지 않는다. RapidOCR 로그와 원문 이미지는 stdout·stderr·queue에 기록하지 않는다.
 

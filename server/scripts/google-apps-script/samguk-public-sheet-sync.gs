@@ -6,12 +6,13 @@
  * 단일 sheet 기준값으로 추가합니다. 공개 시트는 독립 교차검증 출처로 세지 않습니다.
  */
 
-var SAMGUK_PUBLIC_SCHEMA_VERSION = "2026.08.03.2";
+var SAMGUK_PUBLIC_SCHEMA_VERSION = "2026.08.03.4";
 var SAMGUK_PUBLIC_DEFAULT_MASTER_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
-var SAMGUK_PUBLIC_API_URL = "https://api.soopnotice.com/api/samguk";
+var SAMGUK_PUBLIC_API_URL = "https://api.soopnotice.com/api/samguk?refresh=1";
 var SAMGUK_PUBLIC_SITE_URL = "https://soopnotice.com";
 var SAMGUK_PUBLIC_EXPECTED_MEMBER_COUNT = 90;
 var SAMGUK_PUBLIC_POWER_SCALE = 125;
+var SAMGUK_PUBLIC_SYNC_INTERVAL_MINUTES = 5;
 var SAMGUK_PUBLIC_MAX_PROPOSAL_ROW = 1001;
 var SAMGUK_PUBLIC_MAX_MASTER_OBSERVATION_ROW = 5001;
 var SAMGUK_PUBLIC_PROTECTION_PREFIX = "[SOOPNOTICE_PUBLIC]";
@@ -29,7 +30,9 @@ var SAMGUK_PUBLIC_HEADERS = {
     "두갑강화", "흉갑강화", "각갑강화", "말", "말강화", "최대체력", "공격력",
     "최종확인", "SOOP 방송", "체력", "현재장수", "방어력", "공격력증가(%)",
     "피해감소(%)", "치명타확률(%)", "치명타피해(%)", "스킬쿨타임감소(%)",
-    "스킬피해증가(%)", "이동속도증가(%)", "말최대체력"
+    "스킬피해증가(%)", "이동속도증가(%)", "말최대체력", "무력보너스",
+    "기민보너스", "기력보너스", "지모보너스", "공격력증가량", "이동속도증가량",
+    "체력증가량", "절기가속증가량"
   ],
   "스탯·장비": [
     "player_id", "국가", "닉네임", "SOOP_ID", "세력/길드", "장수/직업", "레벨",
@@ -38,7 +41,8 @@ var SAMGUK_PUBLIC_HEADERS = {
     "수집률", "출처", "출처수", "검증상태", "최종확인", "근거", "체력",
     "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
     "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)",
-    "말최대체력"
+    "말최대체력", "무력보너스", "기민보너스", "기력보너스", "지모보너스",
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량"
   ],
   "수정제안": [
     "proposal_id", "제출시각", "player_id", "닉네임", "field_key", "현재값", "제안값",
@@ -81,7 +85,15 @@ var SAMGUK_PUBLIC_FIELD_CONFIG = {
   skillCooldownReductionPct: { label: "스킬쿨타임감소(%)", currentHeader: "스킬쿨타임감소(%)", observationHeader: "스킬쿨타임감소(%)", maximum: 1000, integer: false, higherOnly: false },
   skillDamageBonusPct: { label: "스킬피해증가(%)", currentHeader: "스킬피해증가(%)", observationHeader: "스킬피해증가(%)", maximum: 1000, integer: false, higherOnly: false },
   moveSpeedBonusPct: { label: "이동속도증가(%)", currentHeader: "이동속도증가(%)", observationHeader: "이동속도증가(%)", maximum: 1000, integer: false, higherOnly: false },
-  horseMaxHealth: { label: "말최대체력", currentHeader: "말최대체력", observationHeader: "말최대체력", maximum: 1000000, integer: true, higherOnly: false }
+  horseMaxHealth: { label: "말최대체력", currentHeader: "말최대체력", observationHeader: "말최대체력", maximum: 1000000, integer: true, higherOnly: false },
+  strengthBonus: { label: "무력보너스", currentHeader: "무력보너스", observationHeader: "무력보너스", maximum: 1000000, integer: false, higherOnly: false },
+  agilityBonus: { label: "기민보너스", currentHeader: "기민보너스", observationHeader: "기민보너스", maximum: 1000000, integer: false, higherOnly: false },
+  vitalityBonus: { label: "기력보너스", currentHeader: "기력보너스", observationHeader: "기력보너스", maximum: 1000000, integer: false, higherOnly: false },
+  intelligenceBonus: { label: "지모보너스", currentHeader: "지모보너스", observationHeader: "지모보너스", maximum: 1000000, integer: false, higherOnly: false },
+  attackPowerIncrease: { label: "공격력증가량", currentHeader: "공격력증가량", observationHeader: "공격력증가량", maximum: 1000000, integer: false, higherOnly: false },
+  moveSpeedIncrease: { label: "이동속도증가량", currentHeader: "이동속도증가량", observationHeader: "이동속도증가량", maximum: 1000000, integer: false, higherOnly: false },
+  healthIncrease: { label: "체력증가량", currentHeader: "체력증가량", observationHeader: "체력증가량", maximum: 1000000, integer: false, higherOnly: false },
+  skillHasteIncrease: { label: "절기가속증가량", currentHeader: "절기가속증가량", observationHeader: "절기가속증가량", maximum: 1000000, integer: false, higherOnly: false }
 };
 
 var SAMGUK_PUBLIC_SOURCE_TYPES = [
@@ -89,7 +101,7 @@ var SAMGUK_PUBLIC_SOURCE_TYPES = [
 ];
 
 /**
- * 공개 시트를 새로 만들거나 기존 시트를 멱등 업데이트하고 15분 동기화를 설치합니다.
+ * 공개 시트를 새로 만들거나 기존 시트를 멱등 업데이트하고 5분 동기화를 설치합니다.
  */
 function installSamgukPublicSheet() {
   var lock = LockService.getScriptLock();
@@ -117,7 +129,7 @@ function installSamgukPublicSheet() {
   }
 }
 
-/** 15분 트리거에서 호출하는 공개 출력 동기화 함수입니다. */
+/** 5분 트리거에서 호출하는 공개 출력 동기화 함수입니다. */
 function syncSamgukPublicSheet() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error("public_sheet_busy");
@@ -330,12 +342,12 @@ function samgukPublicSeedGuide_(sheet, publicUrl) {
   var rows = [
     ["사이트", SAMGUK_PUBLIC_SITE_URL],
     ["공개 시트", publicUrl],
-    ["자동 갱신", "15분마다 SOOPNOTICE 공개 API의 정상 90명 자료로 갱신됩니다."],
-    ["파워점수", "사이트 파워 v1.1 하한점수 × " + SAMGUK_PUBLIC_POWER_SCALE + " 표시값입니다. 최대체력·공격력·평타피해와 정보창 동적 수치는 아직 파워 산식에 포함하지 않습니다."],
+    ["자동 갱신", "5분마다 캐시를 우회해 SOOPNOTICE 공개 API의 정상 90명 자료로 갱신됩니다."],
+    ["파워점수", "사이트 파워 v1.5 하한점수 × " + SAMGUK_PUBLIC_POWER_SCALE + " 표시값입니다. 기량 4종은 실제 합계를 고정 600점 기준으로 환산하고, 장비는 무기 60%·흉갑 30%·각갑 10%이며 군주 두갑은 15% 추가 보너스, 말은 5등급과 강화를 반영합니다."],
     ["보기 권한", "링크가 있는 모든 사용자는 볼 수 있습니다."],
     ["수정 권한", "Google Drive에서 편집 권한을 요청하면 소유자가 계정별로 승인합니다."],
     ["수정 방법", "승인된 편집자는 수정제안 탭의 입력 칸만 작성합니다. 한 행에는 한 선수의 한 항목만 적습니다."],
-    ["반영 조건", "운영자가 승인한 HTTPS 근거만 반영합니다. 강화·공격력은 상승값, 동적 정보창 수치는 최신 관측값을 사용합니다."],
+    ["반영 조건", "레벨·강화·무/민/기/지·최대체력·공격력은 확인된 최고값, 장비 세팅에 따라 내려갈 수 있는 동적 정보창 수치는 최신 관측값을 사용합니다."],
     ["교차검증", "이 공개 시트는 운영원장의 표시용 사본이므로 독립 출처나 교차검증 1회로 중복 계산하지 않습니다."],
     ["오류 정정", "잘못 승인된 값은 삭제하지 않고 철회한 뒤 이전 최고값으로 되돌립니다."],
     ["제보 안내", "player_id와 field_key는 드롭다운에서 고르고, 관측시각·원문 URL·설명을 함께 적어 주세요."],
@@ -541,7 +553,8 @@ function samgukPublicInstallTriggers_(spreadsheet) {
   var existing = ScriptApp.getProjectTriggers().filter(function(trigger) {
     return handlers[trigger.getHandlerFunction()] === true;
   });
-  var syncTrigger = ScriptApp.newTrigger("syncSamgukPublicSheet").timeBased().everyMinutes(15).create();
+  var syncTrigger = ScriptApp.newTrigger("syncSamgukPublicSheet").timeBased()
+    .everyMinutes(SAMGUK_PUBLIC_SYNC_INTERVAL_MINUTES).create();
   var editTrigger = ScriptApp.newTrigger("handleSamgukPublicEdit").forSpreadsheet(spreadsheet).onEdit().create();
   var keep = {};
   keep[syncTrigger.getUniqueId()] = true;
@@ -658,6 +671,14 @@ function samgukPublicNormalizeMember_(raw, rosterMember) {
     skillDamageBonusPct: number("skillDamageBonusPct", 1000),
     moveSpeedBonusPct: number("moveSpeedBonusPct", 1000),
     horseMaxHealth: number("horseMaxHealth", 1000000),
+    strengthBonus: number("strengthBonus", 1000000),
+    agilityBonus: number("agilityBonus", 1000000),
+    vitalityBonus: number("vitalityBonus", 1000000),
+    intelligenceBonus: number("intelligenceBonus", 1000000),
+    attackPowerIncrease: number("attackPowerIncrease", 1000000),
+    moveSpeedIncrease: number("moveSpeedIncrease", 1000000),
+    healthIncrease: number("healthIncrease", 1000000),
+    skillHasteIncrease: number("skillHasteIncrease", 1000000),
     powerRankScore: rankScore,
     powerIndex: number("powerIndex", 100),
     powerCoverage: number("powerCoverage", 100),
@@ -702,7 +723,11 @@ function samgukPublicBuildRankingRows_(members) {
       samgukPublicBlank_(member.attackPowerBonusPct), samgukPublicBlank_(member.damageReductionPct),
       samgukPublicBlank_(member.criticalChancePct), samgukPublicBlank_(member.criticalDamagePct),
       samgukPublicBlank_(member.skillCooldownReductionPct), samgukPublicBlank_(member.skillDamageBonusPct),
-      samgukPublicBlank_(member.moveSpeedBonusPct), samgukPublicBlank_(member.horseMaxHealth)
+      samgukPublicBlank_(member.moveSpeedBonusPct), samgukPublicBlank_(member.horseMaxHealth),
+      samgukPublicBlank_(member.strengthBonus), samgukPublicBlank_(member.agilityBonus),
+      samgukPublicBlank_(member.vitalityBonus), samgukPublicBlank_(member.intelligenceBonus),
+      samgukPublicBlank_(member.attackPowerIncrease), samgukPublicBlank_(member.moveSpeedIncrease),
+      samgukPublicBlank_(member.healthIncrease), samgukPublicBlank_(member.skillHasteIncrease)
     ].map(samgukPublicSafeCell_);
   });
 }
@@ -727,7 +752,11 @@ function samgukPublicBuildDetailRows_(members) {
       samgukPublicBlank_(member.attackPowerBonusPct), samgukPublicBlank_(member.damageReductionPct),
       samgukPublicBlank_(member.criticalChancePct), samgukPublicBlank_(member.criticalDamagePct),
       samgukPublicBlank_(member.skillCooldownReductionPct), samgukPublicBlank_(member.skillDamageBonusPct),
-      samgukPublicBlank_(member.moveSpeedBonusPct), samgukPublicBlank_(member.horseMaxHealth)
+      samgukPublicBlank_(member.moveSpeedBonusPct), samgukPublicBlank_(member.horseMaxHealth),
+      samgukPublicBlank_(member.strengthBonus), samgukPublicBlank_(member.agilityBonus),
+      samgukPublicBlank_(member.vitalityBonus), samgukPublicBlank_(member.intelligenceBonus),
+      samgukPublicBlank_(member.attackPowerIncrease), samgukPublicBlank_(member.moveSpeedIncrease),
+      samgukPublicBlank_(member.healthIncrease), samgukPublicBlank_(member.skillHasteIncrease)
     ].map(samgukPublicSafeCell_);
   });
 }

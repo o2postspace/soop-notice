@@ -13,7 +13,10 @@ const MEMBER_FIELDS = [
   "basicAttackSampleCount", "basicAttackTarget", "combatConditions", "healthStat",
   "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
   "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct",
-  "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth", "observedAt", "evidence",
+  "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
+  "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
+  "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
+  "observedAt", "evidence",
 ];
 const TERRITORY_FIELDS = [
   "id", "number", "x", "y", "owner", "capital", "facility", "level",

@@ -1,6 +1,10 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createRunner, samgukTrackingConfig } = require("../cron");
+const {
+  createRunner,
+  samgukFmkoreaConfig,
+  samgukTrackingConfig,
+} = require("../cron");
 
 const silentLogger = { error() {} };
 
@@ -103,5 +107,54 @@ test("겹친 삼국지 승격 주기는 같은 in-flight Promise를 공유한다
   assert.equal(promotionCalls, 1);
 
   releasePromotion.finish();
+  await Promise.all([first, second]);
+});
+
+test("FMK 장비 monitor는 명시적으로 켰을 때 tracking과 같은 queue를 사용한다", async () => {
+  const tracking = samgukTrackingConfig({
+    SAMGUK_OBSERVATION_QUEUE_PATH: "data/test-fmk-observations.ndjson",
+  });
+  const config = samgukFmkoreaConfig({
+    SAMGUK_FMKOREA_MONITOR_ENABLED: "1",
+    SAMGUK_FMKOREA_MIN_INTERVAL_MS: "600000",
+  }, tracking);
+  assert.equal(config.enabled, true);
+  assert.equal(config.queuePath, tracking.queuePath);
+  assert.equal(config.minIntervalMs, 600_000);
+  assert.equal(config.statePath, `${tracking.queuePath.replace(/\/[^/]+$/, "")}/fmkorea-gear-monitor-state.json`);
+
+  const disabled = samgukFmkoreaConfig({}, tracking);
+  assert.equal(disabled.enabled, false);
+});
+
+test("겹친 FMK 장비 수집 주기는 같은 in-flight Promise를 공유한다", async () => {
+  let release;
+  let calls = 0;
+  const started = new Promise(resolve => { release = { start: resolve }; });
+  const blocked = new Promise(resolve => { release.finish = resolve; });
+  const runner = createRunner({
+    fmkoreaMonitorFn: async () => {
+      calls += 1;
+      release.start();
+      await blocked;
+      return { inserted: 1, searched: 10, fetched: 1, errors: [] };
+    },
+    samgukFmkorea: {
+      enabled: true,
+      queuePath: "/tmp/samguk-fmkorea-test.ndjson",
+      statePath: "/tmp/samguk-fmkorea-test.json",
+      minIntervalMs: 300_000,
+      aliasesByPlayer: {},
+    },
+    logger: silentLogger,
+  });
+
+  const first = runner.runSamgukFmkoreaMonitor();
+  await started;
+  const second = runner.runSamgukFmkoreaMonitor();
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+
+  release.finish();
   await Promise.all([first, second]);
 });

@@ -161,22 +161,26 @@ test("영토 화면은 60개 사각 타일·국가 합계·현재 스냅샷 갱�
   assert.match(root.innerHTML, /class="samguk-map-marker is-bonus"/);
 });
 
-test("전투 관측 셀은 새 필드를 빈값 없이 최대 네 그룹으로 escape해 표시한다", () => {
+test("전투 관측 셀은 기량 증가량을 포함해 빈값 없이 최대 다섯 그룹으로 escape해 표시한다", () => {
   const html = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
   const combatCell = html.match(/function combatCell\(member\) \{[\s\S]*?\n  \}/)?.[0] || "";
 
   for (const field of [
     "healthStat", "activeGeneral", "defense", "attackPowerBonusPct", "damageReductionPct",
     "criticalChancePct", "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
-    "moveSpeedBonusPct", "horseMaxHealth",
+    "moveSpeedBonusPct", "horseMaxHealth", "strengthBonus", "agilityBonus", "vitalityBonus",
+    "intelligenceBonus", "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
   ]) {
     assert.match(combatCell, new RegExp(`member\\.${field}`));
   }
   assert.match(combatCell, /filter\(Boolean\)/);
   assert.match(combatCell, /if \(damage\) primary\.push\(damage \+ \(samples !== null/);
   assert.match(combatCell, /escapeHtml\(group\.join\(' · '\)\)/);
-  assert.match(combatCell, /const groups = \[primary, character, rates, skillRates\]/);
+  assert.match(combatCell, /const groups = \[primary, character, rates, skillRates, quantity\]/);
+  assert.match(combatCell, /metric\('무력\+', member\.strengthBonus\)/);
+  assert.match(combatCell, /metric\('절기가속', member\.skillHasteIncrease\)/);
+  assert.match(combatCell, /파워 v1\.5 미반영/);
   assert.doesNotMatch(html, /return '<span class="samguk-empty-value">—<\/span>'/);
   assert.match(html, /samguk\.css\?v=20260803c/);
-  assert.match(html, /samguk\.js\?v=20260803b/);
+  assert.match(html, /samguk\.js\?v=20260803d/);
 });

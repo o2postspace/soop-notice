@@ -7,7 +7,6 @@ const {
 } = require("./samguk-observations");
 
 const BATCH_VERSION = 2;
-const MAX_BATCH_RESULTS = 24;
 const PROFILE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 const EVIDENCE_HASH_PATTERN = /^[a-fA-F0-9]{64}$/;
 const BATCH_FIELDS = Object.freeze([
@@ -35,7 +34,16 @@ const BATCH_FIELDS = Object.freeze([
   "skillDamageBonusPct",
   "moveSpeedBonusPct",
   "horseMaxHealth",
+  "strengthBonus",
+  "agilityBonus",
+  "vitalityBonus",
+  "intelligenceBonus",
+  "attackPowerIncrease",
+  "moveSpeedIncrease",
+  "healthIncrease",
+  "skillHasteIncrease",
 ]);
+const MAX_BATCH_RESULTS = BATCH_FIELDS.length;
 const BATCH_FIELD_SET = new Set(BATCH_FIELDS);
 const BATCH_KEYS = new Set(["version", "profileId", "panelVisible", "results"]);
 const RESULT_KEYS = new Set(["field", "value", "confidence"]);

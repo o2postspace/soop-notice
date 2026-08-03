@@ -44,6 +44,8 @@ const SNAPSHOT_FIELDS = Object.freeze([
   "basicAttackTarget", "combatConditions", "healthStat", "activeGeneral", "defense",
   "attackPowerBonusPct", "damageReductionPct", "criticalChancePct", "criticalDamagePct",
   "skillCooldownReductionPct", "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
+  "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
+  "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
 ]);
 const REFERENCE_HEADERS = Object.freeze([
   "player_id", "SOOP_ID", "국가", "세력/길드", "닉네임", "장수/직업",
