@@ -517,7 +517,7 @@ test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 pa
   assert.equal(payload.source, "google-sheet");
   assert.equal(payload.seasonId, SEASON_ID);
   assert.equal(payload.stale, false);
-  assert.equal(DEFAULT_SHEET_ID, "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY");
+  assert.equal(DEFAULT_SHEET_ID, "1yMUytX11t-SzB9Tz9tpizj0Dyc1iIC2H2utQpycUuTQ");
   assert.equal(payload.sheetUrl, `https://docs.google.com/spreadsheets/d/${DEFAULT_SHEET_ID}/edit`);
   assert.deepEqual(Object.keys(payload.members[0]).sort(), MEMBER_KEYS);
   assert.deepEqual(Object.keys(payload.territories[0]).sort(), TERRITORY_KEYS);

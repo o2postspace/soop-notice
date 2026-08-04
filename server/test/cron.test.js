@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   createRunner,
   samgukFmkoreaConfig,
+  samgukGamcomConfig,
   samgukTrackingConfig,
 } = require("../cron");
 const { CURRENT_SEASON_START_AT } = require("../lib/samguk-fmkorea-gear-monitor");
@@ -231,4 +232,108 @@ test("겹친 FMK 장비 수집 주기는 같은 in-flight Promise를 공유한�
 
   release.finish();
   await Promise.all([first, second]);
+});
+
+test("Gamcom Chromium monitor는 명시적으로 켜고 tracking write 정책을 공유한다", () => {
+  const tracking = samgukTrackingConfig({
+    SAMGUK_TRACKING_ENABLED: "1",
+    SAMGUK_TRACKING_WRITE_ENABLED: "1",
+  });
+  const config = samgukGamcomConfig({
+    SAMGUK_GAMCOM_MONITOR_ENABLED: "1",
+    SAMGUK_GAMCOM_CHROMIUM_PATH: "/opt/chrome",
+    SAMGUK_GAMCOM_CHROMIUM_TIMEOUT_MS: "22000",
+    SAMGUK_GAMCOM_VIRTUAL_TIME_BUDGET_MS: "15000",
+    SAMGUK_GAMCOM_LOCK_PATH: "/tmp/gamcom-cron.guard",
+  }, tracking);
+  assert.deepEqual(config, {
+    enabled: true,
+    write: true,
+    chromiumPath: "/opt/chrome",
+    lockPath: "/tmp/gamcom-cron.guard",
+    timeoutMs: 22_000,
+    virtualTimeBudgetMs: 15_000,
+  });
+  assert.equal(samgukGamcomConfig({}, tracking).enabled, false);
+});
+
+test("겹친 Gamcom 수집은 같은 Promise를 공유하고 batch write 뒤 cache를 갱신한다", async () => {
+  let release;
+  let calls = 0;
+  const optionsSeen = [];
+  const stamps = [];
+  const started = new Promise(resolve => { release = { start: resolve }; });
+  const blocked = new Promise(resolve => { release.finish = resolve; });
+  const tracking = samgukTrackingConfig({
+    SAMGUK_TRACKING_ENABLED: "1",
+    SAMGUK_TRACKING_WRITE_ENABLED: "1",
+    SAMGUK_OBSERVATION_QUEUE_PATH: "/tmp/samguk-gamcom-test.ndjson",
+  });
+  const runner = createRunner({
+    createSamgukSheetServiceFn: () => ({ id: "shared-sheet" }),
+    gamcomMonitorFn: async (options) => {
+      calls += 1;
+      optionsSeen.push(options);
+      release.start();
+      await blocked;
+      return { matched: 90, changedCells: 3, snapshots: 1, written: 1 };
+    },
+    markSamgukCacheInvalidatedFn: value => stamps.push(value),
+    samgukTracking: tracking,
+    samgukGamcom: {
+      enabled: true,
+      write: true,
+      chromiumPath: "/usr/bin/google-chrome",
+      lockPath: "/tmp/samguk-gamcom-monitor.guard",
+      timeoutMs: 30_000,
+      virtualTimeBudgetMs: 12_000,
+    },
+    logger: { error() {}, info() {} },
+  });
+
+  const first = runner.runSamgukGamcomMonitor();
+  await started;
+  const second = runner.runSamgukGamcomMonitor();
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+  assert.equal(optionsSeen[0].service.id, "shared-sheet");
+  assert.equal(optionsSeen[0].write, true);
+
+  release.finish();
+  await Promise.all([first, second]);
+  assert.deepEqual(stamps, [tracking.cacheStampPath]);
+});
+
+test("Gamcom runner 종료는 활성 수집을 abort하고 완료까지 기다린다", async () => {
+  let startedResolve;
+  let aborted = false;
+  const started = new Promise(resolve => { startedResolve = resolve; });
+  const runner = createRunner({
+    createSamgukSheetServiceFn: () => ({ id: "shared-sheet" }),
+    gamcomMonitorFn: ({ signal }) => new Promise((resolve, reject) => {
+      startedResolve();
+      signal.addEventListener("abort", () => {
+        aborted = true;
+        const error = new Error("aborted");
+        error.code = "aborted";
+        reject(error);
+      }, { once: true });
+    }),
+    samgukTracking: samgukTrackingConfig({}),
+    samgukGamcom: {
+      enabled: true,
+      write: false,
+      chromiumPath: "/usr/bin/google-chrome",
+      lockPath: "/tmp/samguk-gamcom-monitor.guard",
+      timeoutMs: 20_000,
+      virtualTimeBudgetMs: 12_000,
+    },
+    logger: { error() {}, info() {} },
+  });
+
+  const active = runner.runSamgukGamcomMonitor();
+  await started;
+  await runner.stopSamgukGamcomMonitor();
+  assert.equal(aborted, true);
+  assert.equal(await active, null);
 });

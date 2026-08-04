@@ -2,7 +2,7 @@ const FALLBACK_PAYLOAD = require("../data/samguk-fallback.json");
 const { CURRENT_SEASON_ID } = require("./samguk-observations");
 const { calculateRosterPowerIndexes } = require("./samguk-power-index");
 
-const DEFAULT_SHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
+const DEFAULT_SHEET_ID = "1yMUytX11t-SzB9Tz9tpizj0Dyc1iIC2H2utQpycUuTQ";
 const DEFAULT_TABS = Object.freeze({
   members: "현재현황",
   territories: "영토현황",

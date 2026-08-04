@@ -46,7 +46,7 @@ node scripts/samguk-fmkorea-gear-monitor.js \
 
 ## Google Sheet 연결
 
-운영 원장은 [SOOPNOTICE 후국지 운영원장](https://docs.google.com/spreadsheets/d/1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY/edit)이다. 사이트의 무인증 CSV 조회를 위해 일반 액세스는 `링크가 있는 모든 사용자: 뷰어`로 두되 편집자는 별도로 제한한다. 공개 원장에는 secret, 로컬 경로, 비공개 메모를 넣지 않는다.
+운영 원장은 [SOOPNOTICE 후국지 운영원장](https://docs.google.com/spreadsheets/d/1yMUytX11t-SzB9Tz9tpizj0Dyc1iIC2H2utQpycUuTQ/edit)이다. 사이트의 무인증 CSV 조회를 위해 일반 액세스는 `링크가 있는 모든 사용자: 뷰어`로 두되 편집자는 별도로 제한한다. 공개 원장에는 secret, 로컬 경로, 비공개 메모를 넣지 않는다.
 
 1. Sheet에 바인딩된 Apps Script 프로젝트에 아래 파일을 순서대로 넣고 저장한다.
    - `google-apps-script/samguk-sheet-seed.generated.gs`
@@ -63,7 +63,7 @@ node scripts/samguk-fmkorea-gear-monitor.js \
 
 ### Gamcom 보조자료
 
-[위](https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84)·[촉](https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89)·[오](https://gamcom-3kingdom.vercel.app/factions/%EC%98%A4) 페이지는 우리 원장을 대체하지 않는다. `installSamgukGamcomSync()`를 한 번 실행하면 즉시 동기화하고 `syncSamgukGamcom()` 15분 트리거를 하나만 설치한다. 매번 국가별 30명과 우리 원장 90명의 닉네임·국가가 전부 일치해야 쓰며, 숫자는 `MAX(우리값, Gamcom값)`, 세력·직업·말은 우리 값을 우선한다. 레벨·강화·능력치·원본 무력점수는 이후 더 낮은 관측이 들어와도 현황에서 내려가지 않는다. 같은 실행에서 [60칸 영토 API](https://gamcom-3kingdom.vercel.app/api/castles?fresh=1)도 전체 검증하고 ID·번호·좌표가 우리 원장과 모두 일치할 때 바뀐 영토만 `영토입력`에 추가한다. 원문에 갱신시각이 없으므로 수집시각을 관측시각으로 쓰고 `원문 갱신시각 미제공`을 남긴다. 참가자 자료는 `외부참고`에 수집시각·출처 URL·채택 필드·유지 필드를 남기고, 실제 상승분만 `관측입력`에 `시트+Gamcom`·`기준값` 스냅샷으로 추가한다. 이는 두 출처의 값이 같다는 의미의 `교차검증`과 구분한다.
+[위](https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84?season=2)·[촉](https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89?season=2)·[오](https://gamcom-3kingdom.vercel.app/factions/%EC%98%A4?season=2) 페이지는 우리 원장을 대체하지 않는다. 운영 서버는 `SAMGUK_GAMCOM_MONITOR_ENABLED=1`일 때 격리된 headless Chromium 세 개로 세 페이지를 매분 병렬 수집하며, `SAMGUK_TRACKING_WRITE_ENABLED=1`일 때만 상승분을 batch 저장한다. process 간 lock으로 reload·수동 실행 중복을 막고 종료 시 browser process group과 임시 profile을 회수한다. 수동 확인은 `node scripts/samguk-sync-gamcom-chromium.js`로 dry-run하며, OAuth writer 구성에서만 `--write`를 명시한다. 매번 국가별 30명과 우리 원장 90명의 닉네임·국가가 전부 일치해야 쓰며, 숫자는 `MAX(우리값, Gamcom값)`, 세력·직업·말은 우리 값을 우선한다. 레벨·강화·능력치·원본 무력점수는 이후 더 낮은 관측이 들어와도 현황에서 내려가지 않는다. 원문에 갱신시각이 없으므로 수집시각을 관측시각으로 쓰고 `원문 갱신시각 미제공`을 남긴다. 실제 상승분만 `관측입력`에 `시트+Gamcom`·`기준값` 스냅샷으로 추가하며, 이는 두 출처의 값이 같다는 의미의 `교차검증`과 구분한다. Apps Script 구현은 수동 대체 경로지만 Vercel 보안 checkpoint가 Apps Script 요청을 제한할 수 있다.
 
 ### 공개 현황·제보 시트
 
