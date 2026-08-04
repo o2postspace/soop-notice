@@ -27,7 +27,9 @@ const MAX_ARCHIVED_FRAMES_PER_CANDIDATE = 4;
 // target별 FIFO는 길게 열린 패널이 여러 segment에 걸쳐도 다음 화면을 덮지 않는다.
 const MAX_EAGER_CANDIDATE_PREFETCHES = 12;
 const MAX_QUEUED_CANDIDATES_PER_TARGET = 64;
-const MAX_FALLBACK_ARCHIVE_PREFETCHES = 32;
+// 90채널이 동시에 UI 후보를 내는 짧은 burst도 SD 원본을 놓치지 않도록
+// 실측 peak(약 5GiB)에서 12GiB service 한도 안의 48 lane까지 흡수한다.
+const MAX_FALLBACK_ARCHIVE_PREFETCHES = 48;
 const MAX_SD_FALLBACK_SEGMENT_BYTES = 8 * 1024 * 1024;
 const MAX_SD_FALLBACK_FRAMES = 2;
 const ARCHIVED_CANDIDATE_TTL_MS = 10 * 60_000;
