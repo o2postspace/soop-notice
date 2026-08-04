@@ -139,7 +139,14 @@ function createRunner({
   let samgukFmkoreaRun = null;
   let samgukGamcomRun = null;
   let samgukGamcomAbortController = null;
+  let samgukSheetTaskTail = Promise.resolve();
   let sharedSamgukSheetService = samgukSheetService;
+
+  function enqueueSamgukSheetTask(operation) {
+    const task = samgukSheetTaskTail.then(operation, operation);
+    samgukSheetTaskTail = task.then(() => undefined, () => undefined);
+    return task;
+  }
 
   function runFetch(mode) {
     if (fetchRuns.has(mode)) return fetchRuns.get(mode);
@@ -172,15 +179,17 @@ function createRunner({
 
     samgukPromotionRun = Promise.resolve()
       .then(() => {
-        if (!sharedSamgukSheetService) sharedSamgukSheetService = createSamgukSheetServiceFn();
-        return promoteSamgukFn({
-          queuePath: samgukTracking.queuePath,
-          windowMs: samgukTracking.windowMs,
-          write: samgukTracking.write,
-          service: sharedSamgukSheetService,
-          baselineRetryAttempts: samgukTracking.baselineRetryAttempts,
-          baselineRetryBaseMs: samgukTracking.baselineRetryBaseMs,
-          baselineRetryMaxMs: samgukTracking.baselineRetryMaxMs,
+        return enqueueSamgukSheetTask(() => {
+          if (!sharedSamgukSheetService) sharedSamgukSheetService = createSamgukSheetServiceFn();
+          return promoteSamgukFn({
+            queuePath: samgukTracking.queuePath,
+            windowMs: samgukTracking.windowMs,
+            write: samgukTracking.write,
+            service: sharedSamgukSheetService,
+            baselineRetryAttempts: samgukTracking.baselineRetryAttempts,
+            baselineRetryBaseMs: samgukTracking.baselineRetryBaseMs,
+            baselineRetryMaxMs: samgukTracking.baselineRetryMaxMs,
+          });
         });
       })
       .then((result) => {
@@ -249,15 +258,17 @@ function createRunner({
     samgukGamcomAbortController = abortController;
     samgukGamcomRun = Promise.resolve()
       .then(() => {
-        if (!sharedSamgukSheetService) sharedSamgukSheetService = createSamgukSheetServiceFn();
-        return gamcomMonitorFn({
-          service: sharedSamgukSheetService,
-          write: samgukGamcom.write,
-          chromiumPath: samgukGamcom.chromiumPath,
-          lockPath: samgukGamcom.lockPath,
-          timeoutMs: samgukGamcom.timeoutMs,
-          virtualTimeBudgetMs: samgukGamcom.virtualTimeBudgetMs,
-          signal: abortController.signal,
+        return enqueueSamgukSheetTask(() => {
+          if (!sharedSamgukSheetService) sharedSamgukSheetService = createSamgukSheetServiceFn();
+          return gamcomMonitorFn({
+            service: sharedSamgukSheetService,
+            write: samgukGamcom.write,
+            chromiumPath: samgukGamcom.chromiumPath,
+            lockPath: samgukGamcom.lockPath,
+            timeoutMs: samgukGamcom.timeoutMs,
+            virtualTimeBudgetMs: samgukGamcom.virtualTimeBudgetMs,
+            signal: abortController.signal,
+          });
         });
       })
       .then((result) => {
