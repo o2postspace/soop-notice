@@ -337,3 +337,58 @@ test("Gamcom runner 종료는 활성 수집을 abort하고 완료까지 기다�
   assert.equal(aborted, true);
   assert.equal(await active, null);
 });
+
+test("promotion과 Gamcom은 같은 process에서 Sheet 작업을 직렬화한다", async () => {
+  let finishPromotion;
+  let promotionStarted;
+  let active = 0;
+  let maximumActive = 0;
+  let gamcomCalls = 0;
+  const started = new Promise(resolve => { promotionStarted = resolve; });
+  const blocked = new Promise(resolve => { finishPromotion = resolve; });
+  const tracking = samgukTrackingConfig({
+    SAMGUK_TRACKING_ENABLED: "1",
+    SAMGUK_TRACKING_WRITE_ENABLED: "1",
+  });
+  const enter = () => {
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+  };
+  const leave = () => { active -= 1; };
+  const runner = createRunner({
+    createSamgukSheetServiceFn: () => ({ id: "shared-sheet" }),
+    promoteSamgukFn: async () => {
+      enter();
+      promotionStarted();
+      await blocked;
+      leave();
+      return { queued: 0, snapshots: [], written: 0, baselineAttempts: 1 };
+    },
+    gamcomMonitorFn: async () => {
+      gamcomCalls += 1;
+      enter();
+      leave();
+      return { matched: 90, changedCells: 0, snapshots: 0, written: 0 };
+    },
+    samgukTracking: tracking,
+    samgukGamcom: {
+      enabled: true,
+      write: true,
+      chromiumPath: "/usr/bin/google-chrome",
+      lockPath: "/tmp/samguk-gamcom-monitor.guard",
+      timeoutMs: 20_000,
+      virtualTimeBudgetMs: 12_000,
+    },
+    logger: { error() {}, info() {} },
+  });
+
+  const promotion = runner.runSamgukPromotion();
+  await started;
+  const gamcom = runner.runSamgukGamcomMonitor();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(gamcomCalls, 0);
+  finishPromotion();
+  await Promise.all([promotion, gamcom]);
+  assert.equal(gamcomCalls, 1);
+  assert.equal(maximumActive, 1);
+});
