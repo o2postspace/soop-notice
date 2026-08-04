@@ -26,7 +26,7 @@ const MAX_ARCHIVED_FRAMES_PER_CANDIDATE = 4;
 // burst lane 수와 맞춰 서로 다른 방송 12곳의 순간 화면을 동시에 선점한다.
 // target별 FIFO는 길게 열린 패널이 여러 segment에 걸쳐도 다음 화면을 덮지 않는다.
 const MAX_EAGER_CANDIDATE_PREFETCHES = 12;
-const MAX_QUEUED_CANDIDATES_PER_TARGET = 32;
+const MAX_QUEUED_CANDIDATES_PER_TARGET = 64;
 const MAX_FALLBACK_ARCHIVE_PREFETCHES = 32;
 const MAX_SD_FALLBACK_SEGMENT_BYTES = 8 * 1024 * 1024;
 const MAX_SD_FALLBACK_FRAMES = 2;

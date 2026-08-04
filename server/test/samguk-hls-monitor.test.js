@@ -1243,7 +1243,7 @@ test("burst OCR 실패 시 병렬로 받은 SD cursor는 확정하지 않고 nor
   assert.equal(stats.sdSequenceGaps, 0);
 });
 
-test("burst 중 연속 SD 후보는 기존 archive를 덮지 않고 32개 FIFO로 보존·OCR한다", async () => {
+test("burst 중 연속 SD 후보는 기존 archive를 덮지 않고 64개 FIFO로 보존·OCR한다", async () => {
   let sdCall = 0;
   let originalCall = 0;
   let releaseOcr;
@@ -1256,19 +1256,15 @@ test("burst 중 연속 SD 후보는 기존 archive를 덮지 않고 32개 FIFO�
       if (quality === "SD") {
         sdCall += 1;
         if (sdCall === 1) return [batchSegment(100, "SD-100")];
-        if (sdCall === 2) {
+        if (sdCall >= 2 && sdCall <= 6) {
+          const firstSequence = 101 + (sdCall - 2) * 12;
           return Array.from({ length: 12 }, (_value, index) => (
-            batchSegment(101 + index, `SD-${101 + index}`)
+            batchSegment(firstSequence + index, `SD-${firstSequence + index}`)
           ));
         }
-        if (sdCall === 3) {
-          return Array.from({ length: 12 }, (_value, index) => (
-            batchSegment(113 + index, `SD-${113 + index}`)
-          ));
-        }
-        if (sdCall === 4) {
-          return Array.from({ length: 9 }, (_value, index) => (
-            batchSegment(125 + index, `SD-${125 + index}`)
+        if (sdCall === 7) {
+          return Array.from({ length: 5 }, (_value, index) => (
+            batchSegment(161 + index, `SD-${161 + index}`)
           ));
         }
         return [];
@@ -1310,12 +1306,13 @@ test("burst 중 연속 SD 후보는 기존 archive를 덮지 않고 32개 FIFO�
   while (fixture.monitor.getSnapshot(BASE_TIME).stats.burstSdGateSegments < 12) {
     await new Promise(resolve => setImmediate(resolve));
   }
-  await fixture.monitor.syncBurstSdCursor(target());
-  await fixture.monitor.syncBurstSdCursor(target());
+  for (let index = 0; index < 5; index += 1) {
+    await fixture.monitor.syncBurstSdCursor(target());
+  }
   const queuedSnapshot = fixture.monitor.getSnapshot(BASE_TIME).stats;
-  assert.equal(queuedSnapshot.candidateQueueAdds, 32);
+  assert.equal(queuedSnapshot.candidateQueueAdds, 64);
   assert.equal(queuedSnapshot.candidateQueueDrops, 1);
-  assert.equal(queuedSnapshot.candidateQueueDepth, 32);
+  assert.equal(queuedSnapshot.candidateQueueDepth, 64);
 
   releaseOcr();
   const first = await firstPromise;
@@ -1323,17 +1320,17 @@ test("burst 중 연속 SD 후보는 기존 archive를 덮지 않고 32개 FIFO�
   assert.equal(first.ocr.frames.every(frame => frame.mediaSequence === 100), true);
 
   const queued = [];
-  for (let index = 0; index < 32; index += 1) {
+  for (let index = 0; index < 64; index += 1) {
     queued.push(await fixture.monitor.executeTask({ lane: "burst", target: target() }));
   }
   assert.deepEqual(
     queued.map(result => result.ocr.frames[0]?.mediaSequence),
-    Array.from({ length: 32 }, (_value, index) => 101 + index),
+    Array.from({ length: 64 }, (_value, index) => 101 + index),
   );
   const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
-  assert.equal(stats.burstSdGateSegments, 33);
-  assert.equal(stats.burstSdUiCandidates, 32);
-  assert.equal(stats.candidateQueueAdds, 32);
+  assert.equal(stats.burstSdGateSegments, 65);
+  assert.equal(stats.burstSdUiCandidates, 64);
+  assert.equal(stats.candidateQueueAdds, 64);
   assert.equal(stats.candidateQueueDrops, 1);
   assert.equal(stats.candidateQueueDepth, 0);
   assert.ok(stats.candidateFramesLoaded >= 66);
