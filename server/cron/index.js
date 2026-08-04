@@ -19,6 +19,12 @@ const {
   promote: promoteSamgukObservations,
   resolveCacheStampPath,
 } = require("../scripts/samguk-promote-observations");
+const {
+  DEFAULT_CHROMIUM_PATH: DEFAULT_GAMCOM_CHROMIUM_PATH,
+  DEFAULT_TIMEOUT_MS: DEFAULT_GAMCOM_TIMEOUT_MS,
+  DEFAULT_VIRTUAL_TIME_BUDGET_MS: DEFAULT_GAMCOM_VIRTUAL_TIME_BUDGET_MS,
+  runGamcomChromiumMonitor,
+} = require("../lib/samguk-gamcom-chromium-monitor");
 
 const DEFAULT_SAMGUK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_SAMGUK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -91,6 +97,28 @@ function samgukFmkoreaConfig(env = process.env, tracking = samgukTrackingConfig(
   });
 }
 
+function samgukGamcomConfig(env = process.env, tracking = samgukTrackingConfig(env)) {
+  const lockValue = String(env.SAMGUK_GAMCOM_LOCK_PATH || "").trim();
+  return Object.freeze({
+    enabled: env.SAMGUK_GAMCOM_MONITOR_ENABLED === "1",
+    write: tracking.write,
+    chromiumPath: String(env.SAMGUK_GAMCOM_CHROMIUM_PATH || DEFAULT_GAMCOM_CHROMIUM_PATH).trim(),
+    lockPath: lockValue
+      ? (path.isAbsolute(lockValue) ? lockValue : path.resolve(__dirname, "..", lockValue))
+      : path.join(path.dirname(tracking.queuePath), ".gamcom-monitor.guard"),
+    timeoutMs: boundedPositiveInt(
+      env.SAMGUK_GAMCOM_CHROMIUM_TIMEOUT_MS,
+      DEFAULT_GAMCOM_TIMEOUT_MS,
+      25_000,
+    ),
+    virtualTimeBudgetMs: boundedPositiveInt(
+      env.SAMGUK_GAMCOM_VIRTUAL_TIME_BUDGET_MS,
+      DEFAULT_GAMCOM_VIRTUAL_TIME_BUDGET_MS,
+      60_000,
+    ),
+  });
+}
+
 function createRunner({
   fetchNoticesFn = fetchNotices,
   parseHotFn = parseHot,
@@ -99,14 +127,18 @@ function createRunner({
   samgukSheetService = null,
   markSamgukCacheInvalidatedFn = markCacheInvalidated,
   fmkoreaMonitorFn = runFmkoreaGearMonitor,
+  gamcomMonitorFn = runGamcomChromiumMonitor,
   samgukTracking = samgukTrackingConfig(),
   samgukFmkorea = samgukFmkoreaConfig(process.env, samgukTracking),
+  samgukGamcom = samgukGamcomConfig(process.env, samgukTracking),
   logger = console,
 } = {}) {
   const fetchRuns = new Map();
   let parseRun = null;
   let samgukPromotionRun = null;
   let samgukFmkoreaRun = null;
+  let samgukGamcomRun = null;
+  let samgukGamcomAbortController = null;
   let sharedSamgukSheetService = samgukSheetService;
 
   function runFetch(mode) {
@@ -209,6 +241,64 @@ function createRunner({
     return samgukFmkoreaRun;
   }
 
+  function runSamgukGamcomMonitor() {
+    if (!samgukGamcom.enabled) return Promise.resolve(null);
+    if (samgukGamcomRun) return samgukGamcomRun;
+
+    const abortController = new AbortController();
+    samgukGamcomAbortController = abortController;
+    samgukGamcomRun = Promise.resolve()
+      .then(() => {
+        if (!sharedSamgukSheetService) sharedSamgukSheetService = createSamgukSheetServiceFn();
+        return gamcomMonitorFn({
+          service: sharedSamgukSheetService,
+          write: samgukGamcom.write,
+          chromiumPath: samgukGamcom.chromiumPath,
+          lockPath: samgukGamcom.lockPath,
+          timeoutMs: samgukGamcom.timeoutMs,
+          virtualTimeBudgetMs: samgukGamcom.virtualTimeBudgetMs,
+          signal: abortController.signal,
+        });
+      })
+      .then((result) => {
+        let cacheInvalidated = false;
+        if (samgukGamcom.write && (result?.written ?? 0) > 0) {
+          try {
+            markSamgukCacheInvalidatedFn(samgukTracking.cacheStampPath);
+            cacheInvalidated = true;
+          } catch (error) {
+            logger.error("[cron] samguk Gamcom API cache invalidation failed:", error.message);
+          }
+        }
+        if (result && typeof logger.info === "function") {
+          logger.info(
+            `[cron] samguk Gamcom: mode=${samgukGamcom.write ? "write" : "dry-run"}`
+            + ` status=${result.skipped ? result.skipReason : "collected"}`
+            + ` matched=${result.matched ?? 0} changedCells=${result.changedCells ?? 0}`
+            + ` snapshots=${result.snapshots ?? 0} written=${result.written ?? 0}`
+            + ` visible=${result.visible ?? "n/a"}`
+            + ` cacheInvalidated=${cacheInvalidated}`,
+          );
+        }
+        return result;
+      })
+      .catch((error) => {
+        if (error?.code !== "aborted") logger.error("[cron] samguk Gamcom failed:", error.message);
+        return null;
+      })
+      .finally(() => {
+        if (samgukGamcomAbortController === abortController) samgukGamcomAbortController = null;
+        samgukGamcomRun = null;
+      });
+    return samgukGamcomRun;
+  }
+
+  async function stopSamgukGamcomMonitor() {
+    if (!samgukGamcomRun) return;
+    samgukGamcomAbortController?.abort();
+    await samgukGamcomRun;
+  }
+
   async function runCycle({ includeRest = false } = {}) {
     const fetchTasks = [runFetch("popular")];
     if (includeRest) fetchTasks.push(runFetch("rest"));
@@ -218,8 +308,11 @@ function createRunner({
 
   return {
     runCycle,
+    runSamgukGamcomMonitor,
     runSamgukFmkoreaMonitor,
     runSamgukPromotion,
+    stopSamgukGamcomMonitor,
+    samgukGamcom,
     samgukFmkorea,
     samgukTracking,
   };
@@ -236,6 +329,10 @@ function start() {
     void runner.runCycle({ includeRest });
     void runner.runSamgukFmkoreaMonitor().then(() => runner.runSamgukPromotion());
   });
+  const gamcomTask = cron.schedule("* * * * *", () => {
+    if (stopped) return;
+    void runner.runSamgukGamcomMonitor();
+  });
   const cleanupTask = cron.schedule("17 4 * * *", () => {
     if (stopped) return;
     void cleanupCommunity().catch(error => {
@@ -245,22 +342,35 @@ function start() {
 
   // 재기동 직후에도 전체 공지를 먼저 갱신하고 캘린더를 백필한다.
   void runner.runCycle({ includeRest: true });
+  void runner.runSamgukGamcomMonitor();
   void runner.runSamgukFmkoreaMonitor().then(() => runner.runSamgukPromotion());
 
   const trackingMode = runner.samgukTracking.enabled
     ? (runner.samgukTracking.write ? "write" : "dry-run")
     : "disabled";
   const fmkoreaMode = runner.samgukFmkorea.enabled ? "collect" : "disabled";
-  console.log(`[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, samguk=${trackingMode}, fmkorea=${fmkoreaMode}, bootstrap enabled`);
+  const gamcomMode = runner.samgukGamcom.enabled
+    ? (runner.samgukGamcom.write ? "write/1m" : "dry-run/1m")
+    : "disabled";
+  console.log(`[cron] scheduled: ordered fetch(popular/5m, rest/30m) -> parse-hot, samguk=${trackingMode}, fmkorea=${fmkoreaMode}, gamcom=${gamcomMode}, bootstrap enabled`);
 
-  return () => {
+  return async () => {
     if (stopped) return;
     stopped = true;
     scheduledTask.stop();
     if (typeof scheduledTask.destroy === "function") scheduledTask.destroy();
+    gamcomTask.stop();
+    if (typeof gamcomTask.destroy === "function") gamcomTask.destroy();
     cleanupTask.stop();
     if (typeof cleanupTask.destroy === "function") cleanupTask.destroy();
+    await runner.stopSamgukGamcomMonitor();
   };
 }
 
-module.exports = { start, createRunner, samgukFmkoreaConfig, samgukTrackingConfig };
+module.exports = {
+  start,
+  createRunner,
+  samgukFmkoreaConfig,
+  samgukGamcomConfig,
+  samgukTrackingConfig,
+};

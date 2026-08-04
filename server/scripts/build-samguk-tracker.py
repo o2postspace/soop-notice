@@ -24,7 +24,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 MAX_INPUT_ROW = 5001
 FONT_NAME = "Noto Sans CJK KR"
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY/edit"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1yMUytX11t-SzB9Tz9tpizj0Dyc1iIC2H2utQpycUuTQ/edit"
 WIKI_URL = "https://threekingdoms.notion.site/"
 SKILL_STATS_URL = "https://threekingdoms.notion.site/872f648a81d1821ea42581f61a4fc57e"
 FMKOREA_RULES_URL = "https://www.fmkorea.com/10143176987"
