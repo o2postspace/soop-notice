@@ -3,17 +3,22 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const {
+  CURRENT_SEASON_ID,
   DECIMAL_NUMERIC_FIELDS,
   NUMERIC_FIELD_MAXIMUMS,
   acquireObservationQueueLock,
+  normalizeSeasonId,
 } = require("./samguk-observations");
+const { normalizeSkillBuild } = require("./samguk-skill-build");
 
 const GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token";
 const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const GOOGLE_SHEETS_API_ROOT = "https://sheets.googleapis.com/v4/spreadsheets";
 const OBSERVATION_SHEET = "관측입력";
 const PARTICIPANT_SHEET = "참가자";
-const OBSERVATION_LAST_COLUMN = "AX";
+const RULE_SHEET = "게임정보";
+const SEASON_MARKER_RANGE = `'${RULE_SHEET}'!A1:C30`;
+const OBSERVATION_LAST_COLUMN = "AY";
 const MAX_OBSERVATION_ROW = 5001;
 const MAX_SNAPSHOT_BATCH = 100;
 const MAX_TOKEN_BYTES = 32 * 1024;
@@ -60,6 +65,7 @@ const FIELD_HEADERS = Object.freeze({
   moveSpeedIncrease: "이동속도증가량",
   healthIncrease: "체력증가량",
   skillHasteIncrease: "절기가속증가량",
+  skillBuild: "절기배분",
 });
 const FIELD_NAMES = Object.freeze(Object.keys(FIELD_HEADERS));
 const EXPECTED_HEADERS = Object.freeze([
@@ -72,6 +78,7 @@ const EXPECTED_HEADERS = Object.freeze([
   "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
   "무력보너스", "기민보너스", "기력보너스", "지모보너스",
   "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량",
+  "절기배분",
 ]);
 const INPUT_TIME_COLUMN_INDEX = EXPECTED_HEADERS.indexOf("입력시각");
 const SOURCE_LABELS = Object.freeze({
@@ -146,6 +153,12 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
     fail("invalid_snapshot", "승격할 snapshot이 필요합니다.");
   }
+  let seasonId;
+  try {
+    seasonId = normalizeSeasonId(snapshot.seasonId);
+  } catch {
+    fail("invalid_snapshot", `snapshot seasonId는 '${CURRENT_SEASON_ID}'여야 합니다.`);
+  }
   const observationId = safeText(snapshot.observationId, 128, "observationId");
   if (!/^OBS-[A-Z0-9-]{8,120}$/.test(observationId)) fail("invalid_snapshot", "observationId 형식이 올바르지 않습니다.");
   const playerId = safeText(snapshot.playerId, 16, "playerId");
@@ -195,6 +208,12 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
     const value = snapshot.fields[field];
     if (value === null) {
       fields[field] = "";
+    } else if (field === "skillBuild") {
+      try {
+        fields[field] = normalizeSkillBuild(value);
+      } catch (error) {
+        fail("invalid_snapshot", `skillBuild 값이 올바르지 않습니다: ${error.message}`);
+      }
     } else if (["horse", "basicAttackTarget", "combatConditions", "activeGeneral"].includes(field)) {
       const maximum = ["horse", "activeGeneral"].includes(field)
         ? 80
@@ -225,6 +244,7 @@ function normalizeSnapshot(snapshot, now = Date.now()) {
     fail("invalid_snapshot", "미래 관측값은 쓸 수 없습니다.");
   }
   return Object.freeze({
+    seasonId,
     observationId,
     playerId,
     verification: snapshot.verification,
@@ -494,6 +514,20 @@ function createSamgukGoogleSheetWriter(options = {}) {
     }
   }
 
+  function assertCurrentSeasonMarker(valueRange) {
+    const rows = valueRange?.values || [];
+    if (!Array.isArray(rows) || rows.some(row => !Array.isArray(row) || row.length > 3)) {
+      fail("invalid_sheet", "게임정보 season marker 응답이 올바르지 않습니다.");
+    }
+    const markers = rows.filter(row => String(row[1] || "").trim().toLowerCase() === "season_id");
+    if (markers.length !== 1
+        || String(markers[0][0] || "").trim() !== "시즌"
+        || String(markers[0][1] || "").trim() !== "season_id"
+        || String(markers[0][2] || "").trim() !== CURRENT_SEASON_ID) {
+      fail("invalid_season", `게임정보 season_id는 '${CURRENT_SEASON_ID}'여야 합니다.`);
+    }
+  }
+
   async function appendSnapshotUnlocked(input) {
     const snapshot = normalizeSnapshot(input, now());
     const expectedRow = snapshotRow(snapshot);
@@ -510,10 +544,12 @@ function createSamgukGoogleSheetWriter(options = {}) {
     query.append("ranges", `'${OBSERVATION_SHEET}'!A1:${OBSERVATION_LAST_COLUMN}1`);
     query.append("ranges", `'${OBSERVATION_SHEET}'!A2:${OBSERVATION_LAST_COLUMN}${MAX_OBSERVATION_ROW}`);
     query.append("ranges", `'${PARTICIPANT_SHEET}'!A2:A91`);
+    query.append("ranges", SEASON_MARKER_RANGE);
     const state = await request(apiUrl("/values:batchGet", query));
-    if (!state.ok || !Array.isArray(state.body?.valueRanges) || state.body.valueRanges.length !== 3) {
+    if (!state.ok || !Array.isArray(state.body?.valueRanges) || state.body.valueRanges.length !== 4) {
       fail("invalid_sheet", "Google Sheet 구조를 읽지 못했습니다.");
     }
+    assertCurrentSeasonMarker(state.body.valueRanges[3]);
     const headers = state.body.valueRanges[0].values?.[0] || [];
     if (headers.length !== EXPECTED_HEADERS.length
         || headers.some((header, index) => header !== EXPECTED_HEADERS[index])) {
@@ -590,10 +626,12 @@ function createSamgukGoogleSheetWriter(options = {}) {
     stateQuery.append("ranges", `'${OBSERVATION_SHEET}'!A1:${OBSERVATION_LAST_COLUMN}1`);
     stateQuery.append("ranges", `'${OBSERVATION_SHEET}'!A2:${OBSERVATION_LAST_COLUMN}${MAX_OBSERVATION_ROW}`);
     stateQuery.append("ranges", `'${PARTICIPANT_SHEET}'!A2:A91`);
+    stateQuery.append("ranges", SEASON_MARKER_RANGE);
     const state = await request(apiUrl("/values:batchGet", stateQuery));
-    if (!state.ok || !Array.isArray(state.body?.valueRanges) || state.body.valueRanges.length !== 3) {
+    if (!state.ok || !Array.isArray(state.body?.valueRanges) || state.body.valueRanges.length !== 4) {
       fail("invalid_sheet", "Google Sheet 구조를 읽지 못했습니다.");
     }
+    assertCurrentSeasonMarker(state.body.valueRanges[3]);
     const headers = state.body.valueRanges[0].values?.[0] || [];
     if (headers.length !== EXPECTED_HEADERS.length
         || headers.some((header, index) => header !== EXPECTED_HEADERS[index])) {

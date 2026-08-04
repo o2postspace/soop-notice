@@ -8,6 +8,7 @@ const { spawnSync } = require("node:child_process");
 const { calculateRosterPowerIndexes, POWER_INDEX_VERSION } = require("../lib/samguk-power-index");
 
 const API_URL = "http://127.0.0.1:4000/api/samguk?refresh=1";
+const SEASON_ID = "hugukji-2026-08-04";
 const DISPLAY_MULTIPLIER = 125;
 const WIDTH = 1800;
 const HEIGHT = 2400;
@@ -39,6 +40,22 @@ function displayLevel(value) {
   return Number.isFinite(Number(value)) ? `${Number(value)}강` : "—";
 }
 
+function skillBuildMetrics(value) {
+  if (!value || !Array.isArray(value.skills) || ![6, 9].includes(value.skills.length)) return null;
+  const allocations = value.skills.map(skill => Number(skill?.allocatedPoints));
+  if (allocations.some(points => !Number.isSafeInteger(points) || points < 0)) return null;
+  return {
+    allocatedTotal: allocations.reduce((sum, points) => sum + points, 0),
+    upgradedCount: allocations.filter(points => points > 0).length,
+    skillCount: allocations.length,
+  };
+}
+
+function displaySkillBuild(value) {
+  const metrics = skillBuildMetrics(value);
+  return metrics ? `${metrics.allocatedTotal} (${metrics.upgradedCount}/${metrics.skillCount})` : "—";
+}
+
 function kstTimestamp(now = new Date()) {
   const parts = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -55,8 +72,9 @@ function kstTimestamp(now = new Date()) {
 
 function normalizeRanking(payload) {
   if (!payload || payload.source !== "google-sheet" || payload.stale === true
+      || payload.seasonId !== SEASON_ID
       || !Array.isArray(payload.members) || payload.members.length !== 90) {
-    fail("최신 Google Sheet 90명 payload가 아니어서 이미지를 만들지 않습니다.");
+    fail("최신 후국지 Google Sheet 90명 payload가 아니어서 이미지를 만들지 않습니다.");
   }
   const names = new Set(payload.members.map(member => String(member?.name || "").trim()));
   if (names.size !== 90 || [...names].some(name => !name)) {
@@ -120,6 +138,7 @@ function topCard(entry, place) {
       <span>력 ${displayNumber(member.vitality)}</span><span>모 ${displayNumber(member.intelligence)}</span>
       <i></i>
       <span>무기 ${displayLevel(member.weapon)}</span><span>흉갑 ${displayLevel(member.armor)}</span><span>각갑 ${displayLevel(member.shoes)}</span>
+      <span>절기 ${displaySkillBuild(member.skillBuild)}</span>
     </div>
   </article>`;
 }
@@ -129,7 +148,7 @@ function rankingRow(entry) {
   return `<div class="rank-row">
     <span class="rank-no">${entry.rank}</span>
     ${nationBadge(member.nation)}
-    <span class="person"><b>${escapeHtml(member.name)}</b><small>${escapeHtml(member.job || "장수 미확인")}</small></span>
+    <span class="person"><b>${escapeHtml(member.name)}</b><small>${escapeHtml(member.job || "장수 미확인")} · 절기 ${escapeHtml(displaySkillBuild(member.skillBuild))}</small></span>
     <span class="row-score"><b>${displayNumber(entry.points)}</b><small>PWR</small></span>
   </div>`;
 }
@@ -158,7 +177,7 @@ function buildHtml(ranking, renderedAt) {
       radial-gradient(circle at 12% 8%,rgba(183,123,53,.22),transparent 25%),
       radial-gradient(circle at 88% 14%,rgba(105,31,22,.30),transparent 30%),
       linear-gradient(145deg,#18130d 0%,#2a1b11 55%,#130e0b 100%)}
-  .poster:before{content:"三國志";position:absolute;right:-38px;top:450px;writing-mode:vertical-rl;
+  .poster:before{content:"後國志";position:absolute;right:-38px;top:450px;writing-mode:vertical-rl;
     font-family:"Noto Serif CJK KR",serif;font-weight:900;font-size:300px;letter-spacing:22px;color:rgba(232,202,140,.035)}
   .frame{position:absolute;inset:28px;border:1px solid rgba(213,170,89,.55);pointer-events:none}
   .frame:before,.frame:after{content:"";position:absolute;width:110px;height:110px;border-color:#b68a43;border-style:solid}
@@ -200,13 +219,13 @@ function buildHtml(ranking, renderedAt) {
   .method{font-size:14px;line-height:1.65}.method b{color:#e0c38e}.method strong{color:#d67461;font-weight:800}.brand{text-align:right}
   .brand b{display:block;color:#e7c783;font-family:"Noto Serif CJK KR",serif;font-size:34px;letter-spacing:4px}.brand span{display:block;margin-top:2px;color:#8e8170;font-size:11px;letter-spacing:3px}
 </style></head><body><main class="poster"><div class="frame"></div>
-  <header class="masthead"><div class="eyebrow">2026 SOOP 삼국지 서버</div><div class="title-line"><h1>삼국지 <em>파워 랭킹</em></h1><div class="seal">戰力<br>榜</div></div>
-    <p class="subtitle"><b>90인 전체 순위</b> · 공개 시트와 방송 OCR 관측값을 반영한 파워 ${escapeHtml(POWER_INDEX_VERSION)}</p><span class="asof">${escapeHtml(renderedAt)}</span></header>
+  <header class="masthead"><div class="eyebrow">2026 SOOP 후국지 서버</div><div class="title-line"><h1>후국지 <em>파워 랭킹</em></h1><div class="seal">戰力<br>榜</div></div>
+    <p class="subtitle"><b>90인 전체 순위</b> · 공개 시트와 방송 OCR 관측값 반영 · 절기 강화 별도 표시 · 파워 ${escapeHtml(POWER_INDEX_VERSION)}</p><span class="asof">${escapeHtml(renderedAt)}</span></header>
   <section class="podium">${top.map((entry, index) => topCard(entry, index + 1)).join("\n")}</section>
   <section class="board"><div class="board-title"><h3>全軍 戰力序列</h3><p>총 90명 · 표시점수 ${displayNumber(maxPoints)}–${displayNumber(minPoints)} PWR</p></div>
     <div class="columns">${columns.map(rankingColumn).join("\n")}</div></section>
   <footer class="footer"><div class="method"><b>POWER ${escapeHtml(POWER_INDEX_VERSION)} · 표시단위 ×${DISPLAY_MULTIPLIER}</b>　레벨·기량 30% · 장비 35%(무기 60%) · 각인 20% · 말 15%(5등급+강화)<br>
-    <strong>현재 전원 관측 기반 추정치</strong> · 미관측 요소는 임의 보정하지 않고 확인된 하한값으로 정렬 · 팬메이드 비공식 집계</div>
+    <strong>절기 강화는 별도 관측값이며 v1.6 점수 미반영</strong> · 미관측 요소는 임의 보정하지 않고 확인된 하한값으로 정렬 · 팬메이드 비공식 집계</div>
     <div class="brand"><b>SOOPNOTICE.COM</b><span>DATA · TRACKING · ARCHIVE</span></div></footer>
 </main></body></html>`;
 }
@@ -221,11 +240,11 @@ function chromiumPath() {
 
 async function main() {
   const outputPath = path.resolve(process.argv[2] || path.join(
-    os.homedir(), "exports", `samguk-power-ranking-${new Date().toISOString().slice(0, 10)}.png`,
+    os.homedir(), "exports", `hugukji-power-ranking-${new Date().toISOString().slice(0, 10)}.png`,
   ));
   if (path.extname(outputPath).toLowerCase() !== ".png") fail("출력 파일은 PNG여야 합니다.");
   const response = await fetch(API_URL, { headers: { accept: "application/json" } });
-  if (!response.ok) fail(`삼국지 API 조회 실패: HTTP ${response.status}`);
+  if (!response.ok) fail(`후국지 API 조회 실패: HTTP ${response.status}`);
   const payload = await response.json();
   const ranking = normalizeRanking(payload);
   const html = buildHtml(ranking, kstTimestamp());

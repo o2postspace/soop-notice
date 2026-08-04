@@ -35,6 +35,85 @@ const DARK_OVERLAY_LIMITS = Object.freeze({
   maxTitleY: 12,
 });
 
+// 절기 배분창은 중앙 패널 자체가 어둡고 좌우 gameplay가 함께 보여 일반 panel
+// boundary/title 조건에 걸리지 않는다. 중앙의 6개 장수 행이 만드는 반복 가로
+// stripe와 전체 화면 texture를 함께 요구해 전투/로딩 화면과 분리한다.
+const SKILL_PANEL_RECT = Object.freeze({ x: 16, y: 3, width: 17, height: 21 });
+const SKILL_PANEL_LIMITS = Object.freeze({
+  minOverallMean: 42,
+  maxOverallMean: 64,
+  minLumaStdDev: 20,
+  maxLumaStdDev: 58,
+  minOverallDarkRatio: 0.80,
+  maxOverallDarkRatio: 0.92,
+  minColumnDeltaMean: 8,
+  maxColumnDeltaMean: 15,
+  minEdgeRatio: 0.09,
+  maxEdgeRatio: 0.15,
+  minSmoothRatio: 0.50,
+  maxSmoothRatio: 0.64,
+  minPanelMean: 32,
+  maxPanelMean: 55,
+  minPanelDarkRatio: 0.88,
+  minStripePeaks: 3,
+  minStripeDelta: 4,
+  minBrightOverallMean: 65,
+  maxBrightOverallMean: 100,
+  minBrightLumaStdDev: 35,
+  maxBrightLumaStdDev: 60,
+  minBrightOverallDarkRatio: 0.3,
+  maxBrightOverallDarkRatio: 0.65,
+  minBrightColumnDeltaMean: 14,
+  maxBrightColumnDeltaMean: 22,
+  minBrightEdgeRatio: 0.18,
+  maxBrightEdgeRatio: 0.32,
+  minBrightSmoothRatio: 0.3,
+  maxBrightSmoothRatio: 0.55,
+  minMixedOverallMean: 50,
+  maxMixedOverallMean: 82,
+  minMixedLumaStdDev: 40,
+  maxMixedLumaStdDev: 62,
+  minMixedOverallDarkRatio: 0.45,
+  maxMixedOverallDarkRatio: 0.75,
+  minMixedColumnDeltaMean: 14,
+  maxMixedColumnDeltaMean: 22,
+  minMixedEdgeRatio: 0.18,
+  maxMixedEdgeRatio: 0.36,
+  minMixedSmoothRatio: 0.3,
+  maxMixedSmoothRatio: 0.48,
+  minMixedPanelDarkRatio: 0.83,
+});
+
+// 기량 배분창은 중앙의 네 속성 원과 십자 광원이 큰 정사각형을 만든다. 일반
+// alert/modal도 중앙이 어둡지만 네 사분면 모두의 높은 분산과 십자 대비가 없어
+// 이 구조를 만족하지 않는다.
+const APTITUDE_TITLE_RECT = Object.freeze({ x: 14, y: 3, width: 21, height: 3 });
+const APTITUDE_BODY_RECT = Object.freeze({ x: 14, y: 6, width: 21, height: 18 });
+const APTITUDE_CENTER_RECT = Object.freeze({ x: 23, y: 6, width: 3, height: 15 });
+const APTITUDE_QUADRANT_RECTS = Object.freeze([
+  Object.freeze({ x: 17, y: 7, width: 7, height: 6 }),
+  Object.freeze({ x: 25, y: 7, width: 7, height: 6 }),
+  Object.freeze({ x: 17, y: 14, width: 7, height: 6 }),
+  Object.freeze({ x: 25, y: 14, width: 7, height: 6 }),
+]);
+const APTITUDE_PANEL_LIMITS = Object.freeze({
+  minOverallMean: 48,
+  maxOverallMean: 70,
+  minLumaStdDev: 38,
+  maxLumaStdDev: 56,
+  minOverallDarkRatio: 0.72,
+  maxOverallDarkRatio: 0.88,
+  maxTitleMean: 32,
+  minTitleDarkRatio: 0.98,
+  minBodyMean: 35,
+  maxBodyMean: 58,
+  minBodyDarkRatio: 0.78,
+  maxBodyDarkRatio: 0.93,
+  minQuadrantStdDev: 28,
+  maxQuadrantMean: 68,
+  minCenterContrast: 12,
+});
+
 const DEFAULT_THRESHOLDS = Object.freeze({
   darkPixelMax: 64,
   edgeDelta: 20,
@@ -401,7 +480,13 @@ function findPanelPattern(metrics, thresholds) {
 function isDarkOverlayCandidate(metrics, title) {
   if (!title) return false;
   const limits = DARK_OVERLAY_LIMITS;
-  return metrics.overallMean >= limits.minOverallMean
+  const obviousLoadingSplash = metrics.lumaStdDev > 60
+    && metrics.overallMean < 50
+    && metrics.columnDeltaMean >= 15
+    && title.y >= 12
+    && title.mean < 18;
+  return !obviousLoadingSplash
+    && metrics.overallMean >= limits.minOverallMean
     && metrics.overallMean <= limits.maxOverallMean
     && metrics.lumaStdDev >= limits.minLumaStdDev
     && metrics.lumaStdDev <= limits.maxLumaStdDev
@@ -420,6 +505,176 @@ function isDarkOverlayCandidate(metrics, title) {
     && title.x + title.width >= limits.minTitleRight
     && title.y >= limits.minTitleY
     && title.y <= limits.maxTitleY;
+}
+
+// 일부 방송은 강화창이 왼쪽으로 밀려 일반 panel boundary가 사라지고, title 탐색도
+// 하단 비용 영역을 고른다. 전체 texture와 넓은 하단 title을 함께 요구해 이 레이아웃만
+// 회수한다.
+function isEnhancementPanelCandidate(bytes, metrics, title) {
+  const fixedTitle = rectMoments(bytes, { x: 7, y: 5, width: 16, height: 3 });
+  const enhanceButton = rectMoments(bytes, { x: 13, y: 17, width: 4, height: 3 });
+  const fixedLayout = fixedTitle.mean <= 40
+    && fixedTitle.stdDev <= 15
+    && fixedTitle.darkRatio >= 0.95
+    && enhanceButton.mean >= 45
+    && enhanceButton.stdDev >= 30;
+  const offsetLayout = title !== null
+    && title.width >= 20
+    && title.height >= 5
+    && title.x >= 8
+    && title.x <= 18
+    && title.y >= 17
+    && title.mean <= 46
+    && title.darkRatio >= 0.85
+    && title.contrast >= 30;
+  return metrics.overallMean >= 35
+    && metrics.overallMean <= 60
+    && metrics.lumaStdDev >= 35
+    && metrics.lumaStdDev <= 60
+    && metrics.overallDarkRatio >= 0.80
+    && metrics.overallDarkRatio <= 0.94
+    && metrics.columnDeltaMean >= 12
+    && metrics.columnDeltaMean <= 19
+    && metrics.edgeRatio >= 0.14
+    && metrics.edgeRatio <= 0.24
+    && metrics.smoothRatio >= 0.35
+    && metrics.smoothRatio <= 0.52
+    && (fixedLayout || offsetLayout);
+}
+
+function isSkillPanelCandidate(bytes, metrics) {
+  const limits = SKILL_PANEL_LIMITS;
+  const darkStyle = metrics.overallMean >= limits.minOverallMean
+    && metrics.overallMean <= limits.maxOverallMean
+    && metrics.lumaStdDev >= limits.minLumaStdDev
+    && metrics.lumaStdDev <= limits.maxLumaStdDev
+    && metrics.overallDarkRatio >= limits.minOverallDarkRatio
+    && metrics.overallDarkRatio <= limits.maxOverallDarkRatio
+    && metrics.columnDeltaMean >= limits.minColumnDeltaMean
+    && metrics.columnDeltaMean <= limits.maxColumnDeltaMean
+    && metrics.edgeRatio >= limits.minEdgeRatio
+    && metrics.edgeRatio <= limits.maxEdgeRatio
+    && metrics.smoothRatio >= limits.minSmoothRatio
+    && metrics.smoothRatio <= limits.maxSmoothRatio;
+  const brightStyle = metrics.overallMean >= limits.minBrightOverallMean
+    && metrics.overallMean <= limits.maxBrightOverallMean
+    && metrics.lumaStdDev >= limits.minBrightLumaStdDev
+    && metrics.lumaStdDev <= limits.maxBrightLumaStdDev
+    && metrics.overallDarkRatio >= limits.minBrightOverallDarkRatio
+    && metrics.overallDarkRatio <= limits.maxBrightOverallDarkRatio
+    && metrics.columnDeltaMean >= limits.minBrightColumnDeltaMean
+    && metrics.columnDeltaMean <= limits.maxBrightColumnDeltaMean
+    && metrics.edgeRatio >= limits.minBrightEdgeRatio
+    && metrics.edgeRatio <= limits.maxBrightEdgeRatio
+    && metrics.smoothRatio >= limits.minBrightSmoothRatio
+    && metrics.smoothRatio <= limits.maxBrightSmoothRatio;
+  const mixedStyle = metrics.overallMean >= limits.minMixedOverallMean
+    && metrics.overallMean <= limits.maxMixedOverallMean
+    && metrics.lumaStdDev >= limits.minMixedLumaStdDev
+    && metrics.lumaStdDev <= limits.maxMixedLumaStdDev
+    && metrics.overallDarkRatio >= limits.minMixedOverallDarkRatio
+    && metrics.overallDarkRatio <= limits.maxMixedOverallDarkRatio
+    && metrics.columnDeltaMean >= limits.minMixedColumnDeltaMean
+    && metrics.columnDeltaMean <= limits.maxMixedColumnDeltaMean
+    && metrics.edgeRatio >= limits.minMixedEdgeRatio
+    && metrics.edgeRatio <= limits.maxMixedEdgeRatio
+    && metrics.smoothRatio >= limits.minMixedSmoothRatio
+    && metrics.smoothRatio <= limits.maxMixedSmoothRatio;
+  if (!darkStyle && !brightStyle && !mixedStyle) {
+    return false;
+  }
+
+  const rowMeans = [];
+  let panelSum = 0;
+  let panelDark = 0;
+  for (let y = SKILL_PANEL_RECT.y; y < SKILL_PANEL_RECT.y + SKILL_PANEL_RECT.height; y += 1) {
+    let rowSum = 0;
+    for (let x = SKILL_PANEL_RECT.x; x < SKILL_PANEL_RECT.x + SKILL_PANEL_RECT.width; x += 1) {
+      const pixel = bytes[y * FRAME_WIDTH + x];
+      rowSum += pixel;
+      panelDark += pixel <= 64 ? 1 : 0;
+    }
+    panelSum += rowSum;
+    rowMeans.push(rowSum / SKILL_PANEL_RECT.width);
+  }
+  const panelArea = SKILL_PANEL_RECT.width * SKILL_PANEL_RECT.height;
+  const panelMean = panelSum / panelArea;
+  const panelDarkRatio = panelDark / panelArea;
+  const minPanelDarkRatio = mixedStyle
+    ? limits.minMixedPanelDarkRatio
+    : limits.minPanelDarkRatio;
+  if (panelMean < limits.minPanelMean || panelMean > limits.maxPanelMean
+    || panelDarkRatio < minPanelDarkRatio) {
+    return false;
+  }
+
+  const stripePeaks = [];
+  for (let index = 1; index + 1 < rowMeans.length; index += 1) {
+    if (rowMeans[index] >= rowMeans[index - 1] + limits.minStripeDelta
+      && rowMeans[index] >= rowMeans[index + 1] + limits.minStripeDelta) {
+      stripePeaks.push(index);
+    }
+  }
+  const bottomControl = stripePeaks.some(index => index >= rowMeans.length - 2)
+    || (brightStyle
+      && rowMeans.at(-1) >= rowMeans.at(-2) + 2 * limits.minStripeDelta);
+  return stripePeaks.length >= limits.minStripePeaks && bottomControl;
+}
+
+function rectMoments(bytes, rect) {
+  let sum = 0;
+  let squaredSum = 0;
+  let dark = 0;
+  const area = rect.width * rect.height;
+  for (let y = rect.y; y < rect.y + rect.height; y += 1) {
+    for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+      const pixel = bytes[y * FRAME_WIDTH + x];
+      sum += pixel;
+      squaredSum += pixel * pixel;
+      if (pixel <= 64) dark += 1;
+    }
+  }
+  const mean = sum / area;
+  return {
+    mean,
+    stdDev: Math.sqrt(Math.max(0, squaredSum / area - mean ** 2)),
+    darkRatio: dark / area,
+  };
+}
+
+function isAptitudePanelCandidate(bytes, metrics) {
+  const limits = APTITUDE_PANEL_LIMITS;
+  if (metrics.overallMean < limits.minOverallMean
+    || metrics.overallMean > limits.maxOverallMean
+    || metrics.lumaStdDev < limits.minLumaStdDev
+    || metrics.lumaStdDev > limits.maxLumaStdDev
+    || metrics.overallDarkRatio < limits.minOverallDarkRatio
+    || metrics.overallDarkRatio > limits.maxOverallDarkRatio) {
+    return false;
+  }
+
+  const title = rectMoments(bytes, APTITUDE_TITLE_RECT);
+  const body = rectMoments(bytes, APTITUDE_BODY_RECT);
+  if (title.mean > limits.maxTitleMean
+    || title.darkRatio < limits.minTitleDarkRatio
+    || body.mean < limits.minBodyMean
+    || body.mean > limits.maxBodyMean
+    || body.darkRatio < limits.minBodyDarkRatio
+    || body.darkRatio > limits.maxBodyDarkRatio) {
+    return false;
+  }
+
+  const quadrants = APTITUDE_QUADRANT_RECTS.map(rect => rectMoments(bytes, rect));
+  if (quadrants.some(quadrant => (
+    quadrant.stdDev < limits.minQuadrantStdDev
+      || quadrant.mean > limits.maxQuadrantMean
+  ))) {
+    return false;
+  }
+  const quadrantMean = quadrants.reduce((sum, quadrant) => sum + quadrant.mean, 0)
+    / quadrants.length;
+  const center = rectMoments(bytes, APTITUDE_CENTER_RECT);
+  return center.mean - quadrantMean >= limits.minCenterContrast;
 }
 
 function frameMetrics(bytes, thresholds) {
@@ -537,6 +792,10 @@ function analyzeWithThresholds(frame, thresholds) {
   const metrics = frameMetrics(bytes, thresholds);
   const title = findTitlePattern(metrics, thresholds);
   const panel = findPanelPattern(metrics, thresholds);
+  const obviousTopHud = title?.y <= 1
+    && metrics.overallMean >= 85
+    && metrics.overallDarkRatio <= 0.45
+    && metrics.smoothRatio >= 0.56;
   const titleCandidate = metrics.overallMean >= thresholds.minBrightMean
     && metrics.overallMean <= thresholds.maxBrightMean
     && metrics.lumaStdDev <= thresholds.maxBrightLumaStdDev
@@ -544,16 +803,40 @@ function analyzeWithThresholds(frame, thresholds) {
     && metrics.rowColumnDeltaRatio >= thresholds.minBrightRowColumnRatio
     && metrics.edgeRatio <= thresholds.maxBrightEdgeRatio
     && metrics.smoothRatio >= thresholds.minBrightSmoothRatio
+    && !obviousTopHud
     && title?.contrast >= thresholds.minTitleContrast;
-  const panelCandidate = panel !== null;
+  const obviousBroadcastComposite = panel !== null
+    && panel.x >= 12
+    && panel.y <= 1
+    && panel.width >= 25
+    && title?.x <= 1
+    && title?.y <= 5
+    && metrics.overallMean >= 65
+    && metrics.overallMean <= 80
+    && metrics.lumaStdDev >= 54
+    && metrics.lumaStdDev <= 60
+    && metrics.rowDeltaMean >= 30
+    && metrics.rowColumnDeltaRatio >= 1.45
+    && metrics.edgeRatio >= 0.32
+    && metrics.smoothRatio <= 0.33;
+  const panelCandidate = panel !== null && !obviousBroadcastComposite;
   const darkOverlayCandidate = isDarkOverlayCandidate(metrics, title);
-  const detectedKind = panelCandidate
-    ? "panel"
-    : titleCandidate
-      ? "text_panel"
-      : darkOverlayCandidate
-        ? "dark_overlay"
-        : null;
+  const enhancementPanelCandidate = isEnhancementPanelCandidate(bytes, metrics, title);
+  const skillPanelCandidate = isSkillPanelCandidate(bytes, metrics);
+  const aptitudePanelCandidate = isAptitudePanelCandidate(bytes, metrics);
+  const detectedKind = aptitudePanelCandidate
+    ? "aptitude_panel"
+    : skillPanelCandidate
+      ? "skill_panel"
+      : enhancementPanelCandidate
+        ? "enhancement_panel"
+        : darkOverlayCandidate
+          ? "dark_overlay"
+          : panelCandidate
+            ? "panel"
+            : titleCandidate
+              ? "text_panel"
+              : null;
   let reason = detectedKind ? "candidate" : "no_local_ui_pattern";
   if (metrics.overallMean < thresholds.minOverallMean
     || metrics.overallDarkRatio > thresholds.maxOverallDarkRatio) {

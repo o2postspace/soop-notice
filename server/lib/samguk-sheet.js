@@ -1,4 +1,5 @@
 const FALLBACK_PAYLOAD = require("../data/samguk-fallback.json");
+const { CURRENT_SEASON_ID } = require("./samguk-observations");
 const { calculateRosterPowerIndexes } = require("./samguk-power-index");
 
 const DEFAULT_SHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
@@ -12,6 +13,7 @@ const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_BYTES = 1024 * 1024;
 const EXPECTED_MEMBER_COUNT = 90;
 const EXPECTED_TERRITORY_COUNT = 60;
+const SEASON_ID = CURRENT_SEASON_ID;
 const SOOP_ID_PATTERN = /^[A-Za-z0-9_]{1,30}$/;
 const RULER_JOBS = new Set(["조조", "유비", "손권"]);
 const EQUIPMENT_SLOTS = Object.freeze([
@@ -55,6 +57,56 @@ function normalizeHeader(value) {
     .replace(/^\uFEFF/, "")
     .replace(/\s+/g, "")
     .toLowerCase();
+}
+
+function hasExactKeys(value, expected) {
+  if (Object.prototype.toString.call(value) !== "[object Object]") return false;
+  const keys = Object.keys(value).sort();
+  return keys.length === expected.length && keys.every((key, index) => key === expected[index]);
+}
+
+function normalizeSkillBuild(value) {
+  if (!hasExactKeys(value, ["ownedPoints", "preset", "skills", "version"])) return null;
+  if (value.version !== 1) return null;
+  if (value.preset !== null
+      && (!Number.isSafeInteger(value.preset) || value.preset < 1 || value.preset > 4)) return null;
+  if (!Number.isSafeInteger(value.ownedPoints) || value.ownedPoints < 0 || value.ownedPoints > 1_000_000) {
+    return null;
+  }
+  if (!Array.isArray(value.skills) || ![6, 9].includes(value.skills.length)) return null;
+
+  const seen = new Set();
+  const skills = [];
+  for (const skill of value.skills) {
+    if (!hasExactKeys(skill, ["allocatedPoints", "name", "requiredPoints"])) return null;
+    if (typeof skill.name !== "string" || skill.name !== skill.name.trim()
+        || !skill.name || skill.name.length > 80 || /[\u0000-\u001F\u007F]/.test(skill.name)
+        || seen.has(skill.name)) return null;
+    if (!Number.isSafeInteger(skill.requiredPoints)
+        || skill.requiredPoints < 0 || skill.requiredPoints > 1_000_000
+        || !Number.isSafeInteger(skill.allocatedPoints)
+        || skill.allocatedPoints < 0 || skill.allocatedPoints > 1_000_000) return null;
+    seen.add(skill.name);
+    skills.push({
+      name: skill.name,
+      requiredPoints: skill.requiredPoints,
+      allocatedPoints: skill.allocatedPoints,
+    });
+  }
+  return { version: 1, preset: value.preset, ownedPoints: value.ownedPoints, skills };
+}
+
+function parseSkillBuildCell(value, rowNumber, warnings) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = normalizeSkillBuild(JSON.parse(raw));
+    if (parsed) return parsed;
+  } catch (_) {
+    // 아래 공통 경고로 형식 오류를 알립니다.
+  }
+  warnings.push(`${rowNumber}행 절기배분 값이 canonical v1 형식이 아니어서 제외했습니다.`);
+  return null;
 }
 
 function parseCsv(text) {
@@ -509,6 +561,7 @@ function parseMembersCsv(text) {
     moveSpeedIncrease: { aliases: ["이동속도증가량", "moveSpeedIncrease"], required: false },
     healthIncrease: { aliases: ["체력증가량", "healthIncrease"], required: false },
     skillHasteIncrease: { aliases: ["절기가속증가량", "skillHasteIncrease"], required: false },
+    skillBuild: { aliases: ["절기배분", "skillBuild"], required: false },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["최근근거", "근거", "근거(URL/타임코드)"], required: true },
     reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
@@ -618,6 +671,7 @@ function parseMembersCsv(text) {
       skillHasteIncrease: nullableNumber(
         cell(row, columns.skillHasteIncrease), "절기가속증가량", rowNumber, warnings, 1_000_000,
       ),
+      skillBuild: parseSkillBuildCell(cell(row, columns.skillBuild), rowNumber, warnings),
       sourceType: normalizeSourceType(cell(row, columns.sourceType)),
       sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
       verificationStatus: normalizeVerificationStatus(cell(row, columns.verificationStatus)),
@@ -656,6 +710,7 @@ function parseTerritoriesCsv(text) {
     capital: { aliases: ["수도", "capital"], required: true },
     facility: { aliases: ["거점유형", "시설", "facility"], required: true },
     level: { aliases: ["레벨", "영토레벨"], required: true },
+    special: { aliases: ["특수지", "special", "isCheonrimun"], required: false },
     observedAt: { aliases: ["최종확인", "확인시각"], required: true },
     evidence: { aliases: ["근거", "최근근거"], required: true },
     reviewStatus: { aliases: ["검수상태", "검증상태"], required: true },
@@ -697,6 +752,7 @@ function parseTerritoriesCsv(text) {
       capital: parseBoolean(cell(row, columns.capital)),
       facility: normalizeFacility(cell(row, columns.facility), rowNumber, warnings),
       level: nullableNumber(cell(row, columns.level), "레벨", rowNumber, warnings),
+      special: parseBoolean(cell(row, columns.special)),
       sourceType: normalizeSourceType(cell(row, columns.sourceType)),
       sourceCount: normalizeSourceCount(cell(row, columns.sourceCount), rowNumber, warnings),
       verificationStatus: normalizeVerificationStatus(cell(row, columns.verificationStatus)),
@@ -726,12 +782,22 @@ function parseRulesCsv(text) {
   });
 
   const rules = [];
+  const seasonMarkers = [];
   for (let index = 1; index < rows.length; index += 1) {
     const row = rows[index];
     if (row.every(value => String(value).trim() === "")) continue;
     const title = cell(row, columns.title);
     const description = cell(row, columns.description);
     if (!title || !description) continue;
+    if (title.toLowerCase() === "season_id") {
+      seasonMarkers.push({
+        category: cell(row, columns.category),
+        description,
+        rowNumber: index + 1,
+        title,
+      });
+      continue;
+    }
     rules.push({
       category: cell(row, columns.category) || "기타",
       title,
@@ -741,8 +807,21 @@ function parseRulesCsv(text) {
       reviewStatus: normalizeReviewStatus(cell(row, columns.reviewStatus), "참고"),
     });
   }
+  if (seasonMarkers.length !== 1) {
+    throw new SamgukSheetError(
+      "invalid_season",
+      `게임정보에 시즌 marker가 정확히 하나여야 합니다. (${seasonMarkers.length}개)`,
+    );
+  }
+  const marker = seasonMarkers[0];
+  if (marker.category !== "시즌" || marker.title !== "season_id" || marker.description !== SEASON_ID) {
+    throw new SamgukSheetError(
+      "invalid_season",
+      `${marker.rowNumber}행 시즌 marker가 현재 season '${SEASON_ID}'와 일치하지 않습니다.`,
+    );
+  }
   if (rules.length === 0) throw new SamgukSheetError("empty_sheet", "유효한 게임정보가 없습니다.");
-  return { rules, warnings: [] };
+  return { seasonId: marker.description, rules, warnings: [] };
 }
 
 function validateSheetId(sheetId) {
@@ -763,6 +842,20 @@ function buildCsvUrl(sheetId, sheetName) {
   url.searchParams.set("sheet", sheetName);
   url.searchParams.set("headers", "1");
   return url.toString();
+}
+
+function quoteSheetRange(sheetName) {
+  return `'${String(sheetName).replace(/'/g, "''")}'`;
+}
+
+function valuesToCsv(values) {
+  if (!Array.isArray(values) || values.some(row => !Array.isArray(row))) {
+    throw new SamgukSheetError("invalid_response", "Google Sheets API values 응답이 올바르지 않습니다.");
+  }
+  return values.map(row => row.map(value => {
+    const text = value === null || value === undefined ? "" : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }).join(",")).join("\r\n");
 }
 
 async function readTextLimited(response, maxBytes) {
@@ -819,6 +912,30 @@ async function fetchCsv({ fetchImpl, sheetId, sheetName, timeoutMs, maxBytes }) 
   }
 }
 
+async function fetchOauthCsvBatch({ oauthClient, sheetId, sheetNames, maxBytes }) {
+  if (!oauthClient || typeof oauthClient.batchGetValues !== "function") {
+    throw new SamgukSheetError("config_error", "Google Sheets OAuth client가 올바르지 않습니다.");
+  }
+  if (!Array.isArray(sheetNames) || sheetNames.length === 0) {
+    throw new SamgukSheetError("config_error", "Google Sheets OAuth 조회 탭이 필요합니다.");
+  }
+  const requestedRanges = sheetNames.map(quoteSheetRange);
+  const valueRanges = await oauthClient.batchGetValues(
+    sheetId,
+    requestedRanges,
+    { valueRenderOption: "FORMATTED_VALUE" },
+  );
+  if (!Array.isArray(valueRanges) || valueRanges.length !== sheetNames.length
+      || valueRanges.some(range => !range
+        || (range.values !== undefined && !Array.isArray(range.values)))) {
+    throw new SamgukSheetError("invalid_response", "Google Sheets API values 응답이 올바르지 않습니다.");
+  }
+  return Promise.all(valueRanges.map((range) => {
+    const csv = valuesToCsv(range.values || []);
+    return readTextLimited(new Response(csv), maxBytes);
+  }));
+}
+
 function newestObservedAt(members, territories, fallback) {
   const values = [
     ...members.map(member => member.observedAt),
@@ -842,6 +959,7 @@ function fallbackWarning(error, lastGood) {
   }
   if (error?.code === "upstream_timeout") return `${prefix} 조회 시간이 초과되었습니다.`;
   if (error?.code === "schema_error") return `${prefix} 시트 헤더 구성을 확인하세요.`;
+  if (error?.code === "invalid_season") return `${prefix} 게임정보의 season_id를 확인하세요.`;
   if (error?.code === "incomplete_sheet") return `${prefix} ${error.message}`;
   return prefix;
 }
@@ -849,6 +967,12 @@ function fallbackWarning(error, lastGood) {
 function createSamgukSheetService(options = {}) {
   const fetchImpl = options.fetchImpl || ((...args) => fetch(...args));
   const now = options.now || Date.now;
+  const readMode = String(options.readMode ?? process.env.SAMGUK_SHEET_READ_MODE ?? "gviz")
+    .trim()
+    .toLowerCase() || "gviz";
+  if (!new Set(["gviz", "oauth"]).has(readMode)) {
+    throw new SamgukSheetError("config_error", "SAMGUK_SHEET_READ_MODE는 gviz 또는 oauth여야 합니다.");
+  }
   const sheetId = options.sheetId || process.env.SAMGUK_SHEET_ID || DEFAULT_SHEET_ID;
   const tabs = {
     members: options.tabs?.members || process.env.SAMGUK_STATUS_SHEET || DEFAULT_TABS.members,
@@ -865,22 +989,64 @@ function createSamgukSheetService(options = {}) {
   const expectedTerritoryCount = positiveInt(options.expectedTerritoryCount, EXPECTED_TERRITORY_COUNT);
   const sheetUrl = buildSheetUrl(sheetId);
   const fallbackPayload = clone(options.fallbackPayload || FALLBACK_PAYLOAD);
+  if (fallbackPayload.seasonId !== SEASON_ID) {
+    throw new SamgukSheetError(
+      "config_error",
+      `fallback seed seasonId는 현재 season '${SEASON_ID}'와 일치해야 합니다.`,
+    );
+  }
   let lastGood = null;
+  let oauthClient = options.oauthClient || null;
+
+  function getOauthClient() {
+    if (oauthClient) return oauthClient;
+    const tokenPath = options.oauthTokenPath || process.env.SAMGUK_GOOGLE_OAUTH_TOKEN_PATH || "";
+    if (!tokenPath) {
+      throw new SamgukSheetError("config_error", "OAuth 읽기에는 SAMGUK_GOOGLE_OAUTH_TOKEN_PATH가 필요합니다.");
+    }
+    const { createSheetsApiClient } = require("./samguk-season-sheet-reset");
+    oauthClient = createSheetsApiClient(tokenPath, { fetchImpl, timeoutMs });
+    return oauthClient;
+  }
+
+  function readSheetCsv(targetSheetId, sheetName) {
+    return fetchCsv({
+      fetchImpl,
+      sheetId: targetSheetId,
+      sheetName,
+      timeoutMs,
+      maxBytes,
+    });
+  }
 
   async function load() {
     try {
-      const [memberCsv, territoryCsv, ruleCsv, equipmentOutcome] = await Promise.all([
-        fetchCsv({ fetchImpl, sheetId, sheetName: tabs.members, timeoutMs, maxBytes }),
-        fetchCsv({ fetchImpl, sheetId, sheetName: tabs.territories, timeoutMs, maxBytes }),
-        fetchCsv({ fetchImpl, sheetId, sheetName: tabs.rules, timeoutMs, maxBytes }),
-        fetchCsv({
-          fetchImpl,
-          sheetId: equipmentSheetId,
-          sheetName: tabs.equipment,
-          timeoutMs,
+      let memberCsv;
+      let territoryCsv;
+      let ruleCsv;
+      let equipmentOutcome;
+      if (readMode === "oauth") {
+        [memberCsv, territoryCsv, ruleCsv] = await fetchOauthCsvBatch({
+          oauthClient: getOauthClient(),
+          sheetId,
+          sheetNames: [tabs.members, tabs.territories, tabs.rules],
           maxBytes,
-        }).then(text => ({ text })).catch(error => ({ error })),
-      ]);
+        });
+        equipmentOutcome = await fetchOauthCsvBatch({
+          oauthClient: getOauthClient(),
+          sheetId: equipmentSheetId,
+          sheetNames: [tabs.equipment],
+          maxBytes,
+        }).then(([text]) => ({ text })).catch(error => ({ error }));
+      } else {
+        [memberCsv, territoryCsv, ruleCsv, equipmentOutcome] = await Promise.all([
+          readSheetCsv(sheetId, tabs.members),
+          readSheetCsv(sheetId, tabs.territories),
+          readSheetCsv(sheetId, tabs.rules),
+          readSheetCsv(equipmentSheetId, tabs.equipment)
+            .then(text => ({ text })).catch(error => ({ error })),
+        ]);
+      }
       const memberResult = parseMembersCsv(memberCsv);
       const territoryResult = parseTerritoriesCsv(territoryCsv);
       const ruleResult = parseRulesCsv(ruleCsv);
@@ -913,6 +1079,7 @@ function createSamgukSheetService(options = {}) {
       const poweredMembers = enrichMembersWithPowerIndex(mergedMembers);
       const readAt = new Date(now()).toISOString();
       const payload = {
+        seasonId: ruleResult.seasonId,
         source: "google-sheet",
         updatedAt: newestObservedAt(poweredMembers, territoryResult.territories, readAt),
         stale: false,
@@ -941,7 +1108,10 @@ function createSamgukSheetService(options = {}) {
       fallbackPayload.source = "fallback-seed";
       fallbackPayload.stale = true;
       fallbackPayload.sheetUrl = sheetUrl;
-      fallbackPayload.members = enrichMembersWithPowerIndex(fallbackPayload.members);
+      fallbackPayload.members = enrichMembersWithPowerIndex(fallbackPayload.members.map(member => ({
+        ...member,
+        skillBuild: normalizeSkillBuild(member.skillBuild),
+      })));
       fallbackPayload.warnings = unique([
         ...(fallbackPayload.warnings || []),
         fallbackWarning(error, false),
@@ -961,12 +1131,14 @@ module.exports = {
   DEFAULT_SHEET_ID,
   DEFAULT_TABS,
   DEFAULT_TIMEOUT_MS,
+  SEASON_ID,
   SamgukSheetError,
   buildCsvUrl,
   buildSheetUrl,
   createSamgukSheetService,
   enrichMembersWithPowerIndex,
   normalizeTimestamp,
+  normalizeSkillBuild,
   mergeEquipmentData,
   parseCsv,
   parseEquipmentCsv,

@@ -3,7 +3,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const FALLBACK = require("../data/samguk-fallback.json");
-const { appendObservationQueue } = require("./samguk-observations");
+const {
+  CURRENT_SEASON_ID,
+  CURRENT_SEASON_START_AT,
+  appendObservationQueue,
+} = require("./samguk-observations");
 
 const SEARCH_URL = "https://www.fmkorea.com/search.php?mid=afreecatv&sort_index=regdate&listStyle=webzine&search_keyword=%EA%B0%95&search_target=title_content";
 const DEFAULT_MIN_INTERVAL_MS = 5 * 60_000;
@@ -608,9 +612,25 @@ function integerOption(value, fallback, minimum, maximum, label) {
   return candidate;
 }
 
+function normalizeSeasonStartAt(value = CURRENT_SEASON_START_AT) {
+  if (value !== undefined && value !== null && typeof value !== "string") {
+    fail("invalid_config", "seasonStartAt은 밀리초 단위 UTC ISO 시각이어야 합니다.");
+  }
+  const normalized = String(value ?? "").trim() || CURRENT_SEASON_START_AT;
+  const timestamp = Date.parse(normalized);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(normalized)
+    || !Number.isFinite(timestamp)
+    || new Date(timestamp).toISOString() !== normalized) {
+    fail("invalid_config", "seasonStartAt은 밀리초 단위 UTC ISO 시각이어야 합니다.");
+  }
+  return normalized;
+}
+
 async function runFmkoreaGearMonitor(options = {}) {
   const now = options.now === undefined ? Date.now() : Number(options.now);
   if (!Number.isFinite(now) || now <= 0) fail("invalid_config", "현재 시각이 올바르지 않습니다.");
+  const seasonStartAt = normalizeSeasonStartAt(options.seasonStartAt);
+  const seasonStartAtMs = Date.parse(seasonStartAt);
   const queuePath = normalizePath(options.queuePath, "queue");
   const statePath = normalizePath(options.statePath || path.join(path.dirname(queuePath), "fmkorea-gear-monitor-state.json"), "state");
   if (queuePath === statePath) fail("invalid_path", "queue와 state 경로는 달라야 합니다.");
@@ -693,6 +713,7 @@ async function runFmkoreaGearMonitor(options = {}) {
       continue;
     }
     const observedAtMs = Date.parse(detail.observedAt);
+    if (observedAtMs < seasonStartAtMs) continue;
     if (observedAtMs < now - maxPostAgeMs || observedAtMs > now + 5 * 60_000) {
       handled.push({ documentId, status: "too-old" });
       continue;
@@ -708,6 +729,7 @@ async function runFmkoreaGearMonitor(options = {}) {
     }
     for (const claim of claims.values()) {
       observations.push({
+        seasonId: CURRENT_SEASON_ID,
         playerId: claim.playerId,
         field: claim.field,
         value: claim.value,
@@ -749,6 +771,7 @@ async function runFmkoreaGearMonitor(options = {}) {
 }
 
 module.exports = {
+  CURRENT_SEASON_START_AT,
   DEFAULT_HTTP_TIMEOUT_MS,
   DEFAULT_MAX_DETAIL_FETCHES,
   DEFAULT_MAX_POST_AGE_MS,
@@ -769,6 +792,7 @@ module.exports = {
   htmlToText,
   loadAliasesByPlayerFile,
   loadMonitorState,
+  normalizeSeasonStartAt,
   parseFmkoreaPostHtml,
   parseRetryAfter,
   parseFmkoreaSearchHtml,

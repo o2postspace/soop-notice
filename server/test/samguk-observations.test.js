@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const {
+  CURRENT_SEASON_ID,
   SamgukObservationError,
   MONOTONIC_NUMERIC_FIELDS,
   acceptSheetBaseline,
@@ -19,6 +20,20 @@ const {
 
 const FIXED_NOW = Date.parse("2026-08-02T12:00:00.000Z");
 
+function skillBuild(overrides = {}) {
+  return {
+    version: 1,
+    preset: 1,
+    ownedPoints: 6,
+    skills: Array.from({ length: 6 }, (_value, index) => ({
+      name: `절기 ${index + 1}`,
+      requiredPoints: index + 1,
+      allocatedPoints: index,
+    })),
+    ...overrides,
+  };
+}
+
 function observation(overrides = {}) {
   const sourceType = overrides.sourceType || "sheet";
   const urls = {
@@ -28,6 +43,7 @@ function observation(overrides = {}) {
     broadcast: "https://play.sooplive.co.kr/testbj/1234",
   };
   return {
+    seasonId: CURRENT_SEASON_ID,
     playerId: "P001",
     field: "strength",
     value: 10,
@@ -55,15 +71,60 @@ test("관측 스키마를 정규화하고 같은 근거는 결정적인 ID와 ha
   }), { now: FIXED_NOW });
 
   assert.deepEqual(Object.keys(first), [
-    "observationId", "playerId", "field", "value", "sourceType", "sourceId", "sourceUrl",
+    "observationId", "seasonId", "playerId", "field", "value", "sourceType", "sourceId", "sourceUrl",
     "observedAt", "collectedAt", "evidenceHash", "ocrConfidence",
   ]);
+  assert.equal(first.seasonId, CURRENT_SEASON_ID);
   assert.equal(first.value, 1234);
   assert.match(first.observationId, /^OBS-[A-F0-9]{24}$/);
   assert.match(first.evidenceHash, /^[a-f0-9]{64}$/);
   assert.equal(first.observationId, second.observationId);
   assert.equal(observationFingerprint(first), observationFingerprint(second));
   assert.equal(first.sourceUrl, "https://docs.google.com/spreadsheets/d/test/edit");
+});
+
+test("seasonId 누락과 다른 season은 관측 경계에서 fail-closed 처리한다", () => {
+  const explicit = normalizeObservation(observation({ seasonId: CURRENT_SEASON_ID }));
+  assert.equal(explicit.seasonId, CURRENT_SEASON_ID);
+  const missing = observation();
+  delete missing.seasonId;
+  assert.throws(
+    () => normalizeObservation(missing),
+    error => error instanceof SamgukObservationError && error.code === "invalid_season",
+  );
+  assert.throws(
+    () => normalizeObservation(observation({ seasonId: "samgukji-2026-08-03" })),
+    error => error instanceof SamgukObservationError && error.code === "invalid_season",
+  );
+});
+
+test("skillBuild는 6행 전체를 canonical JSON 단일 값으로 정규화한다", () => {
+  const canonical = normalizeObservation(observation({
+    field: "skillBuild",
+    value: skillBuild(),
+  })).value;
+  const reordered = normalizeObservation(observation({
+    field: "skillBuild",
+    value: JSON.stringify({
+      skills: skillBuild().skills.map(skill => ({
+        allocatedPoints: skill.allocatedPoints,
+        name: skill.name,
+        requiredPoints: skill.requiredPoints,
+      })),
+      ownedPoints: 6,
+      preset: 1,
+      version: 1,
+    }),
+  })).value;
+  assert.equal(reordered, canonical);
+  assert.equal(JSON.parse(canonical).skills.length, 6);
+  assert.throws(
+    () => normalizeObservation(observation({
+      field: "skillBuild",
+      value: skillBuild({ skills: skillBuild().skills.slice(0, 5) }),
+    })),
+    error => error.code === "invalid_value",
+  );
 });
 
 test("허용 필드, 값, URL host와 임의 상태 필드를 엄격히 검증한다", () => {
@@ -205,8 +266,9 @@ test("고신뢰 방송은 서로 다른 frame 두 개가 같은 값을 잡을 �
   assert.deepEqual(findAcceptedConsensus([frame1, { ...frame2, value: 11 }]), []);
 });
 
-test("HLS 방송은 같은 media segment의 연속 frame을 독립 근거로 세지 않는다", () => {
+test("일반 HUD 방송은 같은 media segment의 연속 frame을 독립 근거로 세지 않는다", () => {
   const first = observation({
+    field: "maxHealth",
     sourceType: "broadcast",
     sourceId: "screen:P001:1770000000000:1111111111111111:4",
     sourceUrl: "https://play.sooplive.co.kr/testbj/1",
@@ -214,6 +276,7 @@ test("HLS 방송은 같은 media segment의 연속 frame을 독립 근거로 세
     ocrConfidence: 0.99,
   });
   const sameSegment = observation({
+    field: "maxHealth",
     sourceType: "broadcast",
     sourceId: "screen:P001:1770000003000:1111111111111111:5",
     sourceUrl: "https://play.sooplive.co.kr/testbj/1",
@@ -222,6 +285,7 @@ test("HLS 방송은 같은 media segment의 연속 frame을 독립 근거로 세
     ocrConfidence: 0.99,
   });
   const nextSegment = observation({
+    field: "maxHealth",
     sourceType: "broadcast",
     sourceId: "screen:P001:1770000006000:2222222222222222:0",
     sourceUrl: "https://play.sooplive.co.kr/testbj/1",
@@ -234,6 +298,62 @@ test("HLS 방송은 같은 media segment의 연속 frame을 독립 근거로 세
   const accepted = findAcceptedConsensus([first, sameSegment, nextSegment]);
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].evidenceUnitIds.length, 2);
+});
+
+test("고신뢰 장비·절기·기량은 같은 HLS segment의 서로 다른 frame도 합의한다", () => {
+  for (const field of ["weapon", "skillBuild", "strength"]) {
+    const value = field === "skillBuild" ? skillBuild() : 11;
+    const first = observation({
+      field,
+      value,
+      sourceType: "broadcast",
+      sourceId: "screen:P001:1770000000000:1111111111111111:4",
+      sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+      evidenceHash: "1".repeat(64),
+      ocrConfidence: 0.99,
+    });
+    const second = observation({
+      ...first,
+      sourceId: "screen:P001:1770000000000:1111111111111111:5",
+      evidenceHash: "2".repeat(64),
+    });
+    const accepted = findAcceptedConsensus([first, second]);
+    assert.equal(accepted.length, 1);
+    assert.equal(accepted[0].field, field);
+    assert.equal(accepted[0].evidenceUnitIds.length, 2);
+  }
+});
+
+test("skillBuild canonical snapshot 전체가 서로 다른 HLS 근거 두 번 일치해야 합의된다", () => {
+  const frame = (segment, observedAt, value = skillBuild()) => observation({
+    field: "skillBuild",
+    value,
+    sourceType: "broadcast",
+    sourceId: `screen:P001:${Date.parse(observedAt)}:${segment}:0`,
+    sourceUrl: "https://play.sooplive.co.kr/testbj/1",
+    observedAt,
+    evidenceHash: segment[0].repeat(64),
+    ocrConfidence: 0.99,
+  });
+  const first = frame("1111111111111111", "2026-08-02T10:00:00.000Z");
+  const changedRows = skillBuild({
+    skills: skillBuild().skills.map((skill, index) => (
+      index === 5 ? { ...skill, allocatedPoints: skill.allocatedPoints + 1 } : skill
+    )),
+  });
+  assert.deepEqual(findAcceptedConsensus([
+    first,
+    frame("2222222222222222", "2026-08-02T10:00:03.000Z", changedRows),
+  ]), []);
+
+  const accepted = findAcceptedConsensus([
+    first,
+    frame("2222222222222222", "2026-08-02T10:00:03.000Z"),
+  ]);
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0].field, "skillBuild");
+  assert.equal(JSON.parse(accepted[0].value).skills.length, 6);
+  assert.equal(accepted[0].seasonId, CURRENT_SEASON_ID);
 });
 
 test("서로 다른 방송 근거도 현재 시각 기준 window보다 오래되면 승격하지 않는다", () => {
@@ -430,6 +550,7 @@ test("동일 관측은 NDJSON queue에 한 번만 append하고 ID 충돌과 손�
   assert.equal(second.inserted.length, 0);
   assert.equal(second.duplicates.length, 1);
   assert.equal(readObservationQueue(queue).length, 1);
+  assert.equal(JSON.parse(fs.readFileSync(queue, "utf8")).seasonId, CURRENT_SEASON_ID);
   assert.equal(fs.readFileSync(queue, "utf8").trim().split("\n").length, 1);
 
   assert.throws(
@@ -443,6 +564,21 @@ test("동일 관측은 NDJSON queue에 한 번만 append하고 ID 충돌과 손�
   const corrupt = temporaryQueue(t);
   fs.writeFileSync(corrupt, "not-json\n", { mode: 0o600 });
   assert.throws(() => readObservationQueue(corrupt), error => error.code === "queue_corrupt");
+});
+
+test("seasonId 도입 전 영속 queue 행은 검증 후 현재 season 합의에서 제외한다", (t) => {
+  const queue = temporaryQueue(t);
+  const legacy = normalizeObservation(observation());
+  delete legacy.seasonId;
+  fs.writeFileSync(queue, `${JSON.stringify(legacy)}\n`, { mode: 0o600 });
+  assert.deepEqual(readObservationQueue(queue), []);
+
+  delete legacy.playerId;
+  fs.writeFileSync(queue, `${JSON.stringify(legacy)}\n`, { mode: 0o600 });
+  assert.throws(() => readObservationQueue(queue), error => error.code === "queue_corrupt");
+
+  fs.writeFileSync(queue, "null\n", { mode: 0o600 });
+  assert.throws(() => readObservationQueue(queue), error => error.code === "queue_corrupt");
 });
 
 test("queue rewrite는 검증·dedupe한 완전한 0600 파일로 원자 교체한다", (t) => {

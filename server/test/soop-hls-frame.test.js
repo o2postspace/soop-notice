@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const {
   DEFAULT_MAX_BATCH_BYTES,
   DEFAULT_MAX_SEGMENTS,
+  DEFAULT_SEGMENT_CONCURRENCY,
   SoopHlsFrameError,
   buildSoopHlsFrameFfmpegInput,
   buildSoopMpegTsFrameFfmpegInput,
@@ -215,7 +216,7 @@ test("batch cursor 이후만 읽고 최신 cursor면 빈 배열, 회전 시 init
   assert.deepEqual(zeroInitial, []);
 });
 
-test("batch는 12개 상한과 순차 fetch를 지켜 90-stream 부하 증폭을 제한한다", async () => {
+test("batch는 segment를 제한 병렬 fetch하고 완료 순서와 무관하게 media 순서를 보존한다", async () => {
   const uris = Array.from({ length: 30 }, (_value, index) => `load/${index}.ts`);
   const playlist = mediaPlaylist(uris, 1_000);
   let fetchCalls = 0;
@@ -231,7 +232,8 @@ test("batch는 12개 상한과 순차 fetch를 지켜 90-stream 부하 증폭을
       if (parsed.pathname.endsWith(".m3u8")) return chunkedResponse([playlist]);
       activeSegments += 1;
       maxActiveSegments = Math.max(maxActiveSegments, activeSegments);
-      await new Promise(resolve => setImmediate(resolve));
+      const index = Number.parseInt(parsed.pathname.match(/\/([0-9]+)\.ts$/)?.[1] || "0", 10);
+      await new Promise(resolve => setTimeout(resolve, (index % 3) + 1));
       activeSegments -= 1;
       return chunkedResponse([parsed.pathname]);
     },
@@ -243,7 +245,8 @@ test("batch는 12개 상한과 순차 fetch를 지켜 90-stream 부하 증폭을
   assert.equal(result.length, 12);
   assert.deepEqual(result.map(item => item.mediaSequence), Array.from({ length: 12 }, (_v, i) => 1_018 + i));
   assert.equal(fetchCalls, 13);
-  assert.equal(maxActiveSegments, 1);
+  assert.equal(DEFAULT_SEGMENT_CONCURRENCY, 3);
+  assert.equal(maxActiveSegments, DEFAULT_SEGMENT_CONCURRENCY);
 });
 
 test("batch segment ID는 playlist URL 기준이며 공식 redirect 뒤에도 바뀌지 않는다", async () => {
@@ -625,6 +628,12 @@ test("batch factory와 cursor 호출 옵션을 상한·형식까지 strict하게
       error => error.code === "invalid_config" && error.stage === "config",
     );
   }
+  for (const segmentConcurrency of [0, 5, 1.5, "3", null]) {
+    assert.throws(
+      () => createSoopHlsFrameSegmentBatchFetcher({ ...baseOptions, segmentConcurrency }),
+      error => error.code === "invalid_config" && error.stage === "config",
+    );
+  }
   assert.throws(
     () => createSoopHlsFrameSegmentBatchFetcher({ ...baseOptions, unexpected: true }),
     error => error.code === "invalid_config",
@@ -754,36 +763,39 @@ test("batch 누적 byte 상한 초과는 부분 결과 없이 중단되고 같�
     assert.equal(Object.hasOwn(error, "url"), false);
     return error.code === "response_too_large" && error.stage === "segment";
   });
-  assert.equal(segmentFetches, 3);
+  assert.ok(segmentFetches >= 3 && segmentFetches <= 4);
+  const failedAttemptFetches = segmentFetches;
 
   retryMode = true;
   const retried = await fetchBatch(PLAYLIST_URL, { initialSegmentCount: 4 });
   assert.equal(retried.length, 4);
   assert.equal(retried.reduce((total, item) => total + item.body.length, 0), 120);
-  assert.equal(segmentFetches, 7);
+  assert.equal(segmentFetches, failedAttemptFetches + 4);
 });
 
-test("batch 중간 segment 취소는 현재 controller를 중단하고 후속 fetch를 시작하지 않는다", async () => {
+test("batch 취소는 병렬 segment controller를 모두 중단하고 대기 segment를 시작하지 않는다", async () => {
   const playlist = mediaPlaylist([
     "abort/0.ts?aid=batch-abort-secret",
     "abort/1.ts?aid=batch-abort-secret",
     "abort/2.ts?aid=batch-abort-secret",
+    "abort/3.ts?aid=batch-abort-secret",
+    "abort/4.ts?aid=batch-abort-secret",
   ], 90);
   let calls = 0;
-  let activeSignal;
-  let markSecondStarted;
-  const secondStarted = new Promise(resolve => { markSecondStarted = resolve; });
+  const activeSignals = [];
+  let markParallelStarted;
+  const parallelStarted = new Promise(resolve => { markParallelStarted = resolve; });
   const fetchBatch = createSoopHlsFrameSegmentBatchFetcher({
-    maxSegments: 3,
+    maxSegments: 5,
+    segmentConcurrency: 2,
     timeoutMs: 100,
     maxResponseBytes: 2_048,
     maxSegmentBytes: 1_024,
     fetchImpl: async (_url, init) => {
       calls += 1;
       if (calls === 1) return chunkedResponse([playlist]);
-      if (calls === 2) return chunkedResponse(["first"]);
-      activeSignal = init.signal;
-      markSecondStarted();
+      activeSignals.push(init.signal);
+      if (activeSignals.length === 2) markParallelStarted();
       return new Promise((_resolve, reject) => {
         init.signal.addEventListener("abort", () => reject(new Error("batch-abort-secret")), { once: true });
       });
@@ -791,10 +803,10 @@ test("batch 중간 segment 취소는 현재 controller를 중단하고 후속 fe
   });
   const controller = new AbortController();
   const pending = fetchBatch(PLAYLIST_URL, {
-    initialSegmentCount: 3,
+    initialSegmentCount: 5,
     signal: controller.signal,
   });
-  await secondStarted;
+  await parallelStarted;
   controller.abort(new Error("batch-abort-secret"));
 
   await assert.rejects(pending, error => {
@@ -805,6 +817,45 @@ test("batch 중간 segment 취소는 현재 controller를 중단하고 후속 fe
       && !Object.hasOwn(error, "cause")
       && !Object.hasOwn(error, "url");
   });
-  assert.equal(activeSignal.aborted, true);
+  assert.equal(activeSignals.length, 2);
+  assert.equal(activeSignals.every(signal => signal.aborted), true);
+  assert.equal(calls, 3);
+});
+
+test("병렬 segment 하나가 실패하면 sibling을 중단하고 원래 안전 오류를 보존한다", async () => {
+  const playlist = mediaPlaylist(["fail/0.ts", "fail/1.ts", "fail/2.ts"], 200);
+  let calls = 0;
+  let siblingSignal;
+  let markSiblingStarted;
+  const siblingStarted = new Promise(resolve => { markSiblingStarted = resolve; });
+  const fetchBatch = createSoopHlsFrameSegmentBatchFetcher({
+    maxSegments: 3,
+    segmentConcurrency: 2,
+    timeoutMs: 100,
+    maxResponseBytes: 2_048,
+    maxSegmentBytes: 1_024,
+    fetchImpl: async (url, init) => {
+      calls += 1;
+      const pathname = new URL(url).pathname;
+      if (pathname.endsWith(".m3u8")) return chunkedResponse([playlist]);
+      if (pathname.endsWith("/0.ts")) {
+        await siblingStarted;
+        return chunkedResponse([], { status: 503 });
+      }
+      siblingSignal = init.signal;
+      markSiblingStarted();
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(new Error("sibling-secret")), { once: true });
+      });
+    },
+  });
+
+  await assert.rejects(fetchBatch(PLAYLIST_URL, { initialSegmentCount: 3 }), error => {
+    const visible = `${error.name} ${error.code} ${error.stage} ${error.message} ${JSON.stringify(error)}`;
+    return error.code === "upstream_http"
+      && error.stage === "segment"
+      && !visible.includes("sibling-secret");
+  });
+  assert.equal(siblingSignal.aborted, true);
   assert.equal(calls, 3);
 });

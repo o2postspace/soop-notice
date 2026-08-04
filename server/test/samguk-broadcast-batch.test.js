@@ -10,9 +10,12 @@ const {
   flattenBroadcastBatch,
   parseBroadcastBatchOutput,
 } = require("../lib/samguk-broadcast-batch");
+const { CURRENT_SEASON_ID } = require("../lib/samguk-observations");
+const { normalizeSkillBuild } = require("../lib/samguk-skill-build");
 
 const FRAME_CONTEXT = Object.freeze({
   profileId: "stats-panel-v1",
+  seasonId: CURRENT_SEASON_ID,
   playerId: "P001",
   sourceId: "screen:p001-stats-1785621600000-frame1",
   sourceUrl: "https://play.sooplive.com/cnsgkcnehd74",
@@ -25,12 +28,27 @@ function batch(overrides = {}) {
   return {
     version: 2,
     profileId: "stats-panel-v1",
+    seasonId: CURRENT_SEASON_ID,
     panelVisible: true,
     results: [
       { field: "level", value: 42, confidence: 0.99 },
       { field: "horse", value: "백룡마", confidence: 0.98 },
       { field: "weapon", value: 4, confidence: 0.94 },
     ],
+    ...overrides,
+  };
+}
+
+function skillBuild(overrides = {}) {
+  return {
+    version: 1,
+    preset: 3,
+    ownedPoints: 4,
+    skills: Array.from({ length: 6 }, (_value, index) => ({
+      name: `절기 ${index + 1}`,
+      requiredPoints: index + 1,
+      allocatedPoints: index,
+    })),
     ...overrides,
   };
 }
@@ -48,6 +66,7 @@ test("strict v2 JSON을 파싱하고 worker가 지정한 profile만 허용한다
   });
   assert.equal(parsed.version, 2);
   assert.equal(parsed.profileId, "stats-panel-v1");
+  assert.equal(parsed.seasonId, CURRENT_SEASON_ID);
   assert.equal(parsed.results.length, 3);
   assert.ok(Object.isFrozen(parsed));
   assert.ok(Object.isFrozen(parsed.results));
@@ -58,6 +77,12 @@ test("strict v2 JSON을 파싱하고 worker가 지정한 profile만 허용한다
   rejectsWith("profile_mismatch", () => parseBroadcastBatchOutput(JSON.stringify(batch()), {
     expectedProfileId: "other-profile",
   }));
+  rejectsWith("invalid_season", () => parseBroadcastBatchOutput(JSON.stringify(batch({
+    seasonId: "samgukji-2026-08-03",
+  }))));
+  const missingSeason = batch();
+  delete missingSeason.seasonId;
+  rejectsWith("invalid_schema", () => parseBroadcastBatchOutput(JSON.stringify(missingSeason)));
 });
 
 test("top-level과 result extra key, 중복·미허용 field를 frame 전체 오류로 처리한다", () => {
@@ -80,7 +105,10 @@ test("panel이 보이지 않으면 빈 결과만 허용하고 results는 전체 
   const complete = parseBroadcastBatchOutput(JSON.stringify(batch({
     results: BATCH_FIELDS.map((field, index) => ({
       field,
-      value: field === "horse" ? "백룡마" : field === "activeGeneral" ? "조조" : index,
+      value: field === "horse" ? "백룡마"
+        : field === "activeGeneral" ? "조조"
+          : field === "skillBuild" ? skillBuild()
+            : index,
       confidence: 0.99,
     })),
   })));
@@ -91,6 +119,7 @@ test("panel이 보이지 않으면 빈 결과만 허용하고 results는 전체 
   assert.ok(BATCH_FIELDS.includes("horseMaxHealth"));
   assert.ok(BATCH_FIELDS.includes("strengthBonus"));
   assert.ok(BATCH_FIELDS.includes("skillHasteIncrease"));
+  assert.ok(BATCH_FIELDS.includes("skillBuild"));
 
   const hidden = parseBroadcastBatchOutput(JSON.stringify(batch({ panelVisible: false, results: [] })));
   assert.deepEqual(Array.from(hidden.results), []);
@@ -101,6 +130,22 @@ test("panel이 보이지 않으면 빈 결과만 허용하고 results는 전체 
       value: index,
       confidence: 0.99,
     })),
+  }))));
+});
+
+test("skillBuild result는 정확한 6행을 canonical JSON 문자열 하나로 만든다", () => {
+  const parsed = parseBroadcastBatchOutput(JSON.stringify(batch({
+    seasonId: CURRENT_SEASON_ID,
+    results: [{ field: "skillBuild", value: skillBuild(), confidence: 0.99 }],
+  })));
+  assert.equal(parsed.results[0].value, normalizeSkillBuild(skillBuild()));
+
+  rejectsWith("invalid_result", () => parseBroadcastBatchOutput(JSON.stringify(batch({
+    results: [{
+      field: "skillBuild",
+      value: skillBuild({ skills: skillBuild().skills.slice(0, 5) }),
+      confidence: 0.99,
+    }],
   }))));
 });
 
@@ -142,11 +187,15 @@ test("flatten은 저신뢰 결과를 제외하고 같은 worker frame 근거로 
   assert.ok(observations.every(item => item.observedAt === FRAME_CONTEXT.observedAt));
   assert.ok(observations.every(item => item.evidenceHash === FRAME_CONTEXT.evidenceHash));
   assert.deepEqual(observations.map(item => item.ocrConfidence), [0.99, 0.98]);
+  assert.ok(observations.every(item => item.seasonId === CURRENT_SEASON_ID));
 
   rejectsWith("profile_mismatch", () => flattenBroadcastBatch(batch(), {
     ...FRAME_CONTEXT,
     profileId: "other-profile",
   }));
+  const missingContextSeason = { ...FRAME_CONTEXT };
+  delete missingContextSeason.seasonId;
+  rejectsWith("invalid_context", () => flattenBroadcastBatch(batch(), missingContextSeason));
   rejectsWith("invalid_context", () => flattenBroadcastBatch(batch(), {
     ...FRAME_CONTEXT,
     sourceId: "not-a-screen-frame",
@@ -158,6 +207,16 @@ test("flatten은 저신뢰 결과를 제외하고 같은 worker frame 근거로 
     ...FRAME_CONTEXT,
     playerId: "unknown-player",
   }));
+});
+
+test("flatten은 skillBuild 6행 전체를 한 field 관측으로 유지한다", () => {
+  const observations = flattenBroadcastBatch(batch({
+    results: [{ field: "skillBuild", value: skillBuild(), confidence: 0.99 }],
+  }), FRAME_CONTEXT, { now: Date.parse("2026-08-02T10:00:02.000Z") });
+  assert.equal(observations.length, 1);
+  assert.equal(observations[0].field, "skillBuild");
+  assert.equal(observations[0].value, normalizeSkillBuild(skillBuild()));
+  assert.equal(JSON.parse(observations[0].value).skills.length, 6);
 });
 
 test("같은 frame batch는 observation 배열 전체를 queue append에 정확히 한 번 전달한다", () => {

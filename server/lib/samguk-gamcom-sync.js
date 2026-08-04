@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const { CURRENT_SEASON_ID } = require("./samguk-observations");
 
 const EXPECTED_FACTION_COUNT = 30;
 const EXPECTED_ROSTER_COUNT = 90;
@@ -8,12 +9,13 @@ const EXPECTED_TERRITORY_COUNT = 60;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 512 * 1024;
 const GAMCOM_HOST = "gamcom-3kingdom.vercel.app";
+const GAMCOM_SEASON = "2";
 const GAMCOM_FACTION_URLS = Object.freeze({
-  "위나라": `https://${GAMCOM_HOST}/factions/%EC%9C%84`,
-  "촉나라": `https://${GAMCOM_HOST}/factions/%EC%B4%89`,
-  "오나라": `https://${GAMCOM_HOST}/factions/%EC%98%A4`,
+  "위나라": `https://${GAMCOM_HOST}/factions/%EC%9C%84?season=${GAMCOM_SEASON}`,
+  "촉나라": `https://${GAMCOM_HOST}/factions/%EC%B4%89?season=${GAMCOM_SEASON}`,
+  "오나라": `https://${GAMCOM_HOST}/factions/%EC%98%A4?season=${GAMCOM_SEASON}`,
 });
-const GAMCOM_TERRITORY_URL = `https://${GAMCOM_HOST}/api/castles?fresh=1`;
+const GAMCOM_TERRITORY_URL = `https://${GAMCOM_HOST}/api/castles?fresh=1&season=${GAMCOM_SEASON}`;
 const TERRITORY_GROUPS = Object.freeze({
   "위": Object.freeze({ start: 1, end: 20 }),
   "촉": Object.freeze({ start: 21, end: 40 }),
@@ -46,6 +48,7 @@ const SNAPSHOT_FIELDS = Object.freeze([
   "skillCooldownReductionPct", "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
   "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
   "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
+  "skillBuild",
 ]);
 const REFERENCE_HEADERS = Object.freeze([
   "player_id", "SOOP_ID", "국가", "세력/길드", "닉네임", "장수/직업",
@@ -128,14 +131,17 @@ function normalizeCurrentTerritories(rows) {
     const y = requiredInteger(Number(raw.y), 0, 720, "영토 Y");
     const owner = normalizeTerritoryOwner(raw.owner);
     const facility = String(raw.facility || "없음").normalize("NFKC").trim();
-    if (!owner || !TERRITORY_FACILITIES.has(facility) || typeof raw.capital !== "boolean") {
+    if (!owner || !TERRITORY_FACILITIES.has(facility)
+        || typeof raw.capital !== "boolean" || typeof raw.special !== "boolean") {
       fail("invalid_territories", `${number}번 우리 영토 상태가 올바르지 않습니다.`);
     }
     const level = requiredInteger(Number(raw.level), 0, 999, "영토레벨");
     if (ids.has(id) || numbers.has(number)) fail("invalid_territories", "우리 영토 ID 또는 번호가 중복되었습니다.");
     ids.add(id);
     numbers.add(number);
-    normalized.push(Object.freeze({ id, number, x, y, owner, capital: raw.capital, facility, level }));
+    normalized.push(Object.freeze({
+      id, number, x, y, owner, capital: raw.capital, facility, level, special: raw.special,
+    }));
   }
   return Object.freeze(normalized.sort((left, right) => left.number - right.number));
 }
@@ -186,6 +192,7 @@ function parseGamcomTerritoryPayload(payload, { currentTerritories } = {}) {
       if (!owner || !TERRITORY_OWNERS.has(owner)) fail("invalid_territories", `${number}번 소유국이 올바르지 않습니다.`);
       if (!TERRITORY_FACILITIES.has(facility)) fail("invalid_territories", `${number}번 시설이 올바르지 않습니다.`);
       if (typeof raw.isCapital !== "boolean") fail("invalid_territories", `${number}번 수도 값이 boolean이 아닙니다.`);
+      if (typeof raw.isCheonrimun !== "boolean") fail("invalid_territories", `${number}번 특수지 값이 boolean이 아닙니다.`);
       if (owner === "미점령" && (raw.isCapital || facility !== "없음")) {
         fail("invalid_territories", `${number}번 미점령 영토에 수도 또는 시설이 있습니다.`);
       }
@@ -196,7 +203,9 @@ function parseGamcomTerritoryPayload(payload, { currentTerritories } = {}) {
       ids.add(id);
       numbers.add(number);
       coordinates.add(coordinate);
-      territories.push(Object.freeze({ id, number, x, y, owner, capital: raw.isCapital, facility, level }));
+      territories.push(Object.freeze({
+        id, number, x, y, owner, capital: raw.isCapital, facility, level, special: raw.isCheonrimun,
+      }));
     });
   }
   if (territories.length !== EXPECTED_TERRITORY_COUNT || numbers.size !== EXPECTED_TERRITORY_COUNT) {
@@ -407,6 +416,7 @@ async function fetchGamcomTerritories(options = {}) {
       responseUrl.hostname !== GAMCOM_HOST
       || responseUrl.pathname !== "/api/castles"
       || responseUrl.searchParams.get("fresh") !== "1"
+      || responseUrl.searchParams.get("season") !== GAMCOM_SEASON
     )) {
       fail("upstream_error", `Gamcom 영토 조회에 실패했습니다 (${response.status}).`);
     }
@@ -560,12 +570,13 @@ function buildGamcomTerritoryChanges(currentTerritories, externalTerritories, { 
     capital: row.capital,
     facility: row.facility,
     level: row.level,
+    special: row.special,
   })));
   const snapshotHash = crypto.createHash("sha256").update(snapshotMaterial, "utf8").digest("hex");
   const changes = [];
   for (const row of external) {
     const previous = currentById.get(row.id);
-    const changedFields = ["owner", "capital", "facility", "level"]
+    const changedFields = ["owner", "capital", "facility", "level", "special"]
       .filter(field => previous[field] !== row[field]);
     if (changedFields.length === 0) continue;
     const transitionMaterial = JSON.stringify({
@@ -589,7 +600,7 @@ function buildGamcomTerritoryChanges(currentTerritories, externalTerritories, { 
       capital: row.capital,
       facility: row.facility,
       level: row.level,
-      special: row.number === 27,
+      special: row.special,
       captureStatus: row.owner === "미점령" ? "미점령" : "점령",
       captureRate: null,
       verificationStatus: "기준값",
@@ -660,6 +671,7 @@ function buildGamcomSnapshots(result, { sheetUrl, collectedAt } = {}) {
     const material = JSON.stringify({ playerId: member.playerId, fields, sourceUrl: reference.sourceUrl });
     const digest = crypto.createHash("sha256").update(material, "utf8").digest("hex");
     return [Object.freeze({
+      seasonId: CURRENT_SEASON_ID,
       observationId: `OBS-GAMCOM-${digest.slice(0, 24).toUpperCase()}`,
       playerId: member.playerId,
       fields,

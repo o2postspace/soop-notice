@@ -1,13 +1,14 @@
 /**
- * SOOPNOTICE 삼국지 공개 현황 시트 설치기와 승인 제보 동기화.
+ * SOOPNOTICE 후국지 공개 현황 시트 설치기와 승인 제보 동기화.
  *
  * 이 파일은 비공개 운영원장에 바인딩된 Apps Script 프로젝트에서 실행합니다.
  * 공개 시트에는 표시값과 수정제안만 두고, 승인된 제안만 운영원장 관측입력에
  * 단일 sheet 기준값으로 추가합니다. 공개 시트는 독립 교차검증 출처로 세지 않습니다.
  */
 
-var SAMGUK_PUBLIC_SCHEMA_VERSION = "2026.08.03.4";
-var SAMGUK_PUBLIC_DEFAULT_MASTER_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
+var SAMGUK_PUBLIC_SCHEMA_VERSION = "2026.08.05.1";
+var SAMGUK_PUBLIC_SEASON_ID = "hugukji-2026-08-04";
+var SAMGUK_PUBLIC_DEFAULT_MASTER_SPREADSHEET_ID = "1yMUytX11t-SzB9Tz9tpizj0Dyc1iIC2H2utQpycUuTQ";
 var SAMGUK_PUBLIC_API_URL = "https://api.soopnotice.com/api/samguk?refresh=1";
 var SAMGUK_PUBLIC_SITE_URL = "https://soopnotice.com";
 var SAMGUK_PUBLIC_EXPECTED_MEMBER_COUNT = 90;
@@ -23,7 +24,7 @@ var SAMGUK_PUBLIC_SHEET_ORDER = [
 ];
 
 var SAMGUK_PUBLIC_HEADERS = {
-  "안내": ["SOOPNOTICE 삼국지 공개 현황"],
+  "안내": ["SOOPNOTICE 후국지 공개 현황"],
   "파워랭킹": [
     "순위", "player_id", "국가", "닉네임", "세력/길드", "장수/직업", "파워점수",
     "수집률", "상태", "레벨", "무력", "기민", "기력", "지모", "무기강화",
@@ -32,7 +33,7 @@ var SAMGUK_PUBLIC_HEADERS = {
     "피해감소(%)", "치명타확률(%)", "치명타피해(%)", "스킬쿨타임감소(%)",
     "스킬피해증가(%)", "이동속도증가(%)", "말최대체력", "무력보너스",
     "기민보너스", "기력보너스", "지모보너스", "공격력증가량", "이동속도증가량",
-    "체력증가량", "절기가속증가량"
+    "체력증가량", "절기가속증가량", "절기배분"
   ],
   "스탯·장비": [
     "player_id", "국가", "닉네임", "SOOP_ID", "세력/길드", "장수/직업", "레벨",
@@ -42,7 +43,7 @@ var SAMGUK_PUBLIC_HEADERS = {
     "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
     "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)",
     "말최대체력", "무력보너스", "기민보너스", "기력보너스", "지모보너스",
-    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량"
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량", "절기배분"
   ],
   "수정제안": [
     "proposal_id", "제출시각", "player_id", "닉네임", "field_key", "현재값", "제안값",
@@ -248,7 +249,7 @@ function samgukPublicOpenOrCreate_(properties) {
       throw new Error("configured_public_sheet_unavailable:" + String(error && error.message || error));
     }
   }
-  var spreadsheet = SpreadsheetApp.create("SOOPNOTICE 삼국지 공개 현황·파워랭킹", 1001, 27);
+  var spreadsheet = SpreadsheetApp.create("SOOPNOTICE 후국지 공개 현황·파워랭킹", 1001, 27);
   properties.setProperty(SAMGUK_PUBLIC_ID_PROPERTY, spreadsheet.getId());
   return spreadsheet;
 }
@@ -265,11 +266,29 @@ function samgukPublicMasterSpreadsheet_() {
     || SAMGUK_PUBLIC_DEFAULT_MASTER_SPREADSHEET_ID;
   var publicId = properties.getProperty(SAMGUK_PUBLIC_ID_PROPERTY);
   if (spreadsheetId === publicId) throw new Error("public_sheet_cannot_be_master");
-  return SpreadsheetApp.openById(spreadsheetId);
+  var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  samgukPublicAssertMasterSeason_(spreadsheet);
+  return spreadsheet;
+}
+
+function samgukPublicAssertMasterSeason_(spreadsheet) {
+  var rules = spreadsheet.getSheetByName("게임정보");
+  if (!rules) throw new Error("master_rules_missing");
+  var rowCount = Math.max(1, Math.min(30, rules.getLastRow()));
+  var rows = rules.getRange(1, 1, rowCount, 3).getDisplayValues();
+  var markers = rows.filter(function(row) {
+    return String(row[1] || "").trim().toLowerCase() === "season_id";
+  });
+  if (markers.length !== 1
+      || String(markers[0][0] || "").trim() !== "시즌"
+      || String(markers[0][1] || "").trim() !== "season_id"
+      || String(markers[0][2] || "").trim() !== SAMGUK_PUBLIC_SEASON_ID) {
+    throw new Error("invalid_season");
+  }
 }
 
 function samgukPublicPrepareWorkbook_(spreadsheet) {
-  spreadsheet.rename("SOOPNOTICE 삼국지 공개 현황·파워랭킹");
+  spreadsheet.rename("SOOPNOTICE 후국지 공개 현황·파워랭킹");
   spreadsheet.setSpreadsheetLocale("ko_KR");
   spreadsheet.setSpreadsheetTimeZone("Asia/Seoul");
 
@@ -342,8 +361,9 @@ function samgukPublicSeedGuide_(sheet, publicUrl) {
   var rows = [
     ["사이트", SAMGUK_PUBLIC_SITE_URL],
     ["공개 시트", publicUrl],
+    ["시즌", SAMGUK_PUBLIC_SEASON_ID],
     ["자동 갱신", "5분마다 캐시를 우회해 SOOPNOTICE 공개 API의 정상 90명 자료로 갱신됩니다."],
-    ["파워점수", "사이트 파워 v1.5 하한점수 × " + SAMGUK_PUBLIC_POWER_SCALE + " 표시값입니다. 기량 4종은 실제 합계를 고정 600점 기준으로 환산하고, 장비는 무기 60%·흉갑 30%·각갑 10%이며 군주 두갑은 15% 추가 보너스, 말은 5등급과 강화를 반영합니다."],
+    ["파워점수", "사이트 파워 v1.6 하한점수 × " + SAMGUK_PUBLIC_POWER_SCALE + " 표시값입니다. 무력·기민·기력·지모 원값 합계는 기량 1점당 파워 1점으로 그대로 더하고, 장비는 무기 60%·흉갑 30%·각갑 10%이며 군주 두갑은 15% 추가 보너스, 말은 5등급과 강화를 반영합니다."],
     ["보기 권한", "링크가 있는 모든 사용자는 볼 수 있습니다."],
     ["수정 권한", "Google Drive에서 편집 권한을 요청하면 소유자가 계정별로 승인합니다."],
     ["수정 방법", "승인된 편집자는 수정제안 탭의 입력 칸만 작성합니다. 한 행에는 한 선수의 한 항목만 적습니다."],
@@ -591,7 +611,8 @@ function samgukPublicFetchMembers_() {
   var text = response.getContentText("UTF-8");
   if (text.length > 2 * 1024 * 1024) throw new Error("public_api_too_large");
   var payload = JSON.parse(text);
-  if (!payload || payload.stale !== false || !Array.isArray(payload.members)
+  if (!payload || payload.seasonId !== SAMGUK_PUBLIC_SEASON_ID
+      || payload.stale !== false || !Array.isArray(payload.members)
       || payload.members.length !== SAMGUK_PUBLIC_EXPECTED_MEMBER_COUNT) {
     throw new Error("public_api_invalid_roster");
   }
@@ -679,6 +700,7 @@ function samgukPublicNormalizeMember_(raw, rosterMember) {
     moveSpeedIncrease: number("moveSpeedIncrease", 1000000),
     healthIncrease: number("healthIncrease", 1000000),
     skillHasteIncrease: number("skillHasteIncrease", 1000000),
+    skillBuild: samgukPublicNormalizeSkillBuild_(raw.skillBuild),
     powerRankScore: rankScore,
     powerIndex: number("powerIndex", 100),
     powerCoverage: number("powerCoverage", 100),
@@ -689,6 +711,52 @@ function samgukPublicNormalizeMember_(raw, rosterMember) {
     observedAt: text("observedAt", 80),
     evidence: text("evidence", 4000)
   };
+}
+
+function samgukPublicNormalizeSkillBuild_(value) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)
+      || Object.keys(value).sort().join(",") !== "ownedPoints,preset,skills,version"
+      || value.version !== 1
+      || (value.preset !== null
+        && (!Number.isInteger(value.preset) || value.preset < 1 || value.preset > 4))
+      || !Number.isInteger(value.ownedPoints) || value.ownedPoints < 0 || value.ownedPoints > 1000000
+      || !Array.isArray(value.skills) || [6, 9].indexOf(value.skills.length) === -1) {
+    throw new Error("public_api_invalid_field:skillBuild");
+  }
+  var seen = {};
+  var skills = value.skills.map(function(skill) {
+    if (!skill || typeof skill !== "object" || Array.isArray(skill)
+        || Object.keys(skill).sort().join(",") !== "allocatedPoints,name,requiredPoints"
+        || typeof skill.name !== "string" || skill.name !== skill.name.trim()
+        || !skill.name || skill.name.length > 80 || /[\u0000-\u001F\u007F]/.test(skill.name)
+        || Object.prototype.hasOwnProperty.call(seen, skill.name)
+        || !Number.isInteger(skill.requiredPoints) || skill.requiredPoints < 0 || skill.requiredPoints > 1000000
+        || !Number.isInteger(skill.allocatedPoints) || skill.allocatedPoints < 0 || skill.allocatedPoints > 1000000) {
+      throw new Error("public_api_invalid_field:skillBuild");
+    }
+    seen[skill.name] = true;
+    return {
+      name: skill.name,
+      requiredPoints: skill.requiredPoints,
+      allocatedPoints: skill.allocatedPoints
+    };
+  });
+  return { version: 1, preset: value.preset, ownedPoints: value.ownedPoints, skills: skills };
+}
+
+function samgukPublicSkillBuildCell_(value) {
+  if (value === null) return "";
+  var allocatedTotal = value.skills.reduce(function(sum, skill) {
+    return sum + skill.allocatedPoints;
+  }, 0);
+  var upgraded = value.skills.filter(function(skill) { return skill.allocatedPoints > 0; }).length;
+  var preset = value.preset === null ? "프리셋 미확인" : "프리셋 " + value.preset;
+  var details = value.skills.map(function(skill) {
+    return skill.name + " " + skill.allocatedPoints + "/" + skill.requiredPoints;
+  }).join(" | ");
+  return "총배분 " + allocatedTotal + " · 강화 " + upgraded + "/" + value.skills.length
+    + " · 남은 " + value.ownedPoints + " · " + preset + " | " + details;
 }
 
 function samgukPublicBuildRankingRows_(members) {
@@ -727,7 +795,8 @@ function samgukPublicBuildRankingRows_(members) {
       samgukPublicBlank_(member.strengthBonus), samgukPublicBlank_(member.agilityBonus),
       samgukPublicBlank_(member.vitalityBonus), samgukPublicBlank_(member.intelligenceBonus),
       samgukPublicBlank_(member.attackPowerIncrease), samgukPublicBlank_(member.moveSpeedIncrease),
-      samgukPublicBlank_(member.healthIncrease), samgukPublicBlank_(member.skillHasteIncrease)
+      samgukPublicBlank_(member.healthIncrease), samgukPublicBlank_(member.skillHasteIncrease),
+      samgukPublicSkillBuildCell_(member.skillBuild)
     ].map(samgukPublicSafeCell_);
   });
 }
@@ -756,7 +825,8 @@ function samgukPublicBuildDetailRows_(members) {
       samgukPublicBlank_(member.strengthBonus), samgukPublicBlank_(member.agilityBonus),
       samgukPublicBlank_(member.vitalityBonus), samgukPublicBlank_(member.intelligenceBonus),
       samgukPublicBlank_(member.attackPowerIncrease), samgukPublicBlank_(member.moveSpeedIncrease),
-      samgukPublicBlank_(member.healthIncrease), samgukPublicBlank_(member.skillHasteIncrease)
+      samgukPublicBlank_(member.healthIncrease), samgukPublicBlank_(member.skillHasteIncrease),
+      samgukPublicSkillBuildCell_(member.skillBuild)
     ].map(samgukPublicSafeCell_);
   });
 }
@@ -1088,7 +1158,7 @@ function samgukPublicAppendMasterObservation_(proposal) {
   [
     "말", "평타피해대표값", "평타표본수", "평타대상", "전투조건", "체력", "현재장수",
     "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)", "치명타피해(%)",
-    "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력"
+    "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력", "절기배분"
   ].forEach(function(header) {
     if (header !== SAMGUK_PUBLIC_FIELD_CONFIG[proposal.fieldKey].observationHeader
         && Object.prototype.hasOwnProperty.call(proposal.currentValues, header)) {

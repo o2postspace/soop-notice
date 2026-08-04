@@ -29,8 +29,8 @@ WIKI_URL = "https://threekingdoms.notion.site/"
 SKILL_STATS_URL = "https://threekingdoms.notion.site/872f648a81d1821ea42581f61a4fc57e"
 FMKOREA_RULES_URL = "https://www.fmkorea.com/10143176987"
 FMKOREA_SLIDES_URL = "https://www.fmkorea.com/10143088032"
-FACTIONS_URL = "https://gamcom-3kingdom.vercel.app/factions"
-TERRITORY_URL = "https://gamcom-3kingdom.vercel.app/simulation"
+FACTIONS_URL = "https://gamcom-3kingdom.vercel.app/factions?season=2"
+TERRITORY_URL = "https://gamcom-3kingdom.vercel.app/api/castles?fresh=1&season=2"
 
 COLORS = {
     "navy": "172033",
@@ -122,8 +122,8 @@ def load_snapshot(path: Path | None) -> tuple[dict[str, dict], dict]:
     if isinstance(raw, list):
         members, meta = raw, {}
     else:
-        members = raw.get("members") or raw.get("data") or raw.get("players") or []
-        meta = {key: value for key, value in raw.items() if key not in {"members", "data", "players"}}
+        members = raw.get("members") or raw.get("data") or raw.get("players") or raw.get("rows") or []
+        meta = {key: value for key, value in raw.items() if key not in {"members", "data", "players", "rows"}}
     snapshot = {}
     for member in members:
         nickname = member.get("nickname") or member.get("name")
@@ -172,7 +172,7 @@ def load_territories(path: Path | None) -> list[dict]:
                 "capital": bool(item.get("capital", item.get("isCapital", False))),
                 "facility": str(item.get("facility") or item.get("facilityType") or "없음"),
                 "level": item.get("level"),
-                "special": number == 27,
+                "special": normalize_bool(item.get("special", item.get("isCheonrimun"))) is True,
                 "capture_status": "미점령" if owner == "미점령" else "점령",
                 "capture_rate": item.get("captureRate", item.get("capture_rate")),
             }
@@ -301,7 +301,7 @@ def add_guide_sheet(
         ("3. 교차검증", "서로 다른 두 출처가 같은 값을 확인하거나 방송의 서로 다른 두 프레임이 일치한 스냅샷만 추가합니다."),
         (
             "4. 현황/파워랭킹",
-            "현재현황은 교차검증된 최신 스냅샷 한 행을 통째로 반영합니다. 사이트 파워 v1.5는 레벨·기량 30%, 장비 강화 35%, 각인 20%, 말 강화 15%를 고정 가중치로 합산하고, 기량은 실제 합계를 고정 600점 기준으로 환산합니다. 군주 두갑은 장비 추가 보너스입니다.",
+            "현재현황은 교차검증된 최신 스냅샷 한 행을 통째로 반영합니다. 사이트 파워 v1.6은 무력·기민·기력·지모 원값 합계를 파워에 1:1로 더하고 레벨·장비 강화·각인·말을 합산합니다. 군주 두갑은 장비 추가 보너스입니다.",
         ),
         (
             "5. 랭킹 신뢰도",
@@ -310,7 +310,7 @@ def add_guide_sheet(
         ("6. 영토 기록", "영토 변화도 교차검증된 완전한 스냅샷을 영토입력에 추가하고 가장 최근 확인시각의 행을 표시합니다."),
         (
             "OCR 연결",
-            "OCR설정에 캡처 해상도와 항목별 좌표를 넣습니다. 최대체력은 플레이어 HUD의 현재/최대 표기에서 수집하고, 평타는 동일 대상·조건의 표본 수와 대표값을 함께 기록합니다. 두 전투 관측값은 파워 v1.5에 넣지 않습니다.",
+            "OCR설정에 캡처 해상도와 항목별 좌표를 넣습니다. 최대체력은 플레이어 HUD의 현재/최대 표기에서 수집하고, 평타는 동일 대상·조건의 표본 수와 대표값을 함께 기록합니다. 두 전투 관측값은 파워 v1.6에 넣지 않습니다.",
         ),
         ("초기 데이터", "공개 지통실 조회값을 시트 기준값으로 넣었습니다." if has_snapshot else "현재 네트워크 스냅샷 없이 90명 명단만 넣었습니다."),
         ("초기 영토", "공개 지도 60개를 시트 기준값으로 넣었습니다." if has_territory else "영토 원본 없이 빈 입력 구조만 만들었습니다."),
@@ -402,8 +402,8 @@ def add_game_info_sheet(wb: Workbook, generated_at: datetime) -> None:
     rows = [
         (
             "서버 개요",
-            "10일간 진행되는 RPG 영토전",
-            "2026년 8월 1일 21시부터 8월 10일 21시까지 진행됩니다. 요괴 사냥 RPG와 영토 전쟁이 결합되며, 종료 시 가장 많은 영토를 가진 나라가 우승합니다.",
+            "후국지 RPG 영토전",
+            "2026년 8월 4일부터 8월 10일까지 진행됩니다. 요괴 사냥 RPG와 영토 전쟁이 결합되며, 종료 시 가장 많은 영토를 가진 나라가 우승합니다.",
             WIKI_URL,
         ),
         (
@@ -438,9 +438,9 @@ def add_game_info_sheet(wb: Workbook, generated_at: datetime) -> None:
         ),
         (
             "영토",
-            "수도 · 시설 · 27번 특수 영토",
-            "초기 수도는 위 8번, 촉 42번, 오 47번입니다. 시설은 병영·성채·장원이 있고 장원은 국가당 최대 10개입니다. 27번 특수 영토는 보유국 인원의 공격력을 5% 높입니다.",
-            WIKI_URL,
+            "후국지 초기 수도와 특수 영토",
+            "후국지 초기 수도는 위 8번, 촉 42번, 오 47번이며 각각 위·촉·오가 소유합니다. season=2 지도 기준 특수 영토(isCheonrimun)는 확인되지 않았습니다.",
+            TERRITORY_URL,
         ),
         (
             "점령전",
@@ -602,15 +602,15 @@ def add_observations_sheet(
             values = [
                 nonzero_snapshot_value(snap, "level"),
                 snapshot_value(snap, "horse"),
-                nonzero_snapshot_value(snap, "horse_level", "horseLevel"),
-                nonzero_snapshot_value(snap, "weapon"),
-                nonzero_snapshot_value(snap, "helmet"),
-                nonzero_snapshot_value(snap, "armor"),
-                nonzero_snapshot_value(snap, "shoes"),
-                nonzero_snapshot_value(snap, "stat_strength", "strength"),
-                nonzero_snapshot_value(snap, "stat_agility", "agility"),
-                nonzero_snapshot_value(snap, "stat_vitality", "vitality"),
-                nonzero_snapshot_value(snap, "stat_intelligence", "intelligence"),
+                snapshot_value(snap, "horse_level", "horseLevel"),
+                snapshot_value(snap, "weapon"),
+                snapshot_value(snap, "helmet"),
+                snapshot_value(snap, "armor"),
+                snapshot_value(snap, "shoes"),
+                snapshot_value(snap, "stat_strength", "strength"),
+                snapshot_value(snap, "stat_agility", "agility"),
+                snapshot_value(snap, "stat_vitality", "vitality"),
+                snapshot_value(snap, "stat_intelligence", "intelligence"),
                 nonzero_snapshot_value(snap, "power_score", "powerScore", "power"),
             ]
             combat_values = [
@@ -1086,19 +1086,16 @@ def build_workbook(
         )
         if baseline_count != 60:
             raise RuntimeError(f"영토 초기 기준값 행 검증 실패: {baseline_count}")
-        special_rows = [
-            row for row in range(2, 62)
+        special_numbers = {
+            check["영토입력"].cell(row, 6).value
+            for row in range(2, 62)
             if check["영토입력"].cell(row, 13).value == "Y"
-        ]
-        if len(special_rows) != 1 or check["영토입력"].cell(special_rows[0], 6).value != 27:
-            raise RuntimeError("27번 특수 영토 검증 실패")
-    seed_zero_cells = []
-    for row in range(2, min(initial_count, 90) + 2):
-        for column in range(8, 18):
-            if check["관측입력"].cell(row, column).value == 0:
-                seed_zero_cells.append(check["관측입력"].cell(row, column).coordinate)
-    if seed_zero_cells:
-        raise RuntimeError(f"초기 강화/기량 0값 정규화 실패: {seed_zero_cells[:5]}")
+        }
+        expected_special_numbers = {
+            territory["number"] for territory in territories if territory["special"]
+        }
+        if special_numbers != expected_special_numbers:
+            raise RuntimeError("현재 시즌 특수 영토 검증 실패")
     for sheet_name, seeded_rows in (
         ("관측입력", initial_count),
         ("영토입력", territory_initial_count),

@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const vm = require("node:vm");
-const { readObservationQueue } = require("../lib/samguk-observations");
+const { CURRENT_SEASON_ID, readObservationQueue } = require("../lib/samguk-observations");
 const { buildPromotionSnapshots } = require("../scripts/samguk-promote-observations");
 const {
   SamgukMonitorError,
@@ -295,6 +295,7 @@ test("서로 다른 두 방송 frame이 NDJSON에서 promoter와 webhook 계약�
 
   const queued = readObservationQueue(queuePath);
   assert.equal(queued.length, 2);
+  assert.ok(queued.every(item => item.seasonId === CURRENT_SEASON_ID));
   assert.ok(queued.every(item => item.field === "strength" && item.ocrConfidence === 0.98));
   assert.ok(queued.every(item => item.sourceId.startsWith("screen:player-1-strength-")));
   assert.equal(new Set(queued.map(item => item.sourceId)).size, 2);
@@ -302,6 +303,7 @@ test("서로 다른 두 방송 frame이 NDJSON에서 promoter와 webhook 계약�
 
   const baselineTime = new Date(currentTime - 60_000).toISOString();
   const snapshots = buildPromotionSnapshots({
+    seasonId: CURRENT_SEASON_ID,
     source: "google-sheet",
     stale: false,
     sheetUrl: "https://docs.google.com/spreadsheets/d/test-sheet/edit",

@@ -9,6 +9,7 @@ const DEFAULT_QUALITY = "HD";
 const QUALITY_SUFFIX = Object.freeze({
   SD: "sd",
   HD: "hd",
+  ORIGINAL: "original",
 });
 const PLAYER_ORIGIN = "https://play.sooplive.com";
 const STATION_ORIGIN = "https://chapi.sooplive.co.kr";

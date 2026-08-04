@@ -10,7 +10,7 @@ const {
   parseBroadcastBatchOutput,
 } = require("./samguk-broadcast-batch");
 const { createBroadcastChangeTracker } = require("./samguk-broadcast-change-tracker");
-const { appendObservationQueue } = require("./samguk-observations");
+const { CURRENT_SEASON_ID, appendObservationQueue } = require("./samguk-observations");
 const { createSamgukStreamScheduler } = require("./samguk-stream-scheduler");
 const { FRAME_BYTES, analyzeGrayFrame } = require("./samguk-ui-gate");
 
@@ -18,8 +18,18 @@ const MAX_TARGETS = 90;
 const MAX_SEGMENTS_PER_BATCH = 12;
 const MAX_GRAY_FRAMES_PER_SEGMENT = 8;
 const MAX_OCR_SAMPLES_PER_CANDIDATE_SEGMENT = MAX_GRAY_FRAMES_PER_SEGMENT;
-const MAX_PREFETCHED_HD_SEGMENTS = 2;
-const MAX_ARCHIVED_FRAMES_PER_CANDIDATE = 2;
+const OCR_STREAM_QUALITY = "ORIGINAL";
+// SOOP media playlist가 유지하는 최근 구간을 후보 순간에 한 번에 당겨 둔다.
+// 2초 segment 기준 약 12초라 normal→burst 전환이 밀려도 짧은 UI를 복구할 수 있다.
+const MAX_PREFETCHED_OCR_SEGMENTS = 6;
+const MAX_ARCHIVED_FRAMES_PER_CANDIDATE = 4;
+// burst lane 수와 맞춰 서로 다른 방송 12곳의 순간 화면을 동시에 선점한다.
+// target별 FIFO는 길게 열린 패널이 여러 segment에 걸쳐도 다음 화면을 덮지 않는다.
+const MAX_EAGER_CANDIDATE_PREFETCHES = 12;
+const MAX_QUEUED_CANDIDATES_PER_TARGET = 32;
+const MAX_FALLBACK_ARCHIVE_PREFETCHES = 32;
+const MAX_SD_FALLBACK_SEGMENT_BYTES = 8 * 1024 * 1024;
+const MAX_SD_FALLBACK_FRAMES = 2;
 const ARCHIVED_CANDIDATE_TTL_MS = 10 * 60_000;
 const HUD_COMBAT_PROFILE_ID = "hud-combat-v1";
 const DEFAULT_HUD_PROBE_INTERVAL_MS = 10 * 60_000;
@@ -39,6 +49,11 @@ const RETRYABLE_HLS_CODES = new Set([
   "upstream_http",
   "invalid_playlist",
 ]);
+const HLS_URL_REFRESH_CODES = new Set([
+  "upstream_http",
+  "invalid_playlist",
+]);
+const HLS_ERROR_STAGES = new Set(["playlist", "segment"]);
 const SAFE_ERROR_CODES = new Set([
   "aborted",
   "capacity_exceeded",
@@ -66,6 +81,7 @@ const SAFE_ERROR_CODES = new Set([
   "invalid_profile",
   "invalid_response",
   "invalid_result",
+  "invalid_season",
   "invalid_schema",
   "invalid_segment",
   "invalid_version",
@@ -75,6 +91,7 @@ const SAFE_ERROR_CODES = new Set([
   "ocr_failed",
   "observation_id_conflict",
   "profile_mismatch",
+  "season_mismatch",
   "queue_corrupt",
   "queue_too_large",
   "response_too_large",
@@ -96,11 +113,12 @@ const SAFE_ERROR_CODES = new Set([
 ]);
 const DEFAULT_SCHEDULER_OPTIONS = Object.freeze({
   idleIntervalMs: 60_000,
-  liveIntervalMs: 2_000,
+  liveIntervalMs: 1_000,
   burstIntervalMs: 500,
   burstDurationMs: 30_000,
-  normalConcurrency: 40,
-  burstConcurrency: 3,
+  normalConcurrency: 56,
+  burstConcurrency: 8,
+  maxActiveTasks: 64,
   jitterRatio: 0.08,
   backoffBaseMs: 5_000,
   backoffMaxMs: 5 * 60_000,
@@ -236,8 +254,28 @@ function buildBaselinesFromMembers(members, targets = buildFallbackTargets()) {
 
 function safeErrorCode(error, fallback = "scan_failed") {
   const safeFallback = SAFE_ERROR_CODES.has(fallback) ? fallback : "scan_failed";
-  const code = typeof error?.code === "string" ? error.code : safeFallback;
+  let code = safeFallback;
+  try {
+    if (typeof error?.code === "string") code = error.code;
+  } catch {
+    code = safeFallback;
+  }
   return SAFE_ERROR_CODES.has(code) ? code : safeFallback;
+}
+
+function safeHlsErrorStage(error, fallback = "unknown") {
+  try {
+    const stage = error?.stage;
+    if (typeof stage === "string" && HLS_ERROR_STAGES.has(stage)) return stage;
+  } catch {
+    // 외부 오류의 getter나 원문을 heartbeat에 전달하지 않는다.
+  }
+  return fallback === "resolver" ? "resolver" : "unknown";
+}
+
+function shouldRefreshHlsUrl(error) {
+  return safeHlsErrorStage(error) === "playlist"
+    && HLS_URL_REFRESH_CODES.has(safeErrorCode(error));
 }
 
 function sha256(value) {
@@ -279,8 +317,14 @@ function validateSegmentBatch(value) {
 
 function normalizeBatch(output, profileId) {
   return typeof output === "string"
-    ? parseBroadcastBatchOutput(output, { expectedProfileId: profileId })
-    : normalizeBatchObject(output, { expectedProfileId: profileId });
+    ? parseBroadcastBatchOutput(output, {
+      expectedProfileId: profileId,
+      expectedSeasonId: CURRENT_SEASON_ID,
+    })
+    : normalizeBatchObject(output, {
+      expectedProfileId: profileId,
+      expectedSeasonId: CURRENT_SEASON_ID,
+    });
 }
 
 function keepsOcrBurstAlive(batch) {
@@ -290,10 +334,7 @@ function keepsOcrBurstAlive(batch) {
   // results must still reach the change tracker, but must not hold a 30-second
   // OCR burst open as though a transient stats/equipment panel were on screen.
   const passiveHudFields = new Set(["maxHealth", "horseMaxHealth"]);
-  return !(
-    batch.results.length > 0
-      && batch.results.every(result => passiveHudFields.has(result.field))
-  );
+  return batch.results.some(result => !passiveHudFields.has(result.field));
 }
 
 function normalizedObservedAtMs(value) {
@@ -453,15 +494,23 @@ function createSamgukHlsMonitor(options = {}) {
   }
   const fetchSegment = options.fetchSegment;
   const fetchSegments = options.fetchSegments;
+  const fetchOcrSegments = options.fetchOcrSegments;
   const decodeGrayFrame = options.decodeGrayFrame;
   if ((typeof fetchSegment !== "function" && typeof fetchSegments !== "function")
     || (fetchSegment !== undefined && typeof fetchSegment !== "function")
     || (fetchSegments !== undefined && typeof fetchSegments !== "function")
+    || (fetchOcrSegments !== undefined && typeof fetchOcrSegments !== "function")
+    || (fetchOcrSegments !== undefined && typeof fetchSegments !== "function")
     || typeof decodeGrayFrame !== "function") {
-    fail("invalid_config", "fetchSegment 또는 fetchSegments와 decodeGrayFrame 함수가 필요합니다.");
+    fail(
+      "invalid_config",
+      "fetchSegment 또는 fetchSegments와 decodeGrayFrame 함수가 필요하며 fetchOcrSegments는 fetchSegments와 함께 설정해야 합니다.",
+    );
   }
   const usesSegmentBatch = typeof fetchSegments === "function";
-  const maxCatchupSegments = options.maxCatchupSegments === undefined ? 6 : options.maxCatchupSegments;
+  const maxCatchupSegments = options.maxCatchupSegments === undefined
+    ? MAX_SEGMENTS_PER_BATCH
+    : options.maxCatchupSegments;
   if (!Number.isSafeInteger(maxCatchupSegments)
     || maxCatchupSegments < 1 || maxCatchupSegments > MAX_SEGMENTS_PER_BATCH) {
     fail("invalid_config", `maxCatchupSegments는 1~${MAX_SEGMENTS_PER_BATCH} 정수여야 합니다.`);
@@ -504,6 +553,11 @@ function createSamgukHlsMonitor(options = {}) {
   }
   const gate = options.gate || analyzeGrayFrame;
   if (typeof gate !== "function") fail("invalid_config", "gate는 함수여야 합니다.");
+  const maxActiveTasks = options.schedulerOptions?.maxActiveTasks
+    ?? DEFAULT_SCHEDULER_OPTIONS.maxActiveTasks;
+  if (!Number.isSafeInteger(maxActiveTasks) || maxActiveTasks < 1 || maxActiveTasks > MAX_TARGETS) {
+    fail("invalid_config", `maxActiveTasks는 1~${MAX_TARGETS} 정수여야 합니다.`);
+  }
   const scheduler = options.scheduler || createSamgukStreamScheduler({
     ...DEFAULT_SCHEDULER_OPTIONS,
     ...(options.schedulerOptions || {}),
@@ -599,6 +653,9 @@ function createSamgukHlsMonitor(options = {}) {
   const segmentCursors = new Map();
   const streamIdentities = new Map();
   const pendingCandidates = new Map();
+  const queuedCandidates = new Map();
+  const candidatePrefetches = new Map();
+  const candidateFallbackArchives = new Map();
   const active = new Set();
   const stats = {
     tasks: 0,
@@ -618,11 +675,34 @@ function createSamgukHlsMonitor(options = {}) {
     segmentsMissed: 0,
     sdSequenceGaps: 0,
     sdSegmentsMissed: 0,
+    burstSdSegmentsAdvanced: 0,
+    burstSdGateSegments: 0,
+    burstSdUiCandidates: 0,
+    burstSdSyncErrors: 0,
     hdSequenceGaps: 0,
     hdSegmentsUnobserved: 0,
     staleSegmentsSkipped: 0,
     streamResets: 0,
+    hlsRetries: 0,
+    hlsResolverRetryErrors: 0,
+    hlsPlaylistRetryErrors: 0,
+    hlsSegmentRetryErrors: 0,
+    hlsUnknownRetryErrors: 0,
+    hlsResolverFailures: 0,
+    hlsPlaylistFailures: 0,
+    hlsSegmentFailures: 0,
+    hlsUnknownFailures: 0,
+    hlsRetryCacheInvalidations: 0,
+    lastHlsErrorStage: null,
     candidateSequenceMisses: 0,
+    candidatePrefetchStarts: 0,
+    candidatePrefetchSaturated: 0,
+    candidateFallbackArchiveStarts: 0,
+    candidateFallbackArchiveSaturated: 0,
+    candidateQueueAdds: 0,
+    candidateQueueDrops: 0,
+    candidateSdFallbackArchivedFrames: 0,
+    candidateSdFallbackUses: 0,
     candidateFramePrefetches: 0,
     candidateFramesArchived: 0,
     candidateFramesLoaded: 0,
@@ -649,17 +729,90 @@ function createSamgukHlsMonitor(options = {}) {
     return clock();
   }
 
+  function candidatesMatch(left, right) {
+    return Number.isSafeInteger(left?.mediaSequence)
+      && left.mediaSequence === right?.mediaSequence;
+  }
+
+  function noteExpiredCandidate(candidate) {
+    stats.candidateFramesExpired += Array.isArray(candidate?.prefetchedFrames)
+      ? candidate.prefetchedFrames.length
+      : 0;
+  }
+
+  function promoteQueuedCandidate(target, now = monotonicNow()) {
+    const queue = queuedCandidates.get(target.id) || [];
+    while (queue.length > 0) {
+      const candidate = queue.shift();
+      if (Number.isSafeInteger(candidate.expiresAtMs) && now >= candidate.expiresAtMs) {
+        noteExpiredCandidate(candidate);
+        continue;
+      }
+      pendingCandidates.set(target.id, candidate);
+      if (queue.length === 0) queuedCandidates.delete(target.id);
+      else queuedCandidates.set(target.id, queue);
+      if (!Array.isArray(candidate.prefetchedFrames) || candidate.prefetchedFrames.length === 0) {
+        startCandidatePrefetch(target, candidate);
+      }
+      return candidate;
+    }
+    queuedCandidates.delete(target.id);
+    return null;
+  }
+
+  function advancePendingCandidate(target, expected, now = monotonicNow()) {
+    const current = pendingCandidates.get(target.id);
+    if (expected && current !== expected) return current || null;
+    pendingCandidates.delete(target.id);
+    return promoteQueuedCandidate(target, now);
+  }
+
+  function clearTargetCandidates(target) {
+    pendingCandidates.delete(target.id);
+    queuedCandidates.delete(target.id);
+  }
+
   function pendingCandidateFor(target, now = monotonicNow()) {
-    const pending = pendingCandidates.get(target.id);
+    let pending = pendingCandidates.get(target.id);
     if (!pending) return null;
     if (Number.isSafeInteger(pending.expiresAtMs) && now >= pending.expiresAtMs) {
-      stats.candidateFramesExpired += Array.isArray(pending.prefetchedFrames)
-        ? pending.prefetchedFrames.length
-        : 0;
-      pendingCandidates.delete(target.id);
-      return null;
+      noteExpiredCandidate(pending);
+      pending = advancePendingCandidate(target, pending, now);
     }
-    return pending;
+    return pending || null;
+  }
+
+  function replaceCandidate(target, candidate, replacement) {
+    if (pendingCandidates.get(target.id) === candidate) {
+      pendingCandidates.set(target.id, replacement);
+      return true;
+    }
+    const queue = queuedCandidates.get(target.id);
+    const index = Array.isArray(queue) ? queue.indexOf(candidate) : -1;
+    if (index < 0) return false;
+    queue[index] = replacement;
+    return true;
+  }
+
+  function enqueueCandidate(target, candidate, { eager = true, fallbackSegment = null } = {}) {
+    const pending = pendingCandidateFor(target);
+    const queue = queuedCandidates.get(target.id) || [];
+    if (candidatesMatch(pending, candidate)
+      || queue.some(item => candidatesMatch(item, candidate))) return false;
+    if (!pending) {
+      pendingCandidates.set(target.id, candidate);
+      if (eager) startCandidatePrefetch(target, candidate, fallbackSegment);
+      return true;
+    }
+    if (queue.length >= MAX_QUEUED_CANDIDATES_PER_TARGET) {
+      stats.candidateQueueDrops += 1;
+      return false;
+    }
+    queue.push(candidate);
+    queuedCandidates.set(target.id, queue);
+    stats.candidateQueueAdds += 1;
+    if (eager) startCandidatePrefetch(target, candidate, fallbackSegment);
+    return true;
   }
 
   function archivedSegmentsFor(pending) {
@@ -721,11 +874,11 @@ function createSamgukHlsMonitor(options = {}) {
   }
 
   function resetTargetProgress(target) {
-    for (const quality of ["SD", "HD"]) {
+    for (const quality of ["SD", OCR_STREAM_QUALITY]) {
       resetStreamProgress(target, quality);
     }
     streamIdentities.delete(target.id);
-    pendingCandidates.delete(target.id);
+    clearTargetCandidates(target);
     hiddenBurstFrames.delete(target.id);
     nextHudProbeAt.delete(target.id);
     activeHudProbes.delete(target.id);
@@ -876,23 +1029,28 @@ function createSamgukHlsMonitor(options = {}) {
     }
     let lastError;
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      let operationStage = "resolver";
       try {
         throwIfAborted(signal);
         const resolved = await hlsCache.get(target.bjId, quality, { signal: signal || undefined });
         throwIfAborted(signal);
         const hlsUrl = typeof resolved === "string" ? resolved : resolved?.hlsUrl;
         if (typeof hlsUrl !== "string" || !hlsUrl) fail("invalid_hls_result", "HLS cache 결과가 올바르지 않습니다.");
+        operationStage = "fetch";
         const identity = resolverStreamIdentity(resolved);
         const previousIdentity = streamIdentities.get(target.id);
         const identityChanged = Boolean(identity && previousIdentity && identity !== previousIdentity);
         let segments;
         if (usesSegmentBatch) {
+          const batchFetcher = quality === OCR_STREAM_QUALITY && fetchOcrSegments
+            ? fetchOcrSegments
+            : fetchSegments;
           const key = streamKey(target, quality);
           const cursor = identityChanged ? undefined : segmentCursors.get(key);
-          const fetched = await fetchSegments(hlsUrl, {
+          const fetched = await batchFetcher(hlsUrl, {
             ...(cursor ? { afterSegmentId: cursor } : {}),
             initialSegmentCount: initialSegmentCount
-              ?? ((cursor || quality === "HD") ? maxCatchupSegments : 1),
+              ?? ((cursor || quality === OCR_STREAM_QUALITY) ? maxCatchupSegments : 1),
             signal: signal || undefined,
           });
           throwIfAborted(signal);
@@ -931,43 +1089,104 @@ function createSamgukHlsMonitor(options = {}) {
         return segments;
       } catch (error) {
         lastError = error;
-        if (attempt > 0 || !RETRYABLE_HLS_CODES.has(safeErrorCode(error))) break;
+        const errorCode = safeErrorCode(error);
+        const retryable = RETRYABLE_HLS_CODES.has(errorCode);
+        const errorStage = safeHlsErrorStage(
+          error,
+          operationStage === "resolver" ? "resolver" : "unknown",
+        );
+        if (!retryable) break;
+        stats.lastHlsErrorStage = errorStage;
+        if (attempt > 0) {
+          stats[`hls${errorStage[0].toUpperCase()}${errorStage.slice(1)}Failures`] += 1;
+          break;
+        }
+        stats.hlsRetries += 1;
+        stats[`hls${errorStage[0].toUpperCase()}${errorStage.slice(1)}RetryErrors`] += 1;
         throwIfAborted(signal);
-        await hlsCache.invalidate(target.bjId, quality);
-        throwIfAborted(signal);
+        // segment 요청과 timeout은 같은 media playlist를 다시 읽으면 복구할 수 있다.
+        // URL 자체가 거절되거나 playlist가 깨졌을 때만 resolver cache를 비운다.
+        if (shouldRefreshHlsUrl(error)) {
+          await hlsCache.invalidate(target.bjId, quality);
+          stats.hlsRetryCacheInvalidations += 1;
+          throwIfAborted(signal);
+        }
       }
     }
     throw lastError;
   }
 
-  async function prefetchHdCandidate(target, candidate, signal) {
+  async function prefetchOriginalCandidate(target, candidate, signal) {
     if (!ocrEnabled || typeof archiveCandidateFrame !== "function"
       || typeof readCandidateFrame !== "function") return null;
-    const fetched = await resolveAndFetch(target, "HD", signal, {
-      initialSegmentCount: Math.min(MAX_PREFETCHED_HD_SEGMENTS, maxCatchupSegments),
+    const fetched = await resolveAndFetch(target, OCR_STREAM_QUALITY, signal, {
+      initialSegmentCount: Math.min(MAX_PREFETCHED_OCR_SEGMENTS, maxCatchupSegments),
     });
     throwIfAborted(signal);
-    const segments = fetched.slice(-MAX_PREFETCHED_HD_SEGMENTS);
+    const segments = fetched.slice(-MAX_PREFETCHED_OCR_SEGMENTS);
     if (segments.length === 0) return null;
 
     const plans = [];
-    for (const segment of segments) {
-      const grayFrames = await decodeGrayFrame(segment.body, { signal: signal || undefined });
-      throwIfAborted(signal);
-      const inspected = inspectGrayFrames(grayFrames);
-      if (inspected.candidateIndices.length === 0) continue;
+    const fallbackSamples = candidateOcrSampleIndices(candidate);
+    const exactIndex = Number.isSafeInteger(candidate?.mediaSequence)
+      ? segments.findIndex(segment => segment.mediaSequence === candidate.mediaSequence)
+      : -1;
+    const exactSegment = exactIndex >= 0 ? segments[exactIndex] : null;
+    const newestSequence = segments.at(-1)?.mediaSequence;
+
+    // ORIGINAL rendition가 아직 SD 후보 sequence에 도달하지 않았으면 과거
+    // frame을 후보로 잘못 저장하지 않는다. 다음 burst가 같은 sequence를
+    // playlist cursor로 이어서 기다리게 둔다.
+    if (!exactSegment
+      && Number.isSafeInteger(candidate?.mediaSequence)
+      && Number.isSafeInteger(newestSequence)
+      && newestSequence < candidate.mediaSequence) {
+      return null;
+    }
+
+    // sequence가 맞으면 후보 phase를 최우선으로 두고 양쪽 segment 경계도
+    // 함께 보존한다. UI가 segment 경계 직전/직후에 잠깐 열린 경우를 복구한다.
+    if (exactSegment && fallbackSamples.length > 0) {
       plans.push(Object.freeze({
-        segmentId: segment.segmentId,
-        sampleIndices: candidateOcrSampleIndices(inspected),
+        segmentId: exactSegment.segmentId,
+        sampleIndices: fallbackSamples,
       }));
+      const before = segments[exactIndex - 1];
+      const after = segments[exactIndex + 1];
+      if (before) {
+        plans.push(Object.freeze({
+          segmentId: before.segmentId,
+          sampleIndices: Object.freeze([MAX_GRAY_FRAMES_PER_SEGMENT - 1]),
+        }));
+      }
+      if (after) {
+        plans.push(Object.freeze({
+          segmentId: after.segmentId,
+          sampleIndices: Object.freeze([0]),
+        }));
+      }
+    } else {
+      for (const segment of segments) {
+        const grayFrames = await decodeGrayFrame(segment.body, { signal: signal || undefined });
+        throwIfAborted(signal);
+        const inspected = inspectGrayFrames(grayFrames);
+        if (inspected.candidateIndices.length === 0) continue;
+        plans.push(Object.freeze({
+          segmentId: segment.segmentId,
+          sampleIndices: candidateOcrSampleIndices(inspected),
+        }));
+      }
     }
     if (plans.length === 0) {
-      const fallbackSamples = candidateOcrSampleIndices(candidate);
       if (fallbackSamples.length > 0) {
-        plans.push(Object.freeze({
-          segmentId: segments.at(-1).segmentId,
-          sampleIndices: fallbackSamples,
-        }));
+        // rendition sequence가 달라도 최근 ORIGINAL window 자체를 작은 ring으로
+        // 남긴다. gate가 특정 장비/절기 화면을 놓쳐도 OCR이 사후 확인할 수 있다.
+        for (const segment of [...segments].reverse()) {
+          plans.push(Object.freeze({
+            segmentId: segment.segmentId,
+            sampleIndices: Object.freeze([fallbackSamples[0]]),
+          }));
+        }
       }
     }
 
@@ -1034,6 +1253,163 @@ function createSamgukHlsMonitor(options = {}) {
     });
   }
 
+  async function archiveSdCandidateFallback(target, candidate, segment, signal) {
+    if (!segment || !Buffer.isBuffer(segment.body) || segment.body.length === 0
+      || segment.body.length > MAX_SD_FALLBACK_SEGMENT_BYTES
+      || segment.mediaSequence !== candidate.mediaSequence) return null;
+    const sampleIndices = candidateOcrSampleIndices(candidate)
+      .slice(0, MAX_SD_FALLBACK_FRAMES);
+    if (sampleIndices.length === 0) return null;
+    const capturedAtMs = Number.isSafeInteger(candidate.detectedAtMs)
+      ? candidate.detectedAtMs
+      : monotonicNow();
+    const segmentHash = contentHashFor(segment);
+    const frames = [];
+    for (const sampleIndex of sampleIndices) {
+      const png = await decodePngFrame(segment.body, {
+        sampleIndex,
+        signal: signal || undefined,
+      });
+      throwIfAborted(signal);
+      if (!Buffer.isBuffer(png) || png.length < 8
+        || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+        fail("invalid_png_frame", "SD fallback 후보 frame이 PNG 형식이 아닙니다.");
+      }
+      try {
+        const archiveRef = await archiveCandidateFrame(png, Object.freeze({
+          playerId: target.playerId,
+          targetId: target.id,
+          observedAtMs: capturedAtMs,
+          mediaSequence: segment.mediaSequence,
+          sampleIndex,
+          evidenceHash: sha256(png),
+        }));
+        if (typeof archiveRef !== "string" || archiveRef.length < 1 || archiveRef.length > 255
+          || !/^[A-Za-z0-9._-]+$/.test(archiveRef)) {
+          fail("invalid_response", "SD fallback archive 참조가 올바르지 않습니다.");
+        }
+        frames.push(Object.freeze({
+          archiveRef,
+          segmentId: segment.segmentId,
+          segmentHash,
+          mediaSequence: segment.mediaSequence,
+          sampleIndex,
+          observedAtMs: capturedAtMs,
+        }));
+        stats.candidateFramesArchived += 1;
+        stats.candidateSdFallbackArchivedFrames += 1;
+      } catch {
+        stats.candidateFrameArchiveErrors += 1;
+      }
+    }
+    return frames.length === 0 ? null : Object.freeze({
+      capturedAtMs,
+      expiresAtMs: capturedAtMs + ARCHIVED_CANDIDATE_TTL_MS,
+      frames: Object.freeze(frames),
+    });
+  }
+
+  async function prefetchOcrCandidate(target, candidate, signal, fallbackSegment = null) {
+    const fallbackPromise = archiveSdCandidateFallback(
+      target,
+      candidate,
+      fallbackSegment,
+      signal,
+    );
+    const originalPromise = prefetchOriginalCandidate(target, candidate, signal);
+    const [fallback, original] = await Promise.allSettled([fallbackPromise, originalPromise]);
+    if (original.status === "fulfilled" && original.value) return original.value;
+    if (fallback.status === "fulfilled" && fallback.value) {
+      stats.candidateSdFallbackUses += 1;
+      return fallback.value;
+    }
+    if (original.status === "rejected") throw original.reason;
+    if (fallback.status === "rejected") throw fallback.reason;
+    return null;
+  }
+
+  function startFallbackArchive(target, candidate, fallbackSegment) {
+    if (!fallbackSegment || !Buffer.isBuffer(fallbackSegment.body)
+      || fallbackSegment.body.length === 0
+      || fallbackSegment.body.length > MAX_SD_FALLBACK_SEGMENT_BYTES) return null;
+    const existing = candidateFallbackArchives.get(candidate);
+    if (existing) return existing.promise;
+    if (candidateFallbackArchives.size >= MAX_FALLBACK_ARCHIVE_PREFETCHES) {
+      stats.candidateFallbackArchiveSaturated += 1;
+      return null;
+    }
+
+    stats.candidateFallbackArchiveStarts += 1;
+    const entry = { candidate, promise: null };
+    const promise = archiveSdCandidateFallback(
+      target,
+      candidate,
+      fallbackSegment,
+      defaultSignal,
+    )
+      .then((prefetched) => {
+        if (!prefetched) return prefetched;
+        stats.candidateSdFallbackUses += 1;
+        replaceCandidate(target, candidate, Object.freeze({
+          ...candidate,
+          prefetchedCapturedAtMs: prefetched.capturedAtMs,
+          prefetchedFrames: prefetched.frames,
+          expiresAtMs: prefetched.expiresAtMs,
+        }));
+        return prefetched;
+      })
+      .catch(() => {
+        stats.candidateFrameCaptureErrors += 1;
+        return null;
+      })
+      .finally(() => {
+        if (candidateFallbackArchives.get(candidate) === entry) {
+          candidateFallbackArchives.delete(candidate);
+        }
+      });
+    entry.promise = promise;
+    candidateFallbackArchives.set(candidate, entry);
+    return promise;
+  }
+
+  function startCandidatePrefetch(target, candidate, fallbackSegment = null) {
+    if (!ocrEnabled || candidate?.hudProbe === true
+      || typeof archiveCandidateFrame !== "function"
+      || typeof readCandidateFrame !== "function") return null;
+    const existing = candidatePrefetches.get(candidate);
+    if (existing) return existing.promise;
+    if (candidatePrefetches.size >= MAX_EAGER_CANDIDATE_PREFETCHES) {
+      stats.candidatePrefetchSaturated += 1;
+      return startFallbackArchive(target, candidate, fallbackSegment);
+    }
+
+    stats.candidatePrefetchStarts += 1;
+    const entry = { candidate, promise: null };
+    const promise = prefetchOcrCandidate(target, candidate, defaultSignal, fallbackSegment)
+      .then((prefetched) => {
+        if (!prefetched) return prefetched;
+        replaceCandidate(target, candidate, Object.freeze({
+          ...candidate,
+          prefetchedCapturedAtMs: prefetched.capturedAtMs,
+          prefetchedFrames: prefetched.frames,
+          expiresAtMs: prefetched.expiresAtMs,
+        }));
+        return prefetched;
+      })
+      .catch(() => {
+        stats.candidateFrameCaptureErrors += 1;
+        return null;
+      })
+      .finally(() => {
+        if (candidatePrefetches.get(candidate) === entry) {
+          candidatePrefetches.delete(candidate);
+        }
+      });
+    entry.promise = promise;
+    candidatePrefetches.set(candidate, entry);
+    return promise;
+  }
+
   async function scanGate(target, { signal = defaultSignal } = {}) {
     signal = normalizeSignal(signal);
     const preserved = pendingCandidateFor(target);
@@ -1081,7 +1457,8 @@ function createSamgukHlsMonitor(options = {}) {
       };
       if (candidateIndices.length > 0) {
         stats.uiCandidates += 1;
-        postponeHudProbe(target, monotonicNow());
+        const detectedAtMs = monotonicNow();
+        postponeHudProbe(target, detectedAtMs);
         if (Number.isSafeInteger(segment.mediaSequence)) {
           const candidate = Object.freeze({
             mediaSequence: segment.mediaSequence,
@@ -1089,22 +1466,12 @@ function createSamgukHlsMonitor(options = {}) {
             sampleCount: frameCount,
             candidateIndices,
             candidateRuns,
+            detectedAtMs,
+            expiresAtMs: detectedAtMs + ARCHIVED_CANDIDATE_TTL_MS,
           });
-          let prefetched = null;
-          try {
-            prefetched = await prefetchHdCandidate(target, candidate, signal);
-          } catch (error) {
-            if (signal?.aborted) throw error;
-            stats.candidateFrameCaptureErrors += 1;
-          }
-          pendingCandidates.set(target.id, Object.freeze({
-            ...candidate,
-            ...(prefetched ? {
-              prefetchedCapturedAtMs: prefetched.capturedAtMs,
-              prefetchedFrames: prefetched.frames,
-              expiresAtMs: prefetched.expiresAtMs,
-            } : {}),
-          }));
+          // normal lane은 SD cursor를 즉시 반환하되, 별도 12-slot prefetch가
+          // burst 예약을 기다리지 않고 ORIGINAL 과거 window를 선점한다.
+          enqueueCandidate(target, candidate, { fallbackSegment: segment });
         }
         return {
           duplicate: false,
@@ -1127,12 +1494,14 @@ function createSamgukHlsMonitor(options = {}) {
       postponeHudProbe(target, probeNow);
       activeHudProbes.add(target.id);
       if (Number.isSafeInteger(latestProbeFrame.mediaSequence)) {
-        pendingCandidates.set(target.id, Object.freeze({
+        enqueueCandidate(target, Object.freeze({
           ...latestProbeFrame,
           candidateIndices,
           candidateRuns,
           hudProbe: true,
-        }));
+          detectedAtMs: probeNow,
+          expiresAtMs: probeNow + ARCHIVED_CANDIDATE_TTL_MS,
+        }), { eager: false });
       }
       return {
         duplicate: false,
@@ -1156,22 +1525,135 @@ function createSamgukHlsMonitor(options = {}) {
     };
   }
 
+  async function fetchBurstSdCursor(target, { signal = defaultSignal } = {}) {
+    signal = normalizeSignal(signal);
+    if (!usesSegmentBatch) return Object.freeze([]);
+    const fetchedSegments = await resolveAndFetch(target, "SD", signal);
+    throwIfAborted(signal);
+    const previousSequence = lastMediaSequence.get(streamKey(target, "SD"));
+    const fetched = [];
+    for (const segment of fetchedSegments) {
+      let candidateEnqueued = false;
+      const isFresh = !Number.isSafeInteger(previousSequence)
+        || segment.mediaSequence > previousSequence;
+      if (isFresh) {
+        const grayFrames = await decodeGrayFrame(segment.body, { signal: signal || undefined });
+        throwIfAborted(signal);
+        const inspected = inspectGrayFrames(grayFrames);
+        stats.burstSdGateSegments += 1;
+        if (inspected.candidateIndices.length > 0) {
+          const detectedAtMs = monotonicNow();
+          const candidate = Object.freeze({
+            mediaSequence: segment.mediaSequence,
+            sampleIndex: inspected.candidateIndices[0],
+            sampleCount: inspected.sampleCount,
+            candidateIndices: inspected.candidateIndices,
+            candidateRuns: inspected.candidateRuns,
+            detectedAtMs,
+            expiresAtMs: detectedAtMs + ARCHIVED_CANDIDATE_TTL_MS,
+          });
+          candidateEnqueued = enqueueCandidate(target, candidate, { fallbackSegment: segment });
+          if (candidateEnqueued) {
+            stats.uiCandidates += 1;
+            stats.burstSdUiCandidates += 1;
+            postponeHudProbe(target, detectedAtMs);
+          }
+        }
+      }
+      fetched.push(Object.freeze({
+        segment: Object.freeze({
+          segmentId: segment.segmentId,
+          mediaSequence: segment.mediaSequence,
+        }),
+        segmentHash: contentHashFor(segment),
+        candidateEnqueued,
+        gateInspected: isFresh,
+      }));
+    }
+    return Object.freeze(fetched);
+  }
+
+  function commitBurstSdCursor(target, fetched) {
+    if (!Array.isArray(fetched)) fail("invalid_segment", "burst SD batch가 올바르지 않습니다.");
+    const freshSegmentIds = new Set(
+      onlyFreshSegments(target, "SD", fetched.map(item => item.segment)).map(segment => segment.segmentId),
+    );
+    let advancedSegments = 0;
+    let gateInspectedSegments = 0;
+    let candidateSegments = 0;
+    for (const { segment, segmentHash, candidateEnqueued, gateInspected } of fetched) {
+      if (!freshSegmentIds.has(segment.segmentId)) continue;
+      if (gateInspected) gateInspectedSegments += 1;
+      if (candidateEnqueued) candidateSegments += 1;
+      if (isContentDuplicate(target, "SD", segmentHash)) {
+        stats.duplicateSegments += 1;
+        commitSegment(target, "SD", segment, segmentHash);
+        continue;
+      }
+      if (commitSegment(target, "SD", segment, segmentHash)) advancedSegments += 1;
+    }
+    stats.burstSdSegmentsAdvanced += advancedSegments;
+    stats.segmentsProcessed += gateInspectedSegments;
+    return Object.freeze({ advancedSegments, candidateSegments, gateInspectedSegments });
+  }
+
+  async function syncBurstSdCursor(target, { signal = defaultSignal } = {}) {
+    const fetched = await fetchBurstSdCursor(target, { signal });
+    return commitBurstSdCursor(target, fetched);
+  }
+
   async function scanOcr(target, { initialHiddenFrames = 0, signal = defaultSignal } = {}) {
     signal = normalizeSignal(signal);
     if (!Number.isSafeInteger(initialHiddenFrames)
       || initialHiddenFrames < 0 || initialHiddenFrames > 1) {
       fail("invalid_config", "initialHiddenFrames는 0 또는 1이어야 합니다.");
     }
-    const pending = pendingCandidateFor(target);
+    let pending = pendingCandidateFor(target);
+    const eagerPrefetch = pending
+      ? candidatePrefetches.get(pending) || candidateFallbackArchives.get(pending)
+      : null;
+    if (pending && eagerPrefetch) {
+      await eagerPrefetch.promise;
+      throwIfAborted(signal);
+      pending = pendingCandidateFor(target);
+    }
+    if (pending && pending.hudProbe !== true
+      && (!Array.isArray(pending.prefetchedFrames) || pending.prefetchedFrames.length === 0)) {
+      let prefetched = null;
+      try {
+        prefetched = await prefetchOcrCandidate(target, pending, signal);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        stats.candidateFrameCaptureErrors += 1;
+      }
+      if (prefetched) {
+        const candidateToReplace = pending;
+        const prefetchedCandidate = Object.freeze({
+          ...candidateToReplace,
+          prefetchedCapturedAtMs: prefetched.capturedAtMs,
+          prefetchedFrames: prefetched.frames,
+          expiresAtMs: prefetched.expiresAtMs,
+        });
+        if (replaceCandidate(target, candidateToReplace, prefetchedCandidate)) {
+          pending = prefetchedCandidate;
+        } else {
+          pending = pendingCandidateFor(target);
+        }
+      }
+    }
     const archivedSegments = archivedSegmentsFor(pending);
     const usingArchivedFrames = archivedSegments.length > 0;
     const allFetchedSegments = usingArchivedFrames
       ? archivedSegments
-      : await resolveAndFetch(target, "HD", signal);
+      : await resolveAndFetch(target, OCR_STREAM_QUALITY, signal, {
+        // Cold ORIGINAL 복구에서도 전체 playlist window를 다시 받지 않는다.
+        // cursor가 있으면 fetcher가 cursor 이후를 우선하므로 후속 burst catch-up은 유지된다.
+        initialSegmentCount: Math.min(MAX_PREFETCHED_OCR_SEGMENTS, maxCatchupSegments),
+      });
     throwIfAborted(signal);
     const fetchedSegments = usingArchivedFrames
       ? allFetchedSegments
-      : onlyFreshSegments(target, "HD", allFetchedSegments);
+      : onlyFreshSegments(target, OCR_STREAM_QUALITY, allFetchedSegments);
     const pendingSequence = pending?.mediaSequence;
     let segments = fetchedSegments;
     let sequenceMatched = false;
@@ -1184,12 +1666,12 @@ function createSamgukHlsMonitor(options = {}) {
       if (exactIndex >= 0) {
         sequenceMatched = true;
         for (const skipped of fetchedSegments.slice(0, exactIndex)) {
-          commitSegment(target, "HD", skipped, contentHashFor(skipped));
+          commitSegment(target, OCR_STREAM_QUALITY, skipped, contentHashFor(skipped));
         }
         segments = fetchedSegments.slice(exactIndex);
       } else if (fetchedSegments.at(-1).mediaSequence < pendingSequence) {
         for (const skipped of fetchedSegments) {
-          commitSegment(target, "HD", skipped, contentHashFor(skipped));
+          commitSegment(target, OCR_STREAM_QUALITY, skipped, contentHashFor(skipped));
         }
         return {
           duplicate: true,
@@ -1223,14 +1705,14 @@ function createSamgukHlsMonitor(options = {}) {
       const segmentHash = usingArchivedFrames
         ? segment.archivedFrames[0].segmentHash
         : contentHashFor(segment);
-      if (!usingArchivedFrames && isContentDuplicate(target, "HD", segmentHash)) {
+      if (!usingArchivedFrames && isContentDuplicate(target, OCR_STREAM_QUALITY, segmentHash)) {
         stats.duplicateSegments += 1;
         duplicateSegments += 1;
-        commitSegment(target, "HD", segment, segmentHash);
+        commitSegment(target, OCR_STREAM_QUALITY, segment, segmentHash);
         if (Number.isSafeInteger(pendingSequence)
           && Number.isSafeInteger(segment.mediaSequence)
           && segment.mediaSequence >= pendingSequence) {
-          pendingCandidates.delete(target.id);
+          advancePendingCandidate(target, pending);
         }
         continue;
       }
@@ -1324,6 +1806,7 @@ function createSamgukHlsMonitor(options = {}) {
         }
         const observations = flattenBroadcastBatch(batch, {
           profileId,
+          seasonId: CURRENT_SEASON_ID,
           playerId: target.playerId,
           sourceId: `screen:${target.playerId}:${observedAtMs}:${segmentHash.slice(0, 16)}:${sampleKey}`,
           sourceUrl: target.sourceUrl,
@@ -1365,6 +1848,7 @@ function createSamgukHlsMonitor(options = {}) {
         }));
         if (burstVisible) {
           consecutiveHiddenFrames = 0;
+          if (usingArchivedFrames) endBurst = false;
           hudSegmentCountedAsHidden = false;
         } else if (profileId === HUD_COMBAT_PROFILE_ID) {
           // Adjacent samples from one HLS segment are one evidence unit. Count
@@ -1384,19 +1868,21 @@ function createSamgukHlsMonitor(options = {}) {
       }
       if (mustEvaluateAllCandidateSamples && consecutiveHiddenFrames >= 2) endBurst = true;
       throwIfAborted(signal);
-      commitSegment(target, "HD", segment, segmentHash);
+      commitSegment(target, OCR_STREAM_QUALITY, segment, segmentHash);
       stats.segmentsProcessed += 1;
       processedSegments += 1;
       if (Number.isSafeInteger(pendingSequence)
         && !usingArchivedFrames
         && Number.isSafeInteger(segment.mediaSequence)
         && segment.mediaSequence >= pendingSequence) {
-        pendingCandidates.delete(target.id);
+        advancePendingCandidate(target, pending);
       }
-      if (endBurst) break;
+      // 보존 ring은 후보 앞쪽의 숨김 frame이 먼저 올 수 있다. 저장된 window를
+      // 끝까지 확인해야 뒤쪽에 잠깐 나타난 실제 panel을 놓치지 않는다.
+      if (endBurst && !usingArchivedFrames) break;
     }
 
-    if (usingArchivedFrames) pendingCandidates.delete(target.id);
+    if (usingArchivedFrames) advancePendingCandidate(target, pending);
 
     const visibleFrames = frames.filter(frame => frame.panelVisible === true).length;
     const hiddenFrames = frames.filter(frame => frame.panelVisible === false).length;
@@ -1423,15 +1909,36 @@ function createSamgukHlsMonitor(options = {}) {
     signal = normalizeSignal(signal);
     if (task.lane === "burst" && ocrEnabled) {
       try {
-        const ocr = await scanOcr(task.target, {
-          initialHiddenFrames: hiddenBurstFrames.get(task.target.id) || 0,
-          signal,
-        });
+        const [ocrResult, sdSyncResult] = await Promise.allSettled([
+          scanOcr(task.target, {
+            initialHiddenFrames: hiddenBurstFrames.get(task.target.id) || 0,
+            signal,
+          }),
+          fetchBurstSdCursor(task.target, { signal }),
+        ]);
+        if (sdSyncResult.status === "rejected") {
+          if (signal?.aborted) throw sdSyncResult.reason;
+          stats.burstSdSyncErrors += 1;
+        }
+        if (ocrResult.status === "rejected") throw ocrResult.reason;
+        const sdCursor = sdSyncResult.status === "fulfilled"
+          ? commitBurstSdCursor(task.target, sdSyncResult.value)
+          : null;
+        const ocr = ocrResult.value;
         const visibleFrames = ocr.frames.filter(frame => frame.burstVisible === true).length;
         if (visibleFrames > 0) stats.confirmedUiPanels += visibleFrames;
         if (ocr.endBurst) {
           hiddenBurstFrames.delete(task.target.id);
-          pendingCandidates.delete(task.target.id);
+          const nextCandidate = pendingCandidateFor(task.target);
+          if (nextCandidate) {
+            return {
+              live: true,
+              uiCandidate: true,
+              ocr,
+              sdCursor,
+              continuedForQueuedCandidate: true,
+            };
+          }
           activeHudProbes.delete(task.target.id);
           stats.earlyBurstEnds += 1;
           return { live: true, uiCandidate: false, endBurst: true, ocr };
@@ -1441,7 +1948,13 @@ function createSamgukHlsMonitor(options = {}) {
         } else if (visibleFrames > 0) {
           hiddenBurstFrames.delete(task.target.id);
         }
-        return { live: true, uiCandidate: visibleFrames > 0, ocr };
+        const nextCandidate = pendingCandidateFor(task.target);
+        return {
+          live: true,
+          uiCandidate: visibleFrames > 0 || Boolean(nextCandidate),
+          ocr,
+          sdCursor,
+        };
       } catch (error) {
         const errorCode = safeErrorCode(error);
         if ((errorCode === "aborted" || errorCode === "task_deadline") && signal?.aborted) throw error;
@@ -1456,11 +1969,14 @@ function createSamgukHlsMonitor(options = {}) {
       }
     }
 
+    // ORIGINAL은 candidate burst에서만 관측한다. normal 구간을 건너뛴
+    // sequence를 실제 누락으로 합산하지 않도록 다음 burst의 기준을 새로 잡는다.
+    if (usesSegmentBatch) resetStreamProgress(task.target, OCR_STREAM_QUALITY);
     const gateResult = await scanGate(task.target, { signal });
     const uiCandidate = ocrEnabled && gateResult.uiCandidate;
     if (!uiCandidate) {
       hiddenBurstFrames.delete(task.target.id);
-      pendingCandidates.delete(task.target.id);
+      clearTargetCandidates(task.target);
       activeHudProbes.delete(task.target.id);
     }
     return { live: true, uiCandidate, gate: gateResult };
@@ -1516,7 +2032,11 @@ function createSamgukHlsMonitor(options = {}) {
 
   function dispatch(now = monotonicNow(), { signal = defaultSignal } = {}) {
     signal = normalizeSignal(signal);
-    const tasks = scheduler.selectDue(now, { expireLeases: false });
+    const availableSlots = Math.max(0, maxActiveTasks - active.size);
+    const tasks = scheduler.selectDue(now, {
+      expireLeases: false,
+      limit: availableSlots,
+    });
     const promises = tasks.map((task) => {
       const promise = runTask(task, { signal });
       active.add(promise);
@@ -1543,7 +2063,11 @@ function createSamgukHlsMonitor(options = {}) {
         await Promise.race([abortableDelay(pollMs, signal), ...active]);
       }
     }
-    await Promise.allSettled([...active]);
+    await Promise.allSettled([
+      ...active,
+      ...[...candidatePrefetches.values()].map(entry => entry.promise),
+      ...[...candidateFallbackArchives.values()].map(entry => entry.promise),
+    ]);
   }
 
   function refreshBaselines(baselines, now = monotonicNow()) {
@@ -1604,16 +2128,31 @@ function createSamgukHlsMonitor(options = {}) {
 
   function getSnapshot(now = monotonicNow()) {
     let candidateFramesPending = 0;
+    let candidateQueueDepth = 0;
     for (const target of targets) {
       const pending = pendingCandidateFor(target, now);
       candidateFramesPending += Array.isArray(pending?.prefetchedFrames)
         ? pending.prefetchedFrames.length
         : 0;
+      const queue = queuedCandidates.get(target.id) || [];
+      candidateQueueDepth += queue.length;
+      for (const candidate of queue) {
+        candidateFramesPending += Array.isArray(candidate?.prefetchedFrames)
+          ? candidate.prefetchedFrames.length
+          : 0;
+      }
     }
     return Object.freeze({
       ocrEnabled,
       activeTasks: active.size,
-      stats: Object.freeze({ ...stats, candidateFramesPending }),
+      maxActiveTasks,
+      stats: Object.freeze({
+        ...stats,
+        candidateFramesPending,
+        candidateQueueDepth,
+        candidatePrefetchesActive: candidatePrefetches.size,
+        candidateFallbackArchivesActive: candidateFallbackArchives.size,
+      }),
       scheduler: scheduler.getSnapshot(now),
     });
   }
@@ -1627,6 +2166,7 @@ function createSamgukHlsMonitor(options = {}) {
     runTask,
     scanGate,
     scanOcr,
+    syncBurstSdCursor,
     scheduler,
     targets,
   });
@@ -1636,6 +2176,7 @@ module.exports = {
   DEFAULT_SCHEDULER_OPTIONS,
   DEFAULT_HUD_PROBE_INTERVAL_MS,
   MAX_TARGETS,
+  OCR_STREAM_QUALITY,
   SamgukHlsMonitorError,
   abortableDelay,
   buildFallbackBaselines,

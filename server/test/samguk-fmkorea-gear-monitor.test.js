@@ -7,24 +7,35 @@ const os = require("node:os");
 const path = require("node:path");
 const FALLBACK = require("../data/samguk-fallback.json");
 const {
+  CURRENT_SEASON_START_AT,
   buildRosterAliasIndex,
   calculateRateLimitBackoffMs,
   candidatePriority,
   extractGearClaims,
   fetchFmkoreaHtml,
   loadMonitorState,
+  normalizeSeasonStartAt,
   parseFmkoreaPostHtml,
   parseRetryAfter,
   parseFmkoreaSearchHtml,
   runFmkoreaGearMonitor,
 } = require("../lib/samguk-fmkorea-gear-monitor");
-const { readObservationQueue, resolveLatestAccepted } = require("../lib/samguk-observations");
+const {
+  CURRENT_SEASON_ID,
+  readObservationQueue,
+  resolveLatestAccepted,
+} = require("../lib/samguk-observations");
 
 const MEMBERS = Object.freeze([
   Object.freeze({ name: "조경훈", soopId: "cnsgkcnehd74" }),
   Object.freeze({ name: "킴나니", soopId: "sksgml16" }),
   Object.freeze({ name: "표우", soopId: "pyowoo" }),
 ]);
+const LEGACY_TEST_SEASON_START_AT = "2026-08-01T00:00:00.000Z";
+
+function runLegacyTestMonitor(options) {
+  return runFmkoreaGearMonitor({ seasonStartAt: LEGACY_TEST_SEASON_START_AT, ...options });
+}
 
 function temporaryPaths(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "samguk-fmkorea-"));
@@ -179,6 +190,20 @@ test("후보는 정확한 제목을 우선하고 참가자 또는 장비 단서�
   assert.equal(candidatePriority({ title: "강화석 가격이 올랐다" }, aliases), null);
 });
 
+test("시즌 시작시각은 현재 시즌 기본값과 엄격한 UTC ISO 명시값만 허용한다", () => {
+  assert.equal(normalizeSeasonStartAt(), CURRENT_SEASON_START_AT);
+  assert.equal(
+    normalizeSeasonStartAt("2026-08-04T10:36:40.000Z"),
+    "2026-08-04T10:36:40.000Z",
+  );
+  for (const value of ["2026-08-04T19:36:40+09:00", "2026-08-04", "invalid", 0]) {
+    assert.throws(
+      () => normalizeSeasonStartAt(value),
+      error => error.code === "invalid_config",
+    );
+  }
+});
+
 test("수집기는 문서 cache·5분 간격을 지키고 FM 단독 관측만 queue에 넣는다", async (t) => {
   const { queuePath, statePath } = temporaryPaths(t);
   const list = searchHtml([
@@ -202,7 +227,7 @@ test("수집기는 문서 cache·5분 간격을 지키고 FM 단독 관측만 qu
     throw new Error(`unexpected URL: ${url}`);
   };
   const now = Date.parse("2026-08-03T06:00:00.000Z");
-  const first = await runFmkoreaGearMonitor({
+  const first = await runLegacyTestMonitor({
     queuePath,
     statePath,
     members: MEMBERS,
@@ -220,6 +245,7 @@ test("수집기는 문서 cache·5분 간격을 지키고 FM 단독 관측만 qu
     errors: [],
   });
   const queued = readObservationQueue(queuePath);
+  assert.ok(queued.every(item => item.seasonId === CURRENT_SEASON_ID));
   assert.deepEqual(queued.map(item => [item.playerId, item.field, item.value, item.sourceType]), [
     ["P002", "weapon", 8, "fmkorea"],
     ["P001", "armor", 9, "fmkorea"],
@@ -227,7 +253,7 @@ test("수집기는 문서 cache·5분 간격을 지키고 FM 단독 관측만 qu
   assert.deepEqual(resolveLatestAccepted(queued, { now }), []);
   assert.equal(loadMonitorState(statePath).documents["10166535738"].status, "queued");
 
-  const second = await runFmkoreaGearMonitor({
+  const second = await runLegacyTestMonitor({
     queuePath,
     statePath,
     members: MEMBERS,
@@ -237,6 +263,68 @@ test("수집기는 문서 cache·5분 간격을 지키고 FM 단독 관측만 qu
   assert.equal(second.skipped, true);
   assert.equal(calls.length, 3);
   assert.equal(readObservationQueue(queuePath).length, 2);
+});
+
+test("시즌 시작 전 게시물은 관측과 processed cache에서 모두 제외한다", async (t) => {
+  const { queuePath, statePath } = temporaryPaths(t);
+  const beforeId = "10166530001";
+  const boundaryId = "10166530002";
+  const list = searchHtml([
+    searchItem(beforeId, "조경훈 갑빠 9강 성공"),
+    searchItem(boundaryId, "킴나니 무기8강 성공"),
+  ]);
+  const details = new Map([
+    [`https://www.fmkorea.com/${beforeId}`, postHtml(
+      beforeId, "조경훈 갑빠 9강 성공", "<p>조경훈 갑빠 9강 성공</p>", "20260804193639",
+    )],
+    [`https://www.fmkorea.com/${boundaryId}`, postHtml(
+      boundaryId, "킴나니 무기8강 성공", "<p>킴나니 무기8강 성공</p>", "20260804193640",
+    )],
+  ]);
+  const detailCalls = [];
+  const fetchImpl = async (url) => {
+    if (url.includes("search.php")) return htmlResponse(url, list);
+    detailCalls.push(url);
+    return htmlResponse(url, details.get(url));
+  };
+  const now = Date.parse("2026-08-04T10:40:00.000Z");
+
+  const first = await runFmkoreaGearMonitor({
+    queuePath,
+    statePath,
+    members: MEMBERS,
+    fetchImpl,
+    now,
+  });
+  assert.equal(first.candidates, 2);
+  assert.equal(first.observations, 1);
+  assert.equal(first.inserted, 1);
+  assert.deepEqual(
+    readObservationQueue(queuePath).map(item => [item.playerId, item.field, item.value]),
+    [["P002", "weapon", 8]],
+  );
+  let state = loadMonitorState(statePath);
+  assert.equal(state.documents[beforeId], undefined);
+  assert.equal(state.documents[boundaryId].status, "queued");
+
+  const second = await runFmkoreaGearMonitor({
+    queuePath,
+    statePath,
+    members: MEMBERS,
+    fetchImpl,
+    now: now + 5 * 60_000,
+    force: true,
+  });
+  assert.equal(second.candidates, 1);
+  assert.equal(second.observations, 0);
+  assert.equal(second.inserted, 0);
+  state = loadMonitorState(statePath);
+  assert.equal(state.documents[beforeId], undefined);
+  assert.deepEqual(detailCalls, [
+    `https://www.fmkorea.com/${beforeId}`,
+    `https://www.fmkorea.com/${boundaryId}`,
+    `https://www.fmkorea.com/${beforeId}`,
+  ]);
 });
 
 test("상세 응답 오류 문서는 cache하지 않아 다음 주기에 재시도한다", async (t) => {
@@ -249,7 +337,7 @@ test("상세 응답 오류 문서는 cache하지 않아 다음 주기에 재시�
       : htmlResponse(url, "<html>broken</html>")
   );
   const now = Date.parse("2026-08-03T06:00:00.000Z");
-  const result = await runFmkoreaGearMonitor({
+  const result = await runLegacyTestMonitor({
     queuePath,
     statePath,
     members: MEMBERS,
@@ -275,7 +363,7 @@ test("FMK 요청 제한 응답도 실행시각을 기록해 즉시 재요청하�
   };
   const now = Date.parse("2026-08-03T06:00:00.000Z");
   await assert.rejects(
-    () => runFmkoreaGearMonitor({ queuePath, statePath, members: MEMBERS, fetchImpl, now }),
+    () => runLegacyTestMonitor({ queuePath, statePath, members: MEMBERS, fetchImpl, now }),
     error => error.code === "upstream_rate_limited",
   );
   assert.deepEqual(loadMonitorState(statePath), {
@@ -286,7 +374,7 @@ test("FMK 요청 제한 응답도 실행시각을 기록해 즉시 재요청하�
     documents: {},
   });
 
-  const second = await runFmkoreaGearMonitor({
+  const second = await runLegacyTestMonitor({
     queuePath,
     statePath,
     members: MEMBERS,
@@ -299,7 +387,7 @@ test("FMK 요청 제한 응답도 실행시각을 기록해 즉시 재요청하�
   assert.equal(calls, 1);
 
   await assert.rejects(
-    () => runFmkoreaGearMonitor({
+    () => runLegacyTestMonitor({
       queuePath,
       statePath,
       members: MEMBERS,
@@ -374,7 +462,7 @@ test("상세 조회에서 제한되면 앞선 관측은 보존하고 남은 상�
     throw new Error(`제한 뒤 호출되면 안 됩니다: ${url}`);
   };
   const now = Date.parse("2026-08-03T06:00:00.000Z");
-  const result = await runFmkoreaGearMonitor({
+  const result = await runLegacyTestMonitor({
     queuePath,
     statePath,
     members: MEMBERS,

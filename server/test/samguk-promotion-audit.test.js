@@ -7,7 +7,7 @@ const {
   appendPromotionAudit,
   readPromotionAudit,
 } = require("../lib/samguk-promotion-audit");
-const { normalizeObservation } = require("../lib/samguk-observations");
+const { CURRENT_SEASON_ID, normalizeObservation } = require("../lib/samguk-observations");
 
 const FIXED_NOW = Date.parse("2026-08-02T10:30:00.000Z");
 
@@ -20,6 +20,7 @@ function temporaryAudit(t) {
 function candidate(index, overrides = {}) {
   const second = String(index).padStart(2, "0");
   return {
+    seasonId: CURRENT_SEASON_ID,
     playerId: "P001",
     field: "strength",
     value: 10 + index,

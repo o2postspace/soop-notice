@@ -59,7 +59,10 @@ async function runClient(payload, { tab = "status" } = {}) {
     setInterval: () => 0,
     setTimeout,
     clearTimeout,
-    fetch: async () => ({ ok: true, json: async () => payload }),
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ seasonId: "hugukji-2026-08-04", ...payload }),
+    }),
     localStorage: {
       getItem: key => storage.get(key) || null,
       setItem: (key, value) => storage.set(key, value),
@@ -75,7 +78,7 @@ async function runClient(payload, { tab = "status" } = {}) {
   context.window.addEventListener = () => {};
   vm.runInNewContext(fs.readFileSync(path.join(PUBLIC_DIR, "samguk.js"), "utf8"), context);
   await context.window.loadSamgukData(true);
-  return { context, members, root };
+  return { context, members, root, storage };
 }
 
 test("현황 payload의 정보창 11개 필드를 보존하고 HTML 모양 오염값은 숨긴다", async () => {
@@ -134,11 +137,101 @@ test("현황 payload의 정보창 11개 필드를 보존하고 HTML 모양 오�
   assert.equal(members[0].level, null);
 });
 
+test("절기배분 canonical 6개 행만 보존하고 v4 시즌 캐시에만 저장한다", async () => {
+  const skillBuild = {
+    version: 1,
+    preset: 3,
+    ownedPoints: 2,
+    skills: Array.from({ length: 6 }, (_value, index) => ({
+      name: `절기 ${index + 1}`,
+      requiredPoints: 10 + index,
+      allocatedPoints: index,
+    })),
+  };
+  const { members, storage } = await runClient({
+    source: "google-sheet",
+    stale: false,
+    members: [{ name: "감스트", soopId: "devil0108", nation: "촉", skillBuild }],
+    territories: [],
+    rules: [],
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(members[0].skillBuild)), skillBuild);
+  assert.deepEqual([...storage.keys()], ["soopnotice:samguk:v4:hugukji-2026-08-04"]);
+  const stored = JSON.parse(storage.values().next().value);
+  assert.equal(stored.seasonId, "hugukji-2026-08-04");
+  assert.equal(stored.payload.seasonId, "hugukji-2026-08-04");
+
+  const invalid = await runClient({
+    source: "google-sheet",
+    stale: false,
+    members: [{
+      name: "감스트", soopId: "devil0108", nation: "촉", skillBuild: { ...skillBuild, extra: true },
+    }],
+    territories: [],
+    rules: [],
+  });
+  assert.equal(invalid.members[0].skillBuild, null);
+});
+
+test("이전 시즌 API payload는 멤버와 브라우저 캐시에 적용하지 않는다", async () => {
+  const { members, storage } = await runClient({
+    seasonId: "hugukji-old-season",
+    source: "google-sheet",
+    stale: false,
+    members: [{ name: "감스트", soopId: "devil0108", nation: "촉", level: 99 }],
+    territories: [],
+    rules: [],
+  });
+
+  assert.equal(members[0].level, undefined);
+  assert.equal(storage.size, 0);
+});
+
+test("멤버 상세는 직업별 절기 9행과 남은 포인트를 escape해 렌더링한다", () => {
+  const html = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
+  const metricsSource = html.match(/function samgukSkillBuildMetrics\(member\) \{[\s\S]*?\n\}/)?.[0] || "";
+  const renderSource = html.match(/function samgukSkillBuildDetail\(member\) \{[\s\S]*?\n\}/)?.[0] || "";
+  const rankingSource = html.match(/function samgukSkillBuildRankingCell\(member\) \{[\s\S]*?\n\}/)?.[0] || "";
+  const context = {
+    escapeHtml,
+    samgukNumber: value => value === null || value === undefined || value === "" ? null : Number(value),
+  };
+  vm.runInNewContext([metricsSource, renderSource, rankingSource].join("\n"), context);
+  const member = {
+    skillBuild: {
+      version: 1,
+      preset: 4,
+      ownedPoints: 3,
+      skills: Array.from({ length: 9 }, (_value, index) => ({
+        name: index === 0 ? "<img onerror=alert(1)>" : `절기 ${index + 1}`,
+        requiredPoints: index + 10,
+        allocatedPoints: index,
+      })),
+    },
+  };
+  const rendered = context.samgukSkillBuildDetail(member);
+
+  assert.equal((rendered.match(/class="samguk-skill-build-row"/g) || []).length, 9);
+  assert.match(rendered, /투자 합 36 · 강화 8\/9 · 프리셋 4 · 남은 포인트 3/);
+  assert.match(rendered, /배분 8 · 필요 18/);
+  assert.match(rendered, /&lt;img onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(rendered, /<img onerror/);
+
+  const ranking = context.samgukSkillBuildRankingCell(member);
+  assert.match(ranking, /투자 36/);
+  assert.match(ranking, /강화 8\/9 · 남은 3/);
+  assert.match(ranking, /스킬별 상세/);
+  assert.match(ranking, /파워 v1\.6 미반영/);
+  assert.match(ranking, /&lt;img onerror=alert\(1\)&gt; \+0/);
+  assert.doesNotMatch(ranking, /<img onerror/);
+});
+
 test("영토 화면은 60개 사각 타일·국가 합계·현재 스냅샷 갱신 목록을 렌더링한다", async () => {
   const territories = Array.from({ length: 60 }, (_value, index) => territory(index + 1));
   territories[4] = territory(5, { owner: "위" });
   territories[24] = territory(25, { owner: "촉", capital: true });
-  territories[26] = territory(27, { owner: "위" });
+  territories[26] = territory(27, { owner: "위", special: true });
   territories[46] = territory(47, { owner: "오", capital: true, facility: "장원" });
   const { root } = await runClient({
     source: "google-sheet",
@@ -179,8 +272,13 @@ test("전투 관측 셀은 기량 증가량을 포함해 빈값 없이 최대 �
   assert.match(combatCell, /const groups = \[primary, character, rates, skillRates, quantity\]/);
   assert.match(combatCell, /metric\('무력\+', member\.strengthBonus\)/);
   assert.match(combatCell, /metric\('절기가속', member\.skillHasteIncrease\)/);
-  assert.match(combatCell, /파워 v1\.5 미반영/);
+  assert.match(combatCell, /파워 v1\.6 미반영/);
+  assert.match(html, /function samgukSkillBuildDetail\(member\)/);
+  assert.match(html, /!\[6, 9\]\.includes\(build\.skills\.length\)/);
+  assert.match(html, /남은 포인트/);
+  assert.match(html, /배분 [^<]+ · 필요/);
+  assert.match(html, /samgukSkillBuildDetail\(member\)/);
   assert.doesNotMatch(html, /return '<span class="samguk-empty-value">—<\/span>'/);
   assert.match(html, /samguk\.css\?v=20260803c/);
-  assert.match(html, /samguk\.js\?v=20260803d/);
+  assert.match(html, /samguk\.js\?v=20260804a/);
 });

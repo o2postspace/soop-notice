@@ -1,10 +1,15 @@
 const { Router } = require("express");
-const { createEncodedJsonCache, sendEncodedJson } = require("../lib/encoded-json-cache");
+const {
+  createEncodedJsonCache,
+  readCacheInvalidationToken,
+  sendEncodedJson,
+} = require("../lib/encoded-json-cache");
 const { createSamgukSheetService } = require("../lib/samguk-sheet");
+const { DEFAULT_QUEUE_PATH, resolveCacheStampPath } = require("../scripts/samguk-promote-observations");
 
 const DEFAULT_CACHE_TTL_MS = 60_000;
-const CACHE_CONTROL = "public, max-age=15, s-maxage=60, stale-while-revalidate=300, stale-if-error=86400";
-const CDN_CACHE_CONTROL = "public, s-maxage=60, stale-while-revalidate=300, stale-if-error=86400";
+const CACHE_CONTROL = "public, max-age=0, s-maxage=10, stale-while-revalidate=5, stale-if-error=86400";
+const CDN_CACHE_CONTROL = "public, s-maxage=10, stale-while-revalidate=5, stale-if-error=86400";
 
 function positiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -14,10 +19,26 @@ function positiveInt(value, fallback) {
 function createRouter(options = {}) {
   const router = Router();
   const service = options.service || createSamgukSheetService();
+  const cacheStampPath = Object.prototype.hasOwnProperty.call(options, "cacheStampPath")
+    ? options.cacheStampPath
+    : resolveCacheStampPath(
+      process.env.SAMGUK_OBSERVATION_QUEUE_PATH || DEFAULT_QUEUE_PATH,
+      process.env.SAMGUK_API_CACHE_STAMP_PATH,
+    );
+  let lastCacheStampToken = null;
+  const getInvalidationToken = cacheStampPath ? () => {
+    try {
+      lastCacheStampToken = readCacheInvalidationToken(cacheStampPath);
+    } catch (error) {
+      console.error("Samguk cache stamp read error:", error.message);
+    }
+    return lastCacheStampToken;
+  } : undefined;
   const cache = options.cache || createEncodedJsonCache({
     load: () => service.load(),
     ttlMs: positiveInt(options.ttlMs ?? process.env.SAMGUK_CACHE_TTL_MS, DEFAULT_CACHE_TTL_MS),
     staleIfErrorMs: 15_000,
+    getInvalidationToken,
     onRefreshError: error => console.error("Samguk cache refresh error:", error.message),
   });
 
@@ -46,4 +67,5 @@ module.exports._test = {
   CDN_CACHE_CONTROL,
   DEFAULT_CACHE_TTL_MS,
   createRouter,
+  resolveCacheStampPath,
 };

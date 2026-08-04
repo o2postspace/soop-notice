@@ -3,7 +3,7 @@
 const DEFAULT_TTL_MS = 60_000;
 const MAX_TTL_MS = 10 * 60_000;
 const MAX_BJ_IDS = 90;
-const QUALITIES = Object.freeze(["SD", "HD"]);
+const QUALITIES = Object.freeze(["SD", "HD", "ORIGINAL"]);
 const BJ_ID_PATTERN = /^[A-Za-z0-9_]{1,30}$/;
 const BROAD_NO_PATTERN = /^[1-9][0-9]{0,19}$/;
 const MAX_URL_LENGTH = 16 * 1024;
@@ -184,7 +184,10 @@ function createSoopHlsCache(options = {}) {
     validResolvers = Boolean(resolvers)
       && typeof resolvers === "object"
       && !Array.isArray(resolvers)
-      && QUALITIES.every(quality => typeof resolvers[quality] === "function");
+      && typeof resolvers.SD === "function"
+      && (typeof resolvers.HD === "function" || typeof resolvers.ORIGINAL === "function")
+      && (resolvers.HD === undefined || typeof resolvers.HD === "function")
+      && (resolvers.ORIGINAL === undefined || typeof resolvers.ORIGINAL === "function");
   } catch {
     validResolvers = false;
   }
@@ -309,6 +312,7 @@ function createSoopHlsCache(options = {}) {
     const { signal } = normalizeGetCallOptions(callOptions);
     const bjId = validBjId(bjIdInput);
     const quality = validQuality(qualityInput);
+    if (typeof resolvers[quality] !== "function") fail("invalid_quality");
     if (signal && abortSignalState(signal)) {
       return Promise.reject(new SoopHlsCacheError("aborted"));
     }
@@ -404,6 +408,7 @@ function createSoopHlsCache(options = {}) {
     const byQuality = {
       SD: { entries: 0, cached: 0, pending: 0 },
       HD: { entries: 0, cached: 0, pending: 0 },
+      ORIGINAL: { entries: 0, cached: 0, pending: 0 },
     };
     for (const [key, state] of [...entries]) {
       if (state.value && currentTime >= state.expiresAt) {
@@ -420,8 +425,8 @@ function createSoopHlsCache(options = {}) {
       if (state.value) qualityStats.cached += 1;
       if (state.pending) qualityStats.pending += 1;
     }
-    const cachedCount = byQuality.SD.cached + byQuality.HD.cached;
-    const pendingCount = byQuality.SD.pending + byQuality.HD.pending;
+    const cachedCount = QUALITIES.reduce((total, quality) => total + byQuality[quality].cached, 0);
+    const pendingCount = QUALITIES.reduce((total, quality) => total + byQuality[quality].pending, 0);
     return {
       ttlMs,
       maxBjIds,

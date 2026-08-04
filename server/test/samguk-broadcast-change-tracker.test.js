@@ -9,6 +9,8 @@ const {
   createBroadcastChangeTracker,
 } = require("../lib/samguk-broadcast-change-tracker");
 const { BATCH_FIELDS } = require("../lib/samguk-broadcast-batch");
+const { CURRENT_SEASON_ID } = require("../lib/samguk-observations");
+const { normalizeSkillBuild } = require("../lib/samguk-skill-build");
 
 const BASE_TIME = Date.parse("2026-08-02T10:00:00.000Z");
 
@@ -16,6 +18,7 @@ function observation(overrides = {}) {
   const { observedAtMs = BASE_TIME, ...fields } = overrides;
   const sourceId = fields.sourceId || `screen:frame-${observedAtMs}`;
   return {
+    seasonId: CURRENT_SEASON_ID,
     playerId: "P001",
     field: "strength",
     value: 11,
@@ -45,6 +48,19 @@ function observationBatch({
     evidenceHash,
     observedAtMs,
   }));
+}
+
+function skillBuild(allocatedOffset = 0) {
+  return {
+    version: 1,
+    preset: 1,
+    ownedPoints: 6,
+    skills: Array.from({ length: 6 }, (_value, index) => ({
+      name: `절기 ${index + 1}`,
+      requiredPoints: index + 1,
+      allocatedPoints: index + (index === 5 ? allocatedOffset : 0),
+    })),
+  };
 }
 
 function rejectsWith(code, operation) {
@@ -90,6 +106,59 @@ test("같은 새 값을 서로 다른 sourceId와 evidenceHash 두 frame이 확�
   });
   assert.deepEqual(tracker.observe(third, { now: BASE_TIME + 10_000 }), []);
   assert.equal(tracker.getState("P001", "strength").candidate, null);
+});
+
+test("skillBuild 6행은 서로 다른 전체 snapshot 두 번의 합의로 원자 commit한다", () => {
+  const baseline = normalizeSkillBuild(skillBuild(-1));
+  const current = normalizeSkillBuild(skillBuild());
+  const tracker = createBroadcastChangeTracker({
+    baselines: [{ playerId: "P001", field: "skillBuild", value: baseline }],
+    now: BASE_TIME,
+  });
+  const first = observation({
+    field: "skillBuild",
+    value: skillBuild(),
+    sourceId: `screen:P001:${BASE_TIME}:1111111111111111:0`,
+    evidenceHash: "1".repeat(64),
+  });
+  const mismatched = observation({
+    field: "skillBuild",
+    value: skillBuild(1),
+    sourceId: `screen:P001:${BASE_TIME + 1_000}:2222222222222222:0`,
+    evidenceHash: "2".repeat(64),
+    observedAtMs: BASE_TIME + 1_000,
+  });
+  assert.deepEqual(tracker.observeBatch([first], { now: BASE_TIME }), []);
+  assert.deepEqual(tracker.observeBatch([mismatched], { now: BASE_TIME + 1_000 }), []);
+  assert.equal(tracker.getState("P001", "skillBuild").stableValue, baseline);
+
+  const second = observation({
+    field: "skillBuild",
+    value: skillBuild(),
+    sourceId: `screen:P001:${BASE_TIME + 2_000}:3333333333333333:0`,
+    evidenceHash: "3".repeat(64),
+    observedAtMs: BASE_TIME + 2_000,
+  });
+  const third = observation({
+    field: "skillBuild",
+    value: skillBuild(),
+    sourceId: `screen:P001:${BASE_TIME + 3_000}:4444444444444444:0`,
+    evidenceHash: "4".repeat(64),
+    observedAtMs: BASE_TIME + 3_000,
+  });
+  assert.deepEqual(tracker.observeBatch([second], { now: BASE_TIME + 2_000 }), []);
+  let callbackCalls = 0;
+  const emitted = tracker.observeBatch([third], {
+    now: BASE_TIME + 3_000,
+    onConfirmed(items) {
+      callbackCalls += 1;
+      assert.equal(items.length, 2);
+      assert.ok(items.every(item => item.value === current));
+    },
+  });
+  assert.equal(callbackCalls, 1);
+  assert.equal(emitted.length, 2);
+  assert.equal(tracker.getState("P001", "skillBuild").stableValue, current);
 });
 
 test("onConfirmed 성공 뒤에만 stable 값을 commit한다", () => {
@@ -397,7 +466,10 @@ test("observeBatch는 전체 OCR field 수와 key capacity를 batch 전체에 �
   assert.equal(emptyCallbackCalls, 0);
   const maximumBatch = BATCH_FIELDS.map(field => observation({
     field,
-    value: field === "horse" ? "백룡마" : field === "activeGeneral" ? "조조" : 1,
+    value: field === "horse" ? "백룡마"
+      : field === "activeGeneral" ? "조조"
+        : field === "skillBuild" ? skillBuild()
+          : 1,
     sourceId: "screen:too-many",
     evidenceHash: "2".repeat(64),
   }));
@@ -438,21 +510,24 @@ test("sourceId 또는 evidenceHash가 같은 frame은 두 번째 근거로 세�
   }), { now: BASE_TIME + 1_000 }), []);
 });
 
-test("같은 HLS media segment의 인접 frame은 확인 근거 하나로만 센다", () => {
+test("일반 HUD는 같은 HLS media segment의 인접 frame을 확인 근거 하나로만 센다", () => {
   const tracker = createBroadcastChangeTracker({
-    baselines: [{ playerId: "P001", field: "strength", value: 10 }],
+    baselines: [{ playerId: "P001", field: "maxHealth", value: 10 }],
     now: BASE_TIME,
   });
   const first = observation({
+    field: "maxHealth",
     sourceId: "screen:P001:1770000000000:1111111111111111:4",
     evidenceHash: "1".repeat(64),
   });
   const sameSegment = observation({
+    field: "maxHealth",
     sourceId: "screen:P001:1770000003000:1111111111111111:5",
     evidenceHash: "2".repeat(64),
     observedAtMs: BASE_TIME + 3_000,
   });
   const nextSegment = observation({
+    field: "maxHealth",
     sourceId: "screen:P001:1770000006000:2222222222222222:0",
     evidenceHash: "3".repeat(64),
     observedAtMs: BASE_TIME + 6_000,
@@ -460,11 +535,39 @@ test("같은 HLS media segment의 인접 frame은 확인 근거 하나로만 센
 
   assert.deepEqual(tracker.observe(first, { now: BASE_TIME }), []);
   assert.deepEqual(tracker.observe(sameSegment, { now: BASE_TIME + 3_000 }), []);
-  assert.equal(tracker.getState("P001", "strength").candidate.sourceId, first.sourceId);
+  assert.equal(tracker.getState("P001", "maxHealth").candidate.sourceId, first.sourceId);
   assert.deepEqual(
     tracker.observe(nextSegment, { now: BASE_TIME + 6_000 }).map(item => item.sourceId),
     [first.sourceId, nextSegment.sourceId],
   );
+});
+
+test("고신뢰 장비·절기·기량은 같은 HLS segment의 서로 다른 두 PNG로 순간 화면을 확정한다", () => {
+  for (const field of ["weapon", "skillBuild", "strength"]) {
+    const value = field === "skillBuild" ? skillBuild() : 11;
+    const tracker = createBroadcastChangeTracker({
+      baselines: [{ playerId: "P001", field, value: field === "skillBuild" ? skillBuild(-1) : 10 }],
+      now: BASE_TIME,
+    });
+    const first = observation({
+      field,
+      value,
+      sourceId: "screen:P001:1770000000000:1111111111111111:4",
+      evidenceHash: "1".repeat(64),
+    });
+    const second = observation({
+      field,
+      value,
+      sourceId: "screen:P001:1770000000000:1111111111111111:5",
+      evidenceHash: "2".repeat(64),
+    });
+
+    assert.deepEqual(tracker.observe(first, { now: BASE_TIME }), []);
+    assert.deepEqual(
+      tracker.observe(second, { now: BASE_TIME }).map(item => item.sourceId),
+      [first.sourceId, second.sourceId],
+    );
+  }
 });
 
 test("값이 바뀌면 후보를 교체하고 새 후보 값 두 frame만 emit한다", () => {
@@ -521,6 +624,9 @@ test("입력을 엄격히 검증하고 저신뢰·비방송·powerScore를 거�
   }), { now: BASE_TIME }));
   rejectsWith("invalid_observation", () => tracker.observe(observation({ field: "powerScore" }), { now: BASE_TIME }));
   rejectsWith("invalid_observation", () => tracker.observe({ ...observation(), extra: true }, { now: BASE_TIME }));
+  const missingSeason = observation();
+  delete missingSeason.seasonId;
+  rejectsWith("invalid_observation", () => tracker.observe(missingSeason, { now: BASE_TIME }));
 });
 
 test("TTL cleanup은 만료 후보와 stable 없는 key만 제거한다", () => {

@@ -1,20 +1,34 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const express = require("express");
+const { markCacheInvalidated } = require("../lib/encoded-json-cache");
 const {
   DEFAULT_MAX_BYTES,
   DEFAULT_SHEET_ID,
+  SEASON_ID,
   buildCsvUrl,
   createSamgukSheetService,
   enrichMembersWithPowerIndex,
+  normalizeSkillBuild,
   parseCsv,
   parseMembersCsv,
+  parseRulesCsv,
   parseTerritoriesCsv,
   readTextLimited,
 } = require("../lib/samguk-sheet");
 const { createRouter } = require("../routes/samguk")._test;
+const {
+  GAMCOM_MEMBER_URL,
+  GAMCOM_TERRITORY_URL,
+  MEMBER_COLLECTED_AT,
+  NULL_MEMBER_FIELDS,
+  OVERVIEW_DESCRIPTION,
+  SOURCE_DATE,
+  TERRITORY_COLLECTED_AT,
+} = require("../scripts/reset-samguk-fallback-season");
 
 const MEMBER_HEADERS = [
   "국가", "세력/길드", "닉네임", "SOOP_ID", "장수/직업", "레벨", "말", "말강화",
@@ -22,7 +36,7 @@ const MEMBER_HEADERS = [
   "최종확인", "최근근거", "검수상태",
 ];
 const TERRITORY_HEADERS = [
-  "영토ID", "번호", "X", "Y", "소유국", "수도", "거점유형", "레벨", "최종확인", "근거", "검수상태",
+  "영토ID", "번호", "X", "Y", "소유국", "수도", "거점유형", "레벨", "특수지", "최종확인", "근거", "검수상태",
 ];
 const RULE_HEADERS = ["분류", "항목", "내용", "근거", "기준일", "검수상태"];
 const EQUIPMENT_HEADERS = [
@@ -50,10 +64,12 @@ function sheetCsv() {
       "1,234", "7", "8", "9", "2026-08-02 02:30:00", "https://example.com/vod\n01:23", "확정",
     ]]),
     영토현황: makeCsv(TERRITORY_HEADERS, [[
-      "T001", "1", "634", "115", "위나라", "TRUE", "장원", "3", "2026-08-02 02:31:00", "https://example.com/map", "확정",
+      "T001", "1", "634", "115", "위나라", "TRUE", "장원", "3", "FALSE", "2026-08-02 02:31:00", "https://example.com/map", "확정",
     ]]),
     게임정보: makeCsv(RULE_HEADERS, [[
       "영토", "영토 수", "총 60개", "https://example.com/rule", "2026-07-29", "참고",
+    ], [
+      "시즌", "season_id", SEASON_ID, "", "", "고정",
     ]]),
   };
 }
@@ -72,8 +88,27 @@ function googleFetch(csvBySheet, state = {}) {
   };
 }
 
+function googleOauthClient(csvBySheet, state = {}) {
+  return {
+    async batchGetValues(spreadsheetId, ranges, params) {
+      state.calls ||= [];
+      state.calls.push({ spreadsheetId, ranges: [...ranges], params: { ...params } });
+      if (state.fail) throw new Error("private sheet read failed");
+      return ranges.map(range => {
+        const sheet = String(range).replace(/^'/, "").replace(/'$/, "").replace(/''/g, "'");
+        const csv = csvBySheet[sheet];
+        return {
+          range,
+          majorDimension: "ROWS",
+          ...(csv === undefined ? {} : { values: parseCsv(csv) }),
+        };
+      });
+    },
+  };
+}
+
 const PAYLOAD_KEYS = [
-  "members", "rules", "sheetUrl", "source", "stale", "territories", "updatedAt", "warnings",
+  "members", "rules", "seasonId", "sheetUrl", "source", "stale", "territories", "updatedAt", "warnings",
 ].sort();
 const RAW_MEMBER_KEYS = [
   "agility", "armor", "crew", "evidence", "helmet", "horse", "horseLevel", "intelligence", "job", "level",
@@ -83,6 +118,7 @@ const RAW_MEMBER_KEYS = [
   "moveSpeedBonusPct", "horseMaxHealth",
   "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
   "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
+  "skillBuild",
   "name", "nation", "observedAt", "powerScore", "reviewStatus", "shoes", "soopId", "sourceCount",
   "sourceType", "strength", "verificationStatus", "vitality", "weapon",
 ].sort();
@@ -93,7 +129,7 @@ const MEMBER_KEYS = [
 ].sort();
 const TERRITORY_KEYS = [
   "capital", "evidence", "facility", "id", "level", "number", "observedAt", "owner", "reviewStatus",
-  "sourceCount", "sourceType", "verificationStatus", "x", "y",
+  "sourceCount", "sourceType", "special", "verificationStatus", "x", "y",
 ].sort();
 const RULE_KEYS = ["category", "description", "reviewStatus", "sourceDate", "sourceUrl", "title"].sort();
 
@@ -273,6 +309,39 @@ test("현재현황의 동적 정보창·기량 19개 필드를 소수·퍼센트
   });
 });
 
+test("절기배분은 canonical v1의 직업별 9개 절기도 객체로 읽고 느슨한 값은 null 처리한다", () => {
+  const skillBuild = {
+    version: 1,
+    preset: 2,
+    ownedPoints: 4,
+    skills: Array.from({ length: 9 }, (_value, index) => ({
+      name: `절기 ${index + 1}`,
+      requiredPoints: 10 + index,
+      allocatedPoints: index,
+    })),
+  };
+  assert.deepEqual(normalizeSkillBuild(skillBuild), skillBuild);
+
+  const headers = [...MEMBER_HEADERS, "절기배분"];
+  const base = [
+    "촉", "테스트", "관우", "test_skill", "관우", "20", "적토마", "3", "5", "4", "4", "4",
+    "40", "10", "20", "5", "2026-08-04 03:00:00", "https://play.sooplive.com/test", "확정",
+  ];
+  const valid = parseMembersCsv(makeCsv(headers, [[...base, JSON.stringify(skillBuild)]]));
+  assert.deepEqual(valid.members[0].skillBuild, skillBuild);
+
+  for (const invalid of [
+    "not-json",
+    JSON.stringify({ ...skillBuild, version: 2 }),
+    JSON.stringify({ ...skillBuild, extra: true }),
+    JSON.stringify({ ...skillBuild, skills: skillBuild.skills.slice(0, 5) }),
+  ]) {
+    const parsed = parseMembersCsv(makeCsv(headers, [[...base, invalid]]));
+    assert.equal(parsed.members[0].skillBuild, null);
+    assert.match(parsed.warnings.join(" "), /절기배분/);
+  }
+});
+
 test("새 검증상태 헤더를 verificationStatus와 호환 reviewStatus가 함께 읽는다", () => {
   const headers = MEMBER_HEADERS.map(header => header === "검수상태" ? "검증상태" : header);
   const row = [
@@ -300,7 +369,7 @@ test("영토현황은 기존 검수상태와 새 검증상태 헤더를 모두 �
   const headers = TERRITORY_HEADERS.map(header => header === "검수상태" ? "검증상태" : header);
   const row = [
     "T001", "1", "634", "115", "위", "TRUE", "장원", "3",
-    "2026-08-02 03:00:00", "방송 00:20:00", "검수대기",
+    "TRUE", "2026-08-02 03:00:00", "방송 00:20:00", "검수대기",
   ];
   const territory = parseTerritoriesCsv(makeCsv(headers, [row])).territories[0];
 
@@ -308,6 +377,7 @@ test("영토현황은 기존 검수상태와 새 검증상태 헤더를 모두 �
   assert.equal(territory.sourceType, "sheet");
   assert.equal(territory.sourceCount, 1);
   assert.equal(territory.verificationStatus, "baseline");
+  assert.equal(territory.special, true);
 });
 
 test("필수 헤더 누락과 응답 크기 초과를 거부한다", async () => {
@@ -329,6 +399,110 @@ test("Google gviz CSV URL은 첫 행 헤더와 표준 쿼리 파라미터를 고
   assert.equal(url.searchParams.get("headers"), "1");
 });
 
+test("Google Sheet read mode는 gviz와 oauth만 허용한다", () => {
+  assert.throws(
+    () => createSamgukSheetService({ readMode: "private" }),
+    error => error?.code === "config_error" && /gviz.*oauth/.test(error.message),
+  );
+});
+
+test("OAuth read mode는 비공개 Sheet 4개 탭을 FORMATTED_VALUE로 읽고 기존 CSV 계약을 재사용한다", async () => {
+  const state = {};
+  const csv = sheetCsv();
+  csv.장비현황 = makeCsv(EQUIPMENT_HEADERS, [[
+    "테스트", "test_bj",
+    "필살 13.5%", "없음", "없음",
+    "없음", "없음", "없음",
+    "강건", "없음", "없음",
+    "난격 3.4", "없음", "없음",
+    "2026-08-02 22:00:00", "방송 01:07:54", "시트/방송", "2",
+  ]]);
+  const payload = await createSamgukSheetService({
+    readMode: "oauth",
+    oauthClient: googleOauthClient(csv, state),
+    fetchImpl: async () => { throw new Error("gviz must not be called"); },
+    expectedMemberCount: 1,
+    expectedTerritoryCount: 1,
+  }).load();
+
+  assert.equal(payload.source, "google-sheet");
+  assert.equal(payload.stale, false);
+  assert.equal(payload.members[0].crew, "버,인협회");
+  assert.equal(payload.members[0].evidence, "https://example.com/vod\n01:23");
+  assert.equal(payload.members[0].engravings[0].name, "필살");
+  assert.equal(state.calls.length, 2);
+  assert.deepEqual(state.calls.map(call => call.ranges), [
+    ["'현재현황'", "'영토현황'", "'게임정보'"],
+    ["'장비현황'"],
+  ]);
+  assert.ok(state.calls.every(call => call.spreadsheetId === DEFAULT_SHEET_ID));
+  assert.ok(state.calls.every(call => call.params.valueRenderOption === "FORMATTED_VALUE"));
+});
+
+test("SAMGUK_SHEET_READ_MODE=oauth를 지원하고 OAuth 실패·변환 후 용량 초과 시 fallback한다", async () => {
+  const previous = process.env.SAMGUK_SHEET_READ_MODE;
+  process.env.SAMGUK_SHEET_READ_MODE = "oauth";
+  try {
+    const state = { fail: true };
+    const failed = await createSamgukSheetService({
+      oauthClient: googleOauthClient(sheetCsv(), state),
+    }).load();
+    assert.equal(failed.source, "fallback-seed");
+    assert.equal(failed.stale, true);
+    assert.ok(state.calls.length > 0);
+
+    const oversized = await createSamgukSheetService({
+      oauthClient: googleOauthClient(sheetCsv()),
+      maxBytes: 64,
+      expectedMemberCount: 1,
+      expectedTerritoryCount: 1,
+    }).load();
+    assert.equal(oversized.source, "fallback-seed");
+    assert.equal(oversized.stale, true);
+  } finally {
+    if (previous === undefined) delete process.env.SAMGUK_SHEET_READ_MODE;
+    else process.env.SAMGUK_SHEET_READ_MODE = previous;
+  }
+});
+
+test("게임정보의 exact season marker를 파싱하고 누락·중복·불일치를 거부한다", () => {
+  const validRows = parseCsv(sheetCsv().게임정보);
+  const parsed = parseRulesCsv(makeCsv(validRows[0], validRows.slice(1)));
+  assert.equal(parsed.seasonId, SEASON_ID);
+  assert.equal(parsed.rules.length, 1);
+  assert.equal(parsed.rules[0].title, "영토 수");
+
+  for (const rows of [
+    validRows.slice(0, -1),
+    [...validRows, [...validRows.at(-1)]],
+    [...validRows.slice(0, -1), ["시즌", "season_id", "samgukji-2026-08-03", "", "", "고정"]],
+    [...validRows.slice(0, -1), ["기타", "season_id", SEASON_ID, "", "", "고정"]],
+  ]) {
+    assert.throws(
+      () => parseRulesCsv(makeCsv(rows[0], rows.slice(1))),
+      error => error?.code === "invalid_season",
+    );
+  }
+});
+
+test("Google Sheet season marker가 없거나 다르면 상수를 덧씌우지 않고 fallback한다", async () => {
+  for (const replacement of [null, "samgukji-2026-08-03"]) {
+    const csv = sheetCsv();
+    const rows = parseCsv(csv.게임정보);
+    csv.게임정보 = replacement === null
+      ? makeCsv(rows[0], [rows[1]])
+      : makeCsv(rows[0], [rows[1], ["시즌", "season_id", replacement, "", "", "고정"]]);
+    const payload = await createSamgukSheetService({
+      fetchImpl: googleFetch(csv),
+      expectedMemberCount: 1,
+      expectedTerritoryCount: 1,
+    }).load();
+    assert.equal(payload.source, "fallback-seed");
+    assert.equal(payload.stale, true);
+    assert.match(payload.warnings.join(" "), /season_id/);
+  }
+});
+
 test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 payload 계약으로 반환한다", async () => {
   const state = {};
   const service = createSamgukSheetService({
@@ -341,6 +515,7 @@ test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 pa
 
   assert.deepEqual(Object.keys(payload).sort(), PAYLOAD_KEYS);
   assert.equal(payload.source, "google-sheet");
+  assert.equal(payload.seasonId, SEASON_ID);
   assert.equal(payload.stale, false);
   assert.equal(DEFAULT_SHEET_ID, "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY");
   assert.equal(payload.sheetUrl, `https://docs.google.com/spreadsheets/d/${DEFAULT_SHEET_ID}/edit`);
@@ -355,7 +530,7 @@ test("Google Sheet 핵심 3개 탭과 선택형 장비현황을 읽어 정규 pa
   assert.ok(state.urls.every(url => new URL(url).pathname.includes(`/d/${DEFAULT_SHEET_ID}/`)));
   assert.ok(state.urls.every(url => new URL(url).searchParams.get("headers") === "1"));
   assert.ok(state.urls.every(url => !url.includes("vercel.app")));
-  assert.equal(payload.members[0].powerVersion, "v1.5");
+  assert.equal(payload.members[0].powerVersion, "v1.6");
   assert.equal(payload.members[0].powerStatus, "insufficient");
   assert.equal(payload.members[0].powerCoverage, 80);
   assert.deepEqual(payload.members[0].engravings, []);
@@ -493,58 +668,68 @@ test("갱신 오류에는 마지막 정상값을 유지하고 cold 오류에는 
   const fallback = await cold.load();
   assert.deepEqual(Object.keys(fallback).sort(), PAYLOAD_KEYS);
   assert.equal(fallback.source, "fallback-seed");
+  assert.equal(fallback.seasonId, SEASON_ID);
   assert.equal(fallback.stale, true);
   assert.equal(fallback.members.length, 90);
   assert.equal(fallback.territories.length, 60);
   assert.ok(fallback.members.every(member => member.powerScore === null));
-  assert.ok(fallback.members.every(member => member.sourceType === "sheet"));
+  assert.ok(fallback.members.every(member => member.sourceType === "gamcom"));
   assert.ok(fallback.members.every(member => member.sourceCount === 1));
   assert.ok(fallback.members.every(member => member.verificationStatus === "baseline"));
   assert.ok(fallback.members.every(member => member.reviewStatus === "기준값"));
+  assert.ok(fallback.members.every(member => member.skillBuild === null));
   assert.ok(fallback.territories.every(territory => territory.reviewStatus === "기준값"));
+  assert.deepEqual(fallback.territories.filter(territory => territory.owner !== "미점령")
+    .map(territory => [territory.number, territory.owner]), [[8, "위"], [33, "촉"], [42, "촉"], [47, "오"]]);
+  assert.ok(fallback.territories.every(territory => territory.special === false));
   assert.doesNotMatch(JSON.stringify(fallback), /검수대기/);
-  assert.match(fallback.warnings.join(" "), /0 sentinel은 미입력 여부/);
-  assert.equal(fallback.members.some(member => [
-    member.horseLevel, member.weapon, member.helmet, member.armor, member.shoes,
-    member.strength, member.agility, member.vitality, member.intelligence,
-  ].includes(0)), false);
-  assert.equal(fallback.members.find(member => member.name === "김병살").job, "운책");
+  assert.match(fallback.warnings.join(" "), /강화·기량의 0.*유효한 초기값/);
+  assert.ok(fallback.members.every(member => NULL_MEMBER_FIELDS.every(field => member[field] === null)));
+  assert.equal(fallback.members.find(member => member.name === "김병살").job, "패월");
 });
 
-test("fallback 최신 스냅샷은 기량 랭킹 품질 기준을 만족한다", () => {
+test("후국지 fallback은 Gamcom season=2 exact snapshot과 새 시즌 null 경계를 보존한다", () => {
   const snapshot = JSON.parse(fs.readFileSync(
     path.join(__dirname, "../data/samguk-fallback.json"),
     "utf8",
   ));
-  const numericFields = [
-    "level", "horseLevel", "weapon", "helmet", "armor", "shoes",
-    "strength", "agility", "vitality", "intelligence",
-  ];
-  const growthFields = ["strength", "agility", "vitality", "intelligence"];
-  const growthScore = member => growthFields.reduce(
-    (sum, field) => sum + (Number.isFinite(member[field]) && member[field] > 0 ? member[field] : 0),
-    0,
-  );
 
+  assert.equal(snapshot.seasonId, SEASON_ID);
+  assert.equal(snapshot.updatedAt, TERRITORY_COLLECTED_AT);
   assert.equal(snapshot.members.length, 90);
-  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "powerScore")));
-  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "sourceType")));
-  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "sourceCount")));
-  assert.ok(snapshot.members.every(member => Object.hasOwn(member, "verificationStatus")));
-  assert.equal(snapshot.members.some(member => numericFields.some(field => member[field] === 0)), false);
-  assert.equal(snapshot.members.filter(member => member.strength > 0).length, 25);
-  assert.equal(snapshot.members.filter(member => growthScore(member) > 0).length, 31);
-  assert.equal(snapshot.members.reduce((sum, member) => sum + growthScore(member), 0), 549);
-  assert.equal(growthScore(snapshot.members.find(member => member.name === "조경훈")), 86);
-  assert.equal(growthScore(snapshot.members.find(member => member.name === "감스트")), 50);
-  const pyowoo = snapshot.members.find(member => member.name === "표우");
-  assert.deepEqual({ strength: pyowoo.strength, intelligence: pyowoo.intelligence }, {
-    strength: 100,
-    intelligence: 76,
-  });
+  assert.equal(new Set(snapshot.members.map(member => member.name)).size, 90);
+  assert.equal(new Set(snapshot.members.map(member => member.soopId)).size, 90);
+  assert.deepEqual(Object.fromEntries(["위", "촉", "오"].map(nation => [
+    nation,
+    snapshot.members.filter(member => member.nation === nation).length,
+  ])), { "위": 30, "촉": 30, "오": 30 });
+  assert.ok(snapshot.members.every(member => NULL_MEMBER_FIELDS.every(field => member[field] === null)));
+  assert.ok(snapshot.members.every(member => member.evidence === GAMCOM_MEMBER_URL));
+  assert.ok(snapshot.members.every(member => member.observedAt === MEMBER_COLLECTED_AT));
+  assert.ok(snapshot.members.every(member => typeof member.crew === "string" && typeof member.job === "string"));
+  assert.ok(snapshot.members.every(member => typeof member.horse === "string" && member.horseLevel === 0));
+  assert.ok(snapshot.members.every(member => member.agility === 0 && member.vitality === 0 && member.intelligence === 0));
+  assert.equal(snapshot.members.filter(member => member.strength > 0).length, 3);
+  assert.equal(snapshot.members.filter(member => member.weapon > 0).length, 5);
+  assert.deepEqual(
+    Object.fromEntries(["crew", "job", "horse", "horseLevel", "weapon", "strength", "agility", "vitality", "intelligence"]
+      .map(field => [field, snapshot.members.find(member => member.name === "조경훈")[field]])),
+    { crew: "버인협회", job: "조조", horse: "백룡마", horseLevel: 0, weapon: 5,
+      strength: 20, agility: 0, vitality: 0, intelligence: 0 },
+  );
+  assert.equal(snapshot.territories.length, 60);
+  assert.deepEqual(snapshot.territories.filter(territory => territory.owner !== "미점령")
+    .map(territory => [territory.number, territory.owner]), [[8, "위"], [33, "촉"], [42, "촉"], [47, "오"]]);
+  assert.deepEqual(snapshot.territories.filter(territory => territory.capital).map(territory => territory.number), [8, 42, 47]);
+  assert.ok(snapshot.territories.every(territory => territory.special === false));
+  assert.ok(snapshot.territories.every(territory => territory.evidence === GAMCOM_TERRITORY_URL));
+  assert.ok(snapshot.territories.every(territory => territory.observedAt === TERRITORY_COLLECTED_AT));
+  assert.equal(new Set(snapshot.territories.map(territory => territory.number)).size, 60);
+  assert.ok(snapshot.rules.every(rule => rule.sourceDate === SOURCE_DATE));
+  assert.equal(snapshot.rules[0].description, OVERVIEW_DESCRIPTION);
 });
 
-test("파워 v1.5는 같은 강화라도 5단계 말 등급 보너스를 반영한다", () => {
+test("파워 v1.6은 같은 강화라도 5단계 말 등급 보너스를 반영한다", () => {
   const common = {
     job: "천강",
     level: 10,
@@ -571,7 +756,7 @@ test("파워 v1.5는 같은 강화라도 5단계 말 등급 보너스를 반영�
     { ...common, name: "적토마", soopId: "red_hare", horse: "적 토마" },
   ]);
 
-  assert.equal(redHare.powerVersion, "v1.5");
+  assert.equal(redHare.powerVersion, "v1.6");
   assert.deepEqual({
     horse: redHare.powerComponents.horse.horse,
     isRedHare: redHare.powerComponents.horse.isRedHare,
@@ -621,10 +806,15 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
   assert.match(html, /최대 HP/);
   assert.match(html, /공격력/);
   assert.match(html, /평타/);
-  assert.match(html, /파워 v1\.5 미반영/);
+  assert.match(html, /파워 v1\.6 미반영/);
   assert.match(html, /군주 두갑은 15% 추가 보너스/);
   assert.match(html, /담운마·금표마·백룡마·현풍마·적토마 5등급/);
-  assert.match(html, /합산환산.*component\.abilityScore.*\/100/);
+  assert.match(html, /<th>스킬 강화<\/th>/);
+  assert.match(html, /samgukSkillBuildRankingCell\(member\)/);
+  assert.match(html, /스킬 강화\(절기 배분\)[\s\S]{0,120}파워 v1\.6 점수에는 반영하지 않습니다/);
+  assert.match(html, /기량합[\s\S]{0,160}component\.abilityTotal[\s\S]{0,160}파워 \+[\s\S]{0,160}component\.abilityPowerPoints/);
+  assert.match(html, /기량합 1점 = 파워 1점/);
+  assert.doesNotMatch(html, /합산환산|고정 600점/);
   assert.match(html, /component\.horse \? samgukTextValue\(component\.horse\) \+ ' 등급 \+'/);
   assert.match(html, /function samgukTextValue\(value, suffix\)/);
   const componentFunction = html.match(/function componentCell\(member, key\) \{[\s\S]*?\n  \}/)?.[0] || "";
@@ -633,6 +823,11 @@ test("파워랭킹은 우리 시트의 관측 하한점수와 전투 관측을 �
   const rankingFunction = html.match(/function renderSamgukPowerRanking\(\) \{[\s\S]*?\n\}/)?.[0] || "";
   assert.doesNotMatch(rankingFunction, /member\.powerScore/);
   assert.doesNotMatch(rankingFunction, /scoreField.*strength/);
+
+  const poster = fs.readFileSync(path.join(__dirname, "../scripts/render-samguk-power-ranking.js"), "utf8");
+  assert.match(poster, /function displaySkillBuild\(value\)/);
+  assert.match(poster, /절기 \$\{displaySkillBuild\(member\.skillBuild\)\}/);
+  assert.match(poster, /절기 강화는 별도 관측값이며 v1\.6 점수 미반영/);
 });
 
 test("현황판과 파워랭킹은 같은 시트 payload를 쓰고 화면 복귀 시 즉시 갱신한다", () => {
@@ -640,6 +835,10 @@ test("현황판과 파워랭킹은 같은 시트 payload를 쓰고 화면 복귀
   const html = fs.readFileSync(path.join(__dirname, "../../public/index.html"), "utf8");
 
   assert.match(client, /const REFRESH_INTERVAL_MS = 60 \* 1000/);
+  assert.match(client, /const SEASON_ID = 'hugukji-2026-08-04'/);
+  assert.match(client, /const STORAGE_KEY = 'soopnotice:samguk:v4:' \+ SEASON_ID/);
+  assert.match(client, /data\.seasonId !== SEASON_ID/);
+  assert.match(client, /stored\.payload\.seasonId !== SEASON_ID/);
   assert.match(client, /function applyPayload\(data, mode\) \{[\s\S]*?mergeMembers\(data\.members\)/);
   assert.match(client, /strengthBonus: cleanValue\(pick\(row, \['strengthBonus', 'strength_bonus', '무력보너스'\]\)\)/);
   assert.match(client, /'strengthBonus', 'agilityBonus', 'vitalityBonus', 'intelligenceBonus',[\s\S]*?'skillHasteIncrease'/);
@@ -664,9 +863,13 @@ test("참가자나 영토가 일부만 계산되면 정상 시트로 채택하�
   assert.match(payload.warnings.join(" "), /1\/90명/);
 });
 
-test("/api/samguk은 encoded 응답을 60초 공유하고 ETag를 지원한다", async (t) => {
+test("/api/samguk은 origin 응답을 공유하고 promotion stamp 직후 ETag를 갱신한다", async (t) => {
   let loads = 0;
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "samguk-api-cache-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const cacheStampPath = path.join(directory, "promotion.stamp");
   const payload = {
+    seasonId: SEASON_ID,
     source: "test",
     updatedAt: "2026-08-01T18:00:00.000Z",
     stale: false,
@@ -680,6 +883,7 @@ test("/api/samguk은 encoded 응답을 60초 공유하고 ETag를 지원한다",
   app.use("/api/samguk", createRouter({
     service: { load: async () => { loads += 1; return payload; } },
     ttlMs: 60_000,
+    cacheStampPath,
   }));
   const server = await new Promise(resolve => {
     const instance = app.listen(0, () => resolve(instance));
@@ -689,8 +893,8 @@ test("/api/samguk은 encoded 응답을 60초 공유하고 ETag를 지원한다",
 
   const first = await fetch(url, { headers: { "Accept-Encoding": "identity" } });
   assert.equal(first.status, 200);
-  assert.match(first.headers.get("cache-control"), /s-maxage=60/);
-  assert.match(first.headers.get("cdn-cache-control"), /stale-while-revalidate=300/);
+  assert.match(first.headers.get("cache-control"), /s-maxage=10/);
+  assert.match(first.headers.get("cdn-cache-control"), /stale-while-revalidate=5/);
   const etag = first.headers.get("etag");
   assert.deepEqual(Object.keys(await first.json()).sort(), PAYLOAD_KEYS);
 
@@ -699,4 +903,14 @@ test("/api/samguk은 encoded 응답을 60초 공유하고 ETag를 지원한다",
   });
   assert.equal(second.status, 304);
   assert.equal(loads, 1);
+
+  payload.updatedAt = "2026-08-01T18:01:00.000Z";
+  markCacheInvalidated(cacheStampPath);
+  const refreshed = await fetch(url, {
+    headers: { "Accept-Encoding": "identity", "If-None-Match": etag },
+  });
+  assert.equal(refreshed.status, 200);
+  assert.equal((await refreshed.json()).updatedAt, payload.updatedAt);
+  assert.notEqual(refreshed.headers.get("etag"), etag);
+  assert.equal(loads, 2);
 });

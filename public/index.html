@@ -1053,6 +1053,36 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
   .samguk-stat-label { color: #aaa; font-size: 7px; }
   .samguk-stat-value { color: #555; font-size: 9px; font-weight: 800; }
+  .samguk-skill-build {
+    width: 100%;
+    border: 1px solid #dde1f5;
+    border-radius: 6px;
+    background: #fff;
+    color: #60647a;
+    font-size: 8px;
+  }
+  .samguk-skill-build summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    padding: 5px 6px;
+    color: #5964a6;
+    font-weight: 800;
+    cursor: pointer;
+    list-style: none;
+  }
+  .samguk-skill-build summary::-webkit-details-marker { display: none; }
+  .samguk-skill-build-meta { color: #8b8fa4; font-weight: 600; }
+  .samguk-skill-build-rows { border-top: 1px solid #e8eaf6; }
+  .samguk-skill-build-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px;
+    padding: 4px 6px;
+  }
+  .samguk-skill-build-row + .samguk-skill-build-row { border-top: 1px solid #f0f1f7; }
+  .samguk-skill-build-name { min-width: 0; overflow-wrap: anywhere; color: #555a70; }
+  .samguk-skill-build-points { white-space: nowrap; color: #8b8fa4; }
   .samguk-card-btns {
     display: flex;
     gap: 4px;
@@ -1270,13 +1300,17 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   .samguk-power-status.is-confirmed { background: #eaf8ef; color: #2f7b49; }
   .samguk-power-status.is-provisional { background: #fff4d9; color: #98701d; }
   .samguk-power-status.is-insufficient { background: #f0f1f5; color: #777d8c; }
-  .samguk-power-table { min-width: 940px; }
+  .samguk-power-table { min-width: 1100px; }
   .samguk-power-table .samguk-observation-meta { min-width: 0; gap: 2px; }
   .samguk-power-table .samguk-power-status { margin: 0 0 0 4px; vertical-align: middle; }
   .samguk-power-table .samguk-rank-coverage { font-size: 8px; }
   .samguk-power-table .samguk-job { padding: 2px 5px; font-size: 8px; }
   .samguk-power-main { white-space: nowrap; }
   .samguk-power-person { white-space: nowrap; }
+  .samguk-power-skill { min-width: 130px; }
+  .samguk-power-skill-detail { margin-top: 2px; color: #777d8c; font-size: 8px; }
+  .samguk-power-skill-detail summary { cursor: pointer; white-space: nowrap; }
+  .samguk-power-skill-detail span { display: block; max-width: 260px; padding-top: 3px; white-space: normal; }
   .samguk-power-evidence { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   .samguk-power-method { display: inline-block; margin-left: 4px; }
   .samguk-power-method summary { color: #5B6AED; cursor: pointer; }
@@ -1308,6 +1342,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .samguk-equip-shoes { color: #bb8fce; background: #2a1a3a; }
   html.dark .samguk-stat { background: #202020; }
   html.dark .samguk-stat-value { color: #bbb; }
+  html.dark .samguk-skill-build { background: #202020; border-color: #3b3e52; }
+  html.dark .samguk-skill-build summary { color: #9fa7e8; }
+  html.dark .samguk-skill-build-meta,
+  html.dark .samguk-skill-build-points { color: #85899a; }
+  html.dark .samguk-skill-build-rows,
+  html.dark .samguk-skill-build-row + .samguk-skill-build-row { border-color: #333642; }
+  html.dark .samguk-skill-build-name { color: #c2c4cf; }
   html.dark .samguk-ranking-section { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   html.dark .samguk-ranking-guide { background: #1d1d26; border-color: #333545; color: #85899a; }
   html.dark .samguk-ranking-guide b { color: #b0b4c7; }
@@ -2050,7 +2091,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
   <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
   <button class="tab-btn" data-tab="weekly" onclick="switchTab('weekly')">주간</button>
-  <button class="tab-btn" data-tab="samguk" onclick="switchTab('samguk')">삼국지</button>
+  <button class="tab-btn" data-tab="samguk" onclick="switchTab('samguk')">후국지</button>
   <button class="tab-btn" data-tab="community" onclick="switchTab('community')">커뮤니티</button>
   <button class="tab-btn" data-tab="updates" onclick="switchTab('updates')" style="margin-left:auto;">업데이트</button>
   <button class="dark-toggle mobile-dark-toggle" id="darkToggleMobile"></button>
@@ -2111,13 +2152,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="samguk-shell">
     <div class="samguk-head">
       <div>
-        <h2 class="samguk-title">감스트 삼국지 현황</h2>
-        <p class="samguk-subtitle">2026년 8월 1일–10일 · 위·촉·오 참가자 90명<br>시트·에펨코리아·방송 관측값을 교차 확인하고 최신값으로 동기화합니다.</p>
+        <h2 class="samguk-title">감스트 후국지 현황</h2>
+        <p class="samguk-subtitle">후국지 · 2026년 8월 4일–10일 · 위·촉·오 참가자 90명<br>시트·에펨코리아·방송 관측값을 교차 확인하고 최신값으로 동기화합니다.</p>
       </div>
       <div class="samguk-actions">
         <span class="samguk-sync-badge" id="samgukSyncBadge">데이터 불러오는 중</span>
-        <a class="samguk-sheet-link" href="https://threekingdoms.notion.site/" target="_blank" rel="noopener">삼국지 위키</a>
-        <a class="samguk-sheet-link" href="https://docs.google.com/spreadsheets/d/1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY/edit" target="_blank" rel="noopener">관리 시트</a>
+        <a class="samguk-sheet-link" href="https://threekingdoms.notion.site/" target="_blank" rel="noopener">후국지 위키</a>
+        <a class="samguk-sheet-link" href="https://docs.google.com/spreadsheets/d/1zwIJjl2UTkPREkI37in9e0PAwX9xwFtEU3-ECAYYaeU/edit?gid=74847276#gid=74847276" target="_blank" rel="noopener">후국지 명단</a>
       </div>
     </div>
     <div class="samguk-subtabs">
@@ -2152,7 +2193,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="community-heading">
       <div>
         <h2 class="community-title">숲공지 커뮤니티</h2>
-        <p class="community-subtitle">SOOP 방송과 삼국지 이야기를 나누는 익명 게시판입니다.</p>
+        <p class="community-subtitle">SOOP 방송과 후국지 이야기를 나누는 익명 게시판입니다.</p>
       </div>
       <span class="community-anonymous-status">로그인 없이 자동 익명</span>
     </div>
@@ -2164,7 +2205,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <div class="community-categories" id="communityCategories">
           <button class="community-category-button community-active" type="button" data-community-category="all" onclick="communitySetCategory('all')">전체</button>
           <button class="community-category-button" type="button" data-community-category="free" onclick="communitySetCategory('free')">자유</button>
-          <button class="community-category-button" type="button" data-community-category="samguk" onclick="communitySetCategory('samguk')">삼국지</button>
+          <button class="community-category-button" type="button" data-community-category="samguk" onclick="communitySetCategory('samguk')">후국지</button>
           <button class="community-category-button" type="button" data-community-category="question" onclick="communitySetCategory('question')">질문</button>
         </div>
         <select class="community-search-select" id="communitySortSelect" aria-label="정렬" onchange="communitySetSort(this.value)">
@@ -2213,7 +2254,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <label class="community-field-label" for="communityWriteCategory">말머리</label>
             <select class="community-field-select" id="communityWriteCategory" required>
               <option value="free">자유</option>
-              <option value="samguk">삼국지</option>
+              <option value="samguk">후국지</option>
               <option value="question">질문</option>
             </select>
           </div>
@@ -3352,98 +3393,98 @@ function switchTab(tab, options) {
   }
 }
 
-// ===================== 삼국지 =====================
+// ===================== 후국지 =====================
 const SAMGUK_MEMBERS = [
   ['위','버인협회','조경훈','cnsgkcnehd74','조조'],
   ['위','버인협회','표우','pyowoo','하후돈'],
-  ['위','버인협회','해솔','liloolil',null],
-  ['위','버인협회','윤이샘','yoonesaem',null],
-  ['위','버인협회','비숑','merryou',null],
-  ['위','버인협회','송소미','ry0135',null],
-  ['위','버인협회','제리츄','rariruro',null],
-  ['위','버인협회','뀨복','kkyubog',null],
-  ['위','버인협회','김쁘피','gurm01',null],
+  ['위','버인협회','해솔','liloolil','패월'],
+  ['위','버인협회','윤이샘','yoonesaem','사마의'],
+  ['위','버인협회','비숑','merryou','창수'],
+  ['위','버인협회','송소미','ry0135','궁장'],
+  ['위','버인협회','제리츄','rariruro','패월'],
+  ['위','버인협회','뀨복','kkyubog','책사'],
+  ['위','버인협회','김쁘피','gurm01','궁장'],
   ['위','버블란','박재박','jaeparkk','전위'],
   ['위','로스타시티','로기다','hrlim95','장료'],
-  ['위','로스타시티','은초롱','eunchr',null],
-  ['위','로스타시티','리피피','haeri001',null],
-  ['위','로스타시티','시오','siioyeyo',null],
-  ['위','로스타시티','푸마고치','fumagochi',null],
-  ['위','로스타시티','쥬멩이','ju010228',null],
-  ['위','로스타시티','온유일','oneon1y',null],
-  ['위','로스타시티','찐랑','phs6162',null],
-  ['위','로스타시티','아르르','cosmicaaarrr',null],
-  ['위','버블란','공태연','ballty0719',null],
-  ['위','버블란','다시바','tdnlamuron',null],
-  ['위','버블란','루루시','darklucy',null],
-  ['위','버블란','슈니','k4187421',null],
-  ['위','버블란','예요예요','yeyo25',null],
-  ['위','버블란','쩜냥이','hhr001234',null],
-  ['위','버블란','초금비','chogeumbi',null],
-  ['위','버블란','큐티섹시','nnojoke486',null],
-  ['위','로스타시티','한비','imhanbily',null],
-  ['위','버인협회','비쥬','bibitrue',null],
-  ['위','버블란','설채이','aigong7576',null],
+  ['위','로스타시티','은초롱','eunchr','궁장'],
+  ['위','로스타시티','리피피','haeri001','책사'],
+  ['위','로스타시티','시오','siioyeyo','패월'],
+  ['위','로스타시티','푸마고치','fumagochi','창수'],
+  ['위','로스타시티','쥬멩이','ju010228','책사'],
+  ['위','로스타시티','온유일','oneon1y','창수'],
+  ['위','로스타시티','찐랑','phs6162','궁장'],
+  ['위','로스타시티','아르르','cosmicaaarrr','패월'],
+  ['위','버블란','공태연','ballty0719','패월'],
+  ['위','버블란','다시바','tdnlamuron','창수'],
+  ['위','버블란','루루시','darklucy','궁장'],
+  ['위','버블란','슈니','k4187421','영객'],
+  ['위','버블란','예요예요','yeyo25','손책'],
+  ['위','버블란','쩜냥이','hhr001234','책사'],
+  ['위','버블란','초금비','chogeumbi','패월'],
+  ['위','버블란','큐티섹시','nnojoke486','궁장'],
+  ['위','로스타시티','한비','imhanbily','창수'],
+  ['위','버인협회','비쥬','bibitrue','창수'],
+  ['위','버블란','설채이','aigong7576','패월'],
   ['촉','버컴퍼니','감스트','devil0108','유비'],
-  ['촉','버컴퍼니','니니','honeys2',null],
+  ['촉','버컴퍼니','니니','honeys2','패월'],
   ['촉','버컴퍼니','단츄','danchu17','제갈량'],
-  ['촉','버컴퍼니','달묘','nmohoho',null],
-  ['촉','버컴퍼니','망구랑','nmangoquince',null],
-  ['촉','버컴퍼니','바밍','qweasd3456',null],
-  ['촉','버컴퍼니','부르','bureu2002',null],
-  ['촉','버컴퍼니','설이','mini8282',null],
-  ['촉','버컴퍼니','앙또','aangdoxx',null],
-  ['촉','버컴퍼니','유설아','yeveee',null],
-  ['촉','버컴퍼니','유연서','cctvno',null],
-  ['촉','버컴퍼니','앨리스얌','alicehiyam',null],
-  ['촉','버컴퍼니','킹냥이','sa5791',null],
+  ['촉','버컴퍼니','달묘','nmohoho','영객'],
+  ['촉','버컴퍼니','망구랑','nmangoquince','패월'],
+  ['촉','버컴퍼니','바밍','qweasd3456','영객'],
+  ['촉','버컴퍼니','부르','bureu2002','패월'],
+  ['촉','버컴퍼니','설이','mini8282','궁장'],
+  ['촉','버컴퍼니','앙또','aangdoxx','손상향'],
+  ['촉','버컴퍼니','유설아','yeveee','궁장'],
+  ['촉','버컴퍼니','유연서','cctvno','패월'],
+  ['촉','버컴퍼니','앨리스얌','alicehiyam','책사'],
+  ['촉','버컴퍼니','킹냥이','sa5791','패월'],
   ['촉','버컴퍼니','킴나니','sksgml16','관우'],
-  ['촉','버컴퍼니','해리','gofl2237',null],
+  ['촉','버컴퍼니','해리','gofl2237','영객'],
   ['촉','꾸한성','꾸티뉴','aksen7833','조자룡'],
-  ['촉','꾸한성','난워니','whiteone325',null],
-  ['촉','꾸한성','다뮤','not15987',null],
-  ['촉','꾸한성','딴딴2당','dbsk0708',null],
-  ['촉','꾸한성','바먀','wooyah21',null],
-  ['촉','꾸한성','서라0','o0opha',null],
-  ['촉','꾸한성','야무지','land4968',null],
+  ['촉','꾸한성','난워니','whiteone325','책사'],
+  ['촉','꾸한성','다뮤','not15987','패월'],
+  ['촉','꾸한성','딴딴2당','dbsk0708','궁장'],
+  ['촉','꾸한성','바먀','wooyah21','궁장'],
+  ['촉','꾸한성','서라0','o0opha','궁장'],
+  ['촉','꾸한성','야무지','land4968','패월'],
   ['촉','꾸한성','엔쥬','northpole','장비'],
-  ['촉','꾸한성','임민트','mint616',null],
-  ['촉','꾸한성','김옥독','niniru',null],
-  ['촉','꾸한성','리카','lika07',null],
-  ['촉','꾸한성','냥쏘','leesoi34',null],
-  ['촉','꾸한성','윤타미','dbsthdus111',null],
-  ['촉','꾸한성','란다','top6373',null],
-  ['촉','꾸한성','모야','neul0908',null],
+  ['촉','꾸한성','임민트','mint616','책사'],
+  ['촉','꾸한성','김옥독','niniru','창수'],
+  ['촉','꾸한성','리카','lika07','책사'],
+  ['촉','꾸한성','냥쏘','leesoi34','궁장'],
+  ['촉','꾸한성','윤타미','dbsthdus111','창수'],
+  ['촉','꾸한성','란다','top6373','궁장'],
+  ['촉','꾸한성','모야','neul0908','창수'],
   ['오','지력사무소','지피티','tjrdbs999','손권'],
   ['오','원더독','황원태','hwt1014','여몽'],
-  ['오','원더독','단수아','tndk321',null],
-  ['오','원더독','딩굴','dinggoolx3',null],
-  ['오','원더독','야뿌','ekrekrnfl9',null],
-  ['오','원더독','연보라','200501',null],
-  ['오','원더독','연치민','yeonchimin',null],
-  ['오','원더독','희꾸미','ddr9463',null],
+  ['오','원더독','단수아','tndk321','영객'],
+  ['오','원더독','딩굴','dinggoolx3','궁장'],
+  ['오','원더독','야뿌','ekrekrnfl9','궁장'],
+  ['오','원더독','연보라','200501','궁장'],
+  ['오','원더독','연치민','yeonchimin','궁장'],
+  ['오','원더독','희꾸미','ddr9463','궁장'],
   ['오','홍피스','홍타쿠','lhtlgm','태사자'],
-  ['오','홍피스','현단아','hyundana',null],
-  ['오','홍피스','따스히','guqlswls123',null],
-  ['오','지력사무소','김병살','kbs9981','주유'],
-  ['오','지력사무소','김쿼카','quokka1228',null],
+  ['오','홍피스','현단아','hyundana','창수'],
+  ['오','홍피스','따스히','guqlswls123','하후연'],
+  ['오','지력사무소','김병살','kbs9981','패월'],
+  ['오','지력사무소','김쿼카','quokka1228','패월'],
   ['오','지력사무소','라무','5959700','감녕'],
-  ['오','지력사무소','린코','linco00',null],
-  ['오','지력사무소','메루','meuuu3',null],
-  ['오','지력사무소','목츄리','xex3',null],
-  ['오','지력사무소','싱유','singu64',null],
-  ['오','지력사무소','한아련','rkdmsdl782',null],
-  ['오','지력사무소','모나양','monas2',null],
-  ['오','홍피스','보리담','bolidam',null],
-  ['오','홍피스','머라냥','ajfksid0116',null],
-  ['오','홍피스','모아','kimghdus',null],
-  ['오','홍피스','고채린','rjsdnr115',null],
-  ['오','홍피스','힙비','rlawlsthfw',null],
-  ['오','홍피스','연우얌','eunnnny2',null],
-  ['오','홍피스','류버들','buddleee',null],
-  ['오','원더독','감초','33h2101',null],
-  ['오','원더독','아린','59590423',null],
-  ['오','원더독','채하','fbcogk',null],
+  ['오','지력사무소','린코','linco00','궁장'],
+  ['오','지력사무소','메루','meuuu3','영객'],
+  ['오','지력사무소','목츄리','xex3','패월'],
+  ['오','지력사무소','싱유','singu64','패월'],
+  ['오','지력사무소','한아련','rkdmsdl782','주유'],
+  ['오','지력사무소','모나양','monas2','패월'],
+  ['오','홍피스','보리담','bolidam','패월'],
+  ['오','홍피스','머라냥','ajfksid0116','창수'],
+  ['오','홍피스','모아','kimghdus','책사'],
+  ['오','홍피스','고채린','rjsdnr115','궁장'],
+  ['오','홍피스','힙비','rlawlsthfw','창수'],
+  ['오','홍피스','연우얌','eunnnny2','궁장'],
+  ['오','홍피스','류버들','buddleee','창수'],
+  ['오','원더독','감초','33h2101','책사'],
+  ['오','원더독','아린','59590423','책사'],
+  ['오','원더독','채하','fbcogk','창수'],
 ].map(function(row) {
   return { nation: row[0], crew: row[1], name: row[2], soopId: row[3], job: row[4] };
 });
@@ -3634,6 +3675,53 @@ function samgukProfileUrl(soopId) {
     + soopId.slice(0, 2) + '/' + soopId + '/' + soopId + '.jpg';
 }
 
+function samgukSkillBuildMetrics(member) {
+  const build = member && member.skillBuild;
+  if (!build || !Array.isArray(build.skills) || ![6, 9].includes(build.skills.length)) return null;
+  const allocatedTotal = build.skills.reduce(function(sum, skill) {
+    const points = samgukNumber(skill && skill.allocatedPoints);
+    return points === null ? sum : sum + points;
+  }, 0);
+  const upgradedCount = build.skills.filter(function(skill) {
+    const points = samgukNumber(skill && skill.allocatedPoints);
+    return points !== null && points > 0;
+  }).length;
+  return { build: build, allocatedTotal: allocatedTotal, upgradedCount: upgradedCount };
+}
+
+function samgukSkillBuildDetail(member) {
+  const metrics = samgukSkillBuildMetrics(member);
+  if (!metrics) return '';
+  const build = metrics.build;
+  const preset = build.preset === null ? '프리셋 미확인' : '프리셋 ' + build.preset;
+  const rows = build.skills.map(function(skill) {
+    return '<div class="samguk-skill-build-row">'
+      + '<span class="samguk-skill-build-name">' + escapeHtml(skill.name) + '</span>'
+      + '<span class="samguk-skill-build-points">배분 ' + escapeHtml(String(skill.allocatedPoints))
+      + ' · 필요 ' + escapeHtml(String(skill.requiredPoints)) + '</span></div>';
+  }).join('');
+  return '<details class="samguk-skill-build"><summary><span>스킬 강화(절기)</span>'
+    + '<span class="samguk-skill-build-meta">투자 합 ' + escapeHtml(String(metrics.allocatedTotal))
+    + ' · 강화 ' + escapeHtml(String(metrics.upgradedCount)) + '/' + escapeHtml(String(build.skills.length))
+    + ' · ' + escapeHtml(preset) + ' · 남은 포인트 '
+    + escapeHtml(String(build.ownedPoints)) + '</span></summary>'
+    + '<div class="samguk-skill-build-rows">' + rows + '</div></details>';
+}
+
+function samgukSkillBuildRankingCell(member) {
+  const metrics = samgukSkillBuildMetrics(member);
+  if (!metrics) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1.6 미반영</span>';
+  const build = metrics.build;
+  const details = build.skills.map(function(skill) {
+    return skill.name + ' +' + skill.allocatedPoints + ' (필요 ' + skill.requiredPoints + ')';
+  }).join(' · ');
+  return '<div class="samguk-power-skill"><b>투자 ' + escapeHtml(String(metrics.allocatedTotal)) + '</b><br>'
+    + '<span class="samguk-rank-coverage">강화 ' + escapeHtml(String(metrics.upgradedCount)) + '/'
+    + escapeHtml(String(build.skills.length)) + ' · 남은 ' + escapeHtml(String(build.ownedPoints)) + '</span>'
+    + '<details class="samguk-power-skill-detail"><summary>스킬별 상세</summary><span>'
+    + escapeHtml(details) + '</span></details><span class="samguk-rank-coverage">파워 v1.6 미반영</span></div>';
+}
+
 function renderSamguk() {
   const root = document.getElementById('samgukNationList');
   if (!root) return;
@@ -3670,6 +3758,7 @@ function renderSamguk() {
         + '<span class="samguk-stat"><span class="samguk-stat-label">기력</span><span class="samguk-stat-value">' + samgukValue(member.vitality) + '</span></span>'
         + '<span class="samguk-stat"><span class="samguk-stat-label">지모</span><span class="samguk-stat-value">' + samgukValue(member.intelligence) + '</span></span>'
         + '</div>'
+        + samgukSkillBuildDetail(member)
         + '<div class="samguk-card-btns">'
         + '<a class="samguk-soop-link" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">SOOP</a>'
         + '<a class="samguk-soop-link samguk-live-link live-link" data-bjid="' + member.soopId + '" href="https://play.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">LIVE</a>'
@@ -3761,7 +3850,7 @@ function renderSamgukPowerRanking() {
     let detail = '';
     if (key === 'stats') {
       detail = 'Lv ' + samgukTextValue(component.level) + ' · 기량합 ' + samgukTextValue(component.abilityTotal)
-        + ' · 합산환산 ' + samgukTextValue(component.abilityScore) + '/100'
+        + ' · 파워 +' + samgukTextValue(component.abilityPowerPoints)
         + ' · 무 ' + samgukTextValue(member.strength)
         + ' · 민 ' + samgukTextValue(member.agility) + ' · 력 ' + samgukTextValue(member.vitality)
         + ' · 모 ' + samgukTextValue(member.intelligence);
@@ -3826,12 +3915,12 @@ function renderSamgukPowerRanking() {
       metric('절기가속', member.skillHasteIncrease),
     ].filter(Boolean);
     const groups = [primary, character, rates, skillRates, quantity].filter(function(group) { return group.length; });
-    if (!groups.length) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1.5 미반영</span>';
+    if (!groups.length) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1.6 미반영</span>';
     const lines = groups.map(function(group, index) {
       const value = escapeHtml(group.join(' · '));
       return index === 0 ? '<b>' + value + '</b>' : '<span class="samguk-rank-coverage">' + value + '</span>';
     });
-    lines[lines.length - 1] += ' <span class="samguk-rank-coverage">· 파워 v1.5 미반영</span>';
+    lines[lines.length - 1] += ' <span class="samguk-rank-coverage">· 파워 v1.6 미반영</span>';
     return lines.join('<br>');
   }
 
@@ -3863,6 +3952,7 @@ function renderSamgukPowerRanking() {
         + '<td>' + componentCell(member, 'gear') + '</td>'
         + '<td>' + componentCell(member, 'engravings') + '</td>'
         + '<td>' + componentCell(member, 'horse') + '</td>'
+        + '<td>' + samgukSkillBuildRankingCell(member) + '</td>'
         + '<td>' + combatCell(member) + '</td>'
         + '<td><b>' + formatCoverage(entry.coverage) + '</b><br>' + samgukPowerObservationMeta(member) + '</td>'
         + '<td class="col-crew"><span class="samguk-rank-badge" style="background:' + meta.color + '">' + meta.label
@@ -3879,20 +3969,21 @@ function renderSamgukPowerRanking() {
     }
     section += '<div class="samguk-ranking-table-wrap"><table class="samguk-ranking-table is-personal samguk-power-table">'
       + '<thead><tr><th style="width:46px">추정 #</th><th>스트리머</th><th>장수</th><th>관측 파워</th>'
-      + '<th>레벨·기량</th><th>장비</th><th>각인</th><th>말</th><th>전투 관측</th><th>수집률·근거</th><th class="col-crew">국가·소속</th></tr></thead><tbody>'
+      + '<th>레벨·기량</th><th>장비</th><th>각인</th><th>말</th><th>스킬 강화</th><th>전투 관측</th><th>수집률·근거</th><th class="col-crew">국가·소속</th></tr></thead><tbody>'
       + rankingRows(entries) + '</tbody></table></div></section>';
     return section;
   }
 
-  let html = '<div class="samguk-ranking-guide"><b>파워 v1.5 · 표시단위 ×' + POWER_DISPLAY_MULTIPLIER + '</b> · '
+  let html = '<div class="samguk-ranking-guide"><b>파워 v1.6 · 기량합 1점 = 파워 1점</b> · '
     + '<b>레벨·기량 30%</b> · <b>장비 강화 35%</b> · <b>각인 20%</b> · <b>말 강화 15%</b> · 확인된 구성요소의 하한점수로 정렬<br>'
     + escapeHtml(populationText) + ' · '
     + '<span class="samguk-rank-coverage">' + escapeHtml(scopeLabel) + ' · 현재 순위 ' + ranked.length + '명 · 품질 확정 '
     + confirmedCount + '명 · 잠정 ' + provisionalCount + '명 · 수집 중 ' + collecting.length + '명</span>'
     + '<details class="samguk-power-method"><summary>산식 기준</summary><span>'
     + '확인되지 않은 빈칸은 관측된 0으로 바꾸거나 임의 가중치로 확대하지 않습니다. '
-    + '기량은 무력·기민·기력·지모 실제 합계를 고정 600점 기준으로 선형 반영합니다. 장비는 무기 60%·흉갑 30%·각갑 10%이며 군주 두갑은 15% 추가 보너스입니다. 말은 담운마·금표마·백룡마·현풍마·적토마 5등급과 강화를 함께 반영합니다. '
-    + '최대 HP·평타·정보창 동적 수치는 파워 v1.5 미반영이며, 주문서 재고는 아직 사용하지 않은 자원이므로 제외합니다.'
+    + '기량은 무력·기민·기력·지모 원값을 합산해 다른 환산 없이 표시 파워에 그대로 더합니다. 장비는 무기 60%·흉갑 30%·각갑 10%이며 군주 두갑은 15% 추가 보너스입니다. 말은 담운마·금표마·백룡마·현풍마·적토마 5등급과 강화를 함께 반영합니다. '
+    + '스킬 강화(절기 배분)는 투자합과 스킬별 현황을 별도로 표시하되 직업별 효과 환산 근거가 없어 파워 v1.6 점수에는 반영하지 않습니다. '
+    + '최대 HP·평타·정보창 동적 수치도 파워 v1.6 미반영이며, 주문서 재고는 아직 사용하지 않은 자원이므로 제외합니다.'
     + '</span></details>'
     + '</div>';
 
@@ -4377,7 +4468,7 @@ const communityState = {
 
 const communityCategoryLabels = {
   free: '자유',
-  samguk: '삼국지',
+  samguk: '후국지',
   question: '질문',
 };
 
@@ -5142,7 +5233,7 @@ document.addEventListener('click', function(e) {
   if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
 });
 </script>
-<script src="/samguk.js?v=20260803d"></script>
+<script src="/samguk.js?v=20260804a"></script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

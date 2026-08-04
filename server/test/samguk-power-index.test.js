@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  ABILITY_POWER_PER_POINT,
   ABILITY_TOTAL_CAP,
   ENGRAVING_PRIOR_N,
   FIELD_STATES,
@@ -12,6 +13,7 @@ const {
   HORSE_MAX_LEVEL,
   HORSE_SCORING_LEVEL_CAP,
   POWER_INDEX_VERSION,
+  POWER_DISPLAY_SCALE,
   POWER_STATUSES,
   POWER_WEIGHTS,
   RED_HARE_BASE_BONUS,
@@ -54,9 +56,11 @@ function close(actual, expected, epsilon = 0.0001) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
 }
 
-test("v1.5 상수와 외부·장비 내부 가중치를 고정한다", () => {
-  assert.equal(POWER_INDEX_VERSION, "v1.5");
-  assert.equal(ABILITY_TOTAL_CAP, 600);
+test("v1.6 상수와 외부·장비 내부 가중치를 고정한다", () => {
+  assert.equal(POWER_INDEX_VERSION, "v1.6");
+  assert.equal(POWER_DISPLAY_SCALE, 125);
+  assert.equal(ABILITY_POWER_PER_POINT, 1);
+  assert.equal(ABILITY_TOTAL_CAP, 2250);
   assert.deepEqual(POWER_WEIGHTS, { stats: 30, gear: 35, engravings: 20, horse: 15 });
   assert.deepEqual(GEAR_INTERNAL_WEIGHTS, {
     general: { weapon: 0.60, armor: 0.30, shoes: 0.10 },
@@ -77,19 +81,19 @@ test("v1.5 상수와 외부·장비 내부 가중치를 고정한다", () => {
   assert.equal(ENGRAVING_PRIOR_N, 10);
 });
 
-test("레벨은 로스터 백분위, 기량 4종 합계는 고정 기준으로 0~100을 만든다", () => {
+test("레벨은 로스터 백분위, 기량 4종은 최종 표시점수에 합계 그대로 더한다", () => {
   const results = calculateRosterPowerIndexes([
     member({ level: 0, strength: 0, agility: 0, vitality: 0, intelligence: 0 }),
     member({ level: 10, strength: 10, agility: 10, vitality: 10, intelligence: 10 }),
     member({ level: 20, strength: 20, agility: 20, vitality: 20, intelligence: 20, weapon: 15, armor: 15, shoes: 15, horseLevel: 80 }),
   ]);
 
-  assert.deepEqual(results.map(result => result.components.stats.score), [0, 24, 48]);
+  assert.deepEqual(results.map(result => result.components.stats.score), [0, 21.0667, 42.1333]);
   assert.equal(results[2].components.stats.level, 20);
   assert.equal(results[2].components.stats.abilityTotal, 80);
   assert.equal(results[2].components.gear.score, 100);
   assert.equal(results[2].components.horse.score, 100);
-  assert.equal(results[2].score, 64.4);
+  assert.equal(results[2].score, 62.64);
   assert.equal(results[2].coverage, 100);
   assert.equal(results[2].status, POWER_STATUSES.CONFIRMED);
   assert.equal(results[2].rankable, true);
@@ -104,8 +108,9 @@ test("완비된 기량은 로스터 분포가 아니라 네 기량 실제 합계
   assert.equal(jo.components.stats.abilityTotal, 430);
   assert.equal(hwang.components.stats.abilityTotal, 205);
   assert.ok(jo.components.stats.score > hwang.components.stats.score);
-  assert.deepEqual([jo.components.stats.abilityScore, hwang.components.stats.abilityScore], [71.6667, 34.1667]);
-  assert.deepEqual([jo.components.stats.score, hwang.components.stats.score], [63, 40.5]);
+  assert.deepEqual([jo.components.stats.abilityScore, hwang.components.stats.abilityScore], [19.1111, 9.1111]);
+  assert.deepEqual([jo.components.stats.abilityPowerPoints, hwang.components.stats.abilityPowerPoints], [430, 205]);
+  assert.deepEqual([jo.components.stats.score, hwang.components.stats.score], [31.4667, 25.4667]);
   assert.ok(jo.components.stats.statPercentiles.agility < hwang.components.stats.statPercentiles.agility);
 });
 
@@ -115,12 +120,24 @@ test("동점 레벨에는 같은 midrank를 주고 기량은 로스터 구성과
     member({ level: 10, strength: 10, agility: 10, vitality: 10, intelligence: 10 }),
     member({ level: 20, strength: 20, agility: 20, vitality: 20, intelligence: 20 }),
   ]);
-  assert.deepEqual(tied.map(result => result.components.stats.score), [14, 14, 48]);
+  assert.deepEqual(tied.map(result => result.components.stats.score), [11.0667, 11.0667, 42.1333]);
 
   const single = calculateRosterPowerIndexes([member({ strength: 999 })]);
   assert.equal(single[0].components.stats.abilityTotal, 999);
-  assert.equal(single[0].components.stats.abilityScore, 100);
-  assert.equal(single[0].components.stats.score, 80);
+  assert.equal(single[0].components.stats.abilityScore, 44.4);
+  assert.equal(single[0].components.stats.abilityPowerPoints, 999);
+  assert.equal(single[0].components.stats.score, 46.64);
+});
+
+test("기량 원값 1점 증가는 표시 파워를 정확히 1점 올린다", () => {
+  const [base, plusOne] = calculateRosterPowerIndexes([
+    member({ strength: 100, agility: 100, vitality: 100, intelligence: 100 }),
+    member({ strength: 101, agility: 100, vitality: 100, intelligence: 100 }),
+  ]);
+
+  close((plusOne.lower - base.lower) * POWER_DISPLAY_SCALE, 1);
+  assert.equal(plusOne.components.stats.abilityTotal - base.components.stats.abilityTotal, 1);
+  assert.equal(plusOne.components.stats.abilityPowerPoints - base.components.stats.abilityPowerPoints, 1);
 });
 
 test("레벨과 각 기량 결측은 Stats coverage에 독립적으로 반영한다", () => {
@@ -130,8 +147,8 @@ test("레벨과 각 기량 결측은 Stats coverage에 독립적으로 반영한
   ]);
 
   assert.equal(missingLevel.components.stats.coverage, 60);
-  assert.equal(missingLevel.components.stats.lower, 1);
-  assert.equal(missingLevel.components.stats.upper, 41);
+  close(missingLevel.components.stats.lower, 0.2667);
+  close(missingLevel.components.stats.upper, 40.2667);
   assert.equal(missingLevel.coverage, 88);
   assert.equal(missingLevel.status, POWER_STATUSES.PROVISIONAL);
   assert.equal(missingLevel.rankable, true);
@@ -321,9 +338,9 @@ test("말만 unknown이면 coverage 85%, midpoint와 15점 폭 구간의 잠정�
   assert.equal(result.components.horse.score, 50);
   assert.equal(result.components.horse.coverage, 0);
   assert.equal(result.coverage, 85);
-  assert.equal(result.lower, 41.3);
-  assert.equal(result.upper, 56.3);
-  assert.equal(result.score, 48.8);
+  close(result.lower, 41.08);
+  close(result.upper, 56.08);
+  close(result.score, 48.58);
   assert.equal(result.status, POWER_STATUSES.PROVISIONAL);
   assert.equal(result.rankable, true);
 });
@@ -407,8 +424,8 @@ test("createPowerIndexContext와 단일 계산 API가 로스터 분포를 재사
   const context = createPowerIndexContext(roster);
   const result = calculatePowerIndex(roster[1], context);
 
-  assert.equal(result.components.stats.score, 48);
-  assert.equal(result.version, "v1.5");
+  assert.equal(result.components.stats.score, 42.1333);
+  assert.equal(result.version, "v1.6");
 });
 
 test("강화 상한, 말 상한, 각인 스키마와 eligible 슬롯 수를 엄격히 검증한다", () => {

@@ -2,8 +2,9 @@
 
 const { BATCH_FIELDS, MAX_BATCH_RESULTS } = require("./samguk-broadcast-batch");
 const {
+  CURRENT_SEASON_ID,
   MIN_BROADCAST_CONFIDENCE,
-  broadcastEvidenceUnitId,
+  broadcastConfirmationUnitId,
   normalizeObservation,
 } = require("./samguk-observations");
 
@@ -14,6 +15,7 @@ const MAX_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const BASELINE_KEYS = new Set(["playerId", "field", "value"]);
 const BATCH_FIELD_SET = new Set(BATCH_FIELDS);
 const BASELINE_CONTEXT = Object.freeze({
+  seasonId: CURRENT_SEASON_ID,
   sourceType: "broadcast",
   sourceId: "screen:stable-baseline",
   sourceUrl: "https://play.sooplive.com/stable-baseline",
@@ -341,8 +343,8 @@ function createBroadcastChangeTracker(options = {}) {
       }
       return [];
     }
-    if (broadcastEvidenceUnitId(candidate.observation.sourceId)
-        === broadcastEvidenceUnitId(observation.sourceId)
+    if (broadcastConfirmationUnitId(candidate.observation)
+        === broadcastConfirmationUnitId(observation)
       || candidate.observation.evidenceHash === observation.evidenceHash) {
       return [];
     }
@@ -423,8 +425,8 @@ function createBroadcastChangeTracker(options = {}) {
           : { ...previous };
         return { key, success: pending, failure: pending, emitted: null };
       }
-      if (broadcastEvidenceUnitId(candidate.observation.sourceId)
-          === broadcastEvidenceUnitId(observation.sourceId)
+      if (broadcastConfirmationUnitId(candidate.observation)
+          === broadcastConfirmationUnitId(observation)
         || candidate.observation.evidenceHash === observation.evidenceHash) {
         const pending = { ...previous };
         return { key, success: pending, failure: pending, emitted: null };

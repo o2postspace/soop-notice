@@ -1,6 +1,10 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { normalizeSkillBuild } = require("./samguk-skill-build");
+
+const CURRENT_SEASON_ID = "hugukji-2026-08-04";
+const CURRENT_SEASON_START_AT = "2026-08-04T10:36:40.000Z";
 
 const ALLOWED_FIELDS = Object.freeze([
   "level",
@@ -40,9 +44,29 @@ const ALLOWED_FIELDS = Object.freeze([
   "moveSpeedIncrease",
   "healthIncrease",
   "skillHasteIncrease",
+  "skillBuild",
 ]);
 const SOURCE_TYPES = Object.freeze(["sheet", "gamcom", "fmkorea", "broadcast"]);
 const MIN_BROADCAST_CONFIDENCE = 0.95;
+// These panels already require fixed labels/geometry plus repeated OCR recrops.
+// A transient panel may live for less than one 2-second HLS segment, so two
+// distinct PNG samples from that segment are valid confirmation evidence.
+// Passive HUD fields deliberately stay segment-scoped.
+const TRANSIENT_PANEL_FIELDS = new Set([
+  "weapon",
+  "helmet",
+  "armor",
+  "shoes",
+  "skillBuild",
+  "strength",
+  "agility",
+  "vitality",
+  "intelligence",
+  "strengthBonus",
+  "agilityBonus",
+  "vitalityBonus",
+  "intelligenceBonus",
+]);
 const DEFAULT_CONSENSUS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_OBSERVATION_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const DEFAULT_QUEUE_MAX_BYTES = 10 * 1024 * 1024;
@@ -138,9 +162,11 @@ const HASH_PATTERN = /^[a-fA-F0-9]{64}$/;
 const LOCK_OWNER_ID_PATTERN = /^[a-f0-9]{32}$/;
 const LOCK_OWNER_FILE_PATTERN = /^owner-([a-f0-9]{32})\.json$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const SEASON_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const LOCK_SLEEP_BUFFER = new Int32Array(new SharedArrayBuffer(4));
 const ALLOWED_INPUT_KEYS = new Set([
   "observationId",
+  "seasonId",
   "playerId",
   "field",
   "value",
@@ -212,6 +238,20 @@ function normalizeTimestamp(value, label, fallback) {
   return new Date(timestamp).toISOString();
 }
 
+function normalizeSeasonId(value) {
+  if (value === undefined || value === null || value === "") {
+    fail("invalid_season", `seasonId가 필요하며 현재 season '${CURRENT_SEASON_ID}'와 일치해야 합니다.`);
+  }
+  const seasonId = normalizeText(value, "seasonId", {
+    maxLength: 64,
+    pattern: SEASON_ID_PATTERN,
+  });
+  if (seasonId !== CURRENT_SEASON_ID) {
+    fail("invalid_season", `현재 관측 seasonId는 '${CURRENT_SEASON_ID}'여야 합니다.`);
+  }
+  return seasonId;
+}
+
 function normalizeNumber(value, field) {
   if (typeof value === "string") {
     const compact = value.trim().replace(/,/g, "");
@@ -230,6 +270,13 @@ function normalizeNumber(value, field) {
 }
 
 function normalizeValue(field, value) {
+  if (field === "skillBuild") {
+    try {
+      return normalizeSkillBuild(value);
+    } catch (error) {
+      fail("invalid_value", `skillBuild 값이 올바르지 않습니다: ${error.message}`);
+    }
+  }
   if (Object.prototype.hasOwnProperty.call(TEXT_FIELD_MAX_LENGTHS, field)) {
     return normalizeText(value, field, { maxLength: TEXT_FIELD_MAX_LENGTHS[field] });
   }
@@ -288,6 +335,7 @@ function observationFingerprint(observation) {
     observedAt: observation.observedAt,
     ocrConfidence: observation.ocrConfidence,
     playerId: observation.playerId,
+    seasonId: observation.seasonId,
     sourceId: observation.sourceId,
     sourceType: observation.sourceType,
     sourceUrl: observation.sourceUrl,
@@ -304,6 +352,7 @@ function normalizeObservation(input, { now = Date.now() } = {}) {
     fail("invalid_schema", `허용되지 않은 필드입니다: ${unexpected.join(", ")}`);
   }
 
+  const seasonId = normalizeSeasonId(input.seasonId);
   const playerId = normalizeText(input.playerId, "playerId", {
     maxLength: 64,
     pattern: PLAYER_ID_PATTERN,
@@ -319,11 +368,12 @@ function normalizeObservation(input, { now = Date.now() } = {}) {
   const value = normalizeValue(field, input.value);
   const ocrConfidence = normalizeConfidence(input.ocrConfidence);
   const evidenceHash = input.evidenceHash === undefined || input.evidenceHash === null || input.evidenceHash === ""
-    ? sha256(canonicalJson({ sourceId, sourceType, sourceUrl }))
+    ? sha256(canonicalJson({ seasonId, sourceId, sourceType, sourceUrl }))
     : normalizeText(input.evidenceHash, "evidenceHash", { maxLength: 64, pattern: HASH_PATTERN }).toLowerCase();
 
   const normalized = {
     observationId: null,
+    seasonId,
     playerId,
     field,
     value,
@@ -378,11 +428,11 @@ function valueKey(value) {
 }
 
 function consensusKey(observation) {
-  return `${observation.playerId}\u0000${observation.field}\u0000${valueKey(observation.value)}`;
+  return `${observation.seasonId}\u0000${observation.playerId}\u0000${observation.field}\u0000${valueKey(observation.value)}`;
 }
 
 function targetKey(observation) {
-  return `${observation.playerId}\u0000${observation.field}`;
+  return `${observation.seasonId}\u0000${observation.playerId}\u0000${observation.field}`;
 }
 
 /**
@@ -394,6 +444,15 @@ function broadcastEvidenceUnitId(sourceId) {
   const normalized = String(sourceId || "");
   const hls = /^screen:(P\d{3}):\d{13}:([a-f0-9]{16}):(?:mid|\d+)$/i.exec(normalized);
   return hls ? `hls:${hls[1].toUpperCase()}:${hls[2].toLowerCase()}` : normalized;
+}
+
+function broadcastConfirmationUnitId(observation) {
+  const sourceId = String(observation?.sourceId || "");
+  const hls = /^screen:(P\d{3}):\d{13}:([a-f0-9]{16}):(mid|\d+)$/i.exec(sourceId);
+  if (hls && TRANSIENT_PANEL_FIELDS.has(observation?.field)) {
+    return `hls-frame:${hls[1].toUpperCase()}:${hls[2].toLowerCase()}:${hls[3]}`;
+  }
+  return broadcastEvidenceUnitId(sourceId);
 }
 
 function findAcceptedConsensus(inputs, {
@@ -435,7 +494,7 @@ function findAcceptedConsensus(inputs, {
         item.sourceType === "broadcast"
       ));
       const broadcastEvidenceUnits = new Set(
-        highConfidenceBroadcasts.map(item => broadcastEvidenceUnitId(item.sourceId)),
+        highConfidenceBroadcasts.map(item => broadcastConfirmationUnitId(item)),
       );
       const broadcastEvidenceHashes = new Set(
         highConfidenceBroadcasts.map(item => item.evidenceHash),
@@ -448,6 +507,7 @@ function findAcceptedConsensus(inputs, {
       const supporting = crossSource ? eligibleWindow : highConfidenceBroadcasts;
       const latestSupporting = supporting[supporting.length - 1];
       latest = {
+        seasonId: latestSupporting.seasonId,
         playerId: latestSupporting.playerId,
         field: latestSupporting.field,
         value: latestSupporting.value,
@@ -456,7 +516,7 @@ function findAcceptedConsensus(inputs, {
         sourceTypes: [...new Set(supporting.map(item => item.sourceType))].sort(),
         sourceIds: [...new Set(supporting.map(item => item.sourceId))].sort(),
         evidenceUnitIds: [...new Set(supporting.map(item => (
-          item.sourceType === "broadcast" ? broadcastEvidenceUnitId(item.sourceId) : item.sourceId
+          item.sourceType === "broadcast" ? broadcastConfirmationUnitId(item) : item.sourceId
         )))].sort(),
         observationIds: [...new Set(supporting.map(item => item.observationId))].sort(),
         evidenceHashes: [...new Set(supporting.map(item => item.evidenceHash))].sort(),
@@ -477,6 +537,7 @@ function acceptSheetBaseline(input) {
     fail("invalid_baseline", "초기 baseline은 sheet 출처만 즉시 채택할 수 있습니다.");
   }
   return {
+    seasonId: observation.seasonId,
     playerId: observation.playerId,
     field: observation.field,
     value: observation.value,
@@ -1100,6 +1161,13 @@ function readObservationQueue(filePath, { maxBytes = DEFAULT_QUEUE_MAX_BYTES } =
       fail("queue_corrupt", `queue ${index + 1}행 JSON이 올바르지 않습니다.`);
     }
     try {
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        && !Object.prototype.hasOwnProperty.call(parsed, "seasonId")) {
+        // seasonId 도입 전의 영속 queue는 현재 후국지 합의에 재사용하지 않는다.
+        // 다만 나머지 스키마가 손상된 행까지 조용히 버리지 않도록 먼저 검증한다.
+        normalizeObservation({ ...parsed, seasonId: CURRENT_SEASON_ID });
+        continue;
+      }
       rows.push(normalizeObservation(parsed));
     } catch (error) {
       if (error instanceof SamgukObservationError) {
@@ -1304,6 +1372,8 @@ function compactObservationQueue(filePath, transformFn, options = {}) {
 
 module.exports = {
   ALLOWED_FIELDS,
+  CURRENT_SEASON_ID,
+  CURRENT_SEASON_START_AT,
   DEFAULT_CONSENSUS_WINDOW_MS,
   DEFAULT_LINE_MAX_BYTES,
   DEFAULT_QUEUE_MAX_BYTES,
@@ -1320,11 +1390,13 @@ module.exports = {
   acceptSheetBaseline,
   acquireObservationQueueLock,
   appendObservationQueue,
+  broadcastConfirmationUnitId,
   broadcastEvidenceUnitId,
   compactObservationQueue,
   dedupeObservations,
   findAcceptedConsensus,
   normalizeObservation,
+  normalizeSeasonId,
   observationFingerprint,
   readObservationQueue,
   rewriteObservationQueue,

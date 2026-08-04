@@ -1,4 +1,6 @@
-const { createHash } = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+const { createHash, randomUUID } = require("node:crypto");
 const { promisify } = require("node:util");
 const zlib = require("node:zlib");
 
@@ -40,6 +42,7 @@ function createEncodedJsonCache({
   load,
   ttlMs = 60_000,
   staleIfErrorMs = 15_000,
+  getInvalidationToken,
   onRefreshError,
   now = Date.now,
 }) {
@@ -52,45 +55,114 @@ function createEncodedJsonCache({
   if (!Number.isFinite(staleIfErrorMs) || staleIfErrorMs < 0) {
     throw new RangeError("staleIfErrorMs must be a non-negative finite number");
   }
+  if (getInvalidationToken !== undefined && typeof getInvalidationToken !== "function") {
+    throw new TypeError("getInvalidationToken must be a function");
+  }
 
   let cached = null;
   let inFlight = null;
+  let generation = 0;
+  let invalidationTokenInitialized = false;
+  let invalidationToken;
 
-  async function refresh() {
+  function clear() {
+    generation += 1;
+    cached = null;
+    inFlight = null;
+  }
+
+  function synchronizeInvalidationToken() {
+    if (!getInvalidationToken) return;
+    const nextToken = getInvalidationToken();
+    if (!invalidationTokenInitialized) {
+      invalidationToken = nextToken;
+      invalidationTokenInitialized = true;
+      return;
+    }
+    if (!Object.is(nextToken, invalidationToken)) {
+      invalidationToken = nextToken;
+      clear();
+    }
+  }
+
+  async function refresh(refreshGeneration) {
     const value = await load();
     const variants = await encodeJson(value);
     const entry = {
       variants,
       expiresAt: now() + ttlMs,
     };
-    cached = entry;
+    if (generation === refreshGeneration) cached = entry;
     return entry;
   }
 
   return {
     get() {
+      synchronizeInvalidationToken();
       if (cached && now() < cached.expiresAt) {
         return Promise.resolve(cached);
       }
 
       if (!inFlight) {
-        inFlight = refresh()
+        const refreshGeneration = generation;
+        const promise = refresh(refreshGeneration)
           .catch((error) => {
-            if (!cached) throw error;
+            if (generation !== refreshGeneration || !cached) throw error;
             cached.expiresAt = now() + staleIfErrorMs;
             if (typeof onRefreshError === "function") onRefreshError(error);
             return cached;
           })
           .finally(() => {
-            inFlight = null;
+            if (inFlight?.promise === promise) inFlight = null;
           });
+        inFlight = { generation: refreshGeneration, promise };
       }
-      return inFlight;
+      return inFlight.promise;
     },
     invalidate() {
-      cached = null;
+      clear();
     },
   };
+}
+
+function validateInvalidationPath(filePath) {
+  if (typeof filePath !== "string" || !path.isAbsolute(filePath)) {
+    throw new TypeError("cache invalidation path must be absolute");
+  }
+  return path.normalize(filePath);
+}
+
+function readCacheInvalidationToken(filePath) {
+  const target = validateInvalidationPath(filePath);
+  try {
+    return fs.readFileSync(target, "utf8").trim() || null;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function markCacheInvalidated(filePath, { now = Date.now, nonce = randomUUID } = {}) {
+  const target = validateInvalidationPath(filePath);
+  if (typeof now !== "function" || typeof nonce !== "function") {
+    throw new TypeError("cache invalidation clock and nonce must be functions");
+  }
+  const directory = path.dirname(target);
+  const token = `${new Date(now()).toISOString()}:${process.pid}:${nonce()}`;
+  const temporary = path.join(directory, `.${path.basename(target)}.${process.pid}.${nonce()}.tmp`);
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  try {
+    fs.writeFileSync(temporary, `${token}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+    fs.renameSync(temporary, target);
+  } catch (error) {
+    try {
+      fs.unlinkSync(temporary);
+    } catch (cleanupError) {
+      if (cleanupError?.code !== "ENOENT") error.cleanupError = cleanupError;
+    }
+    throw error;
+  }
+  return token;
 }
 
 function parseAcceptEncoding(header) {
@@ -212,7 +284,9 @@ module.exports = {
   createEncodedJsonCache,
   encodeJson,
   etagMatches,
+  markCacheInvalidated,
   parseAcceptEncoding,
+  readCacheInvalidationToken,
   selectEncoding,
   sendEncodedJson,
 };

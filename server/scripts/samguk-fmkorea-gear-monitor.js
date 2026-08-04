@@ -31,6 +31,7 @@ function parseArguments(argv) {
     aliasesPath: String(process.env.SAMGUK_FMKOREA_ALIASES_PATH || "").trim() || null,
     force: false,
     queuePath: queueFromEnv ? path.resolve(queueFromEnv) : DEFAULT_QUEUE_PATH,
+    seasonStartAt: String(process.env.SAMGUK_SEASON_START_AT || "").trim() || undefined,
     statePath: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -65,6 +66,7 @@ async function main(argv = process.argv.slice(2)) {
   const result = await runFmkoreaGearMonitor({
     queuePath: options.queuePath,
     statePath: options.statePath,
+    seasonStartAt: options.seasonStartAt,
     aliasesByPlayer: loadAliasesByPlayerFile(options.aliasesPath),
     force: options.force,
   });
