@@ -11,6 +11,8 @@ const {
   GRAY_FRAME_BYTES,
   GRAY_FRAME_COUNT,
   GRAY_OUTPUT_BYTES,
+  OCR_HEIGHT,
+  OCR_WIDTH,
   SamgukFfmpegFrameError,
   buildGrayArgs,
   buildOcrPngArgs,
@@ -28,7 +30,7 @@ function pngChunk(type, data = Buffer.alloc(0)) {
   return chunk;
 }
 
-function syntheticPng(width = 960, height = 540, trailing = Buffer.alloc(0)) {
+function syntheticPng(width = OCR_WIDTH, height = OCR_HEIGHT, trailing = Buffer.alloc(0)) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
@@ -195,8 +197,9 @@ test("OCR capture 기본값은 gray gate와 같은 fps phase의 index 4를 PNG�
   assert.equal(call.args.includes("-ss"), false);
   assert.equal(
     call.args[call.args.indexOf("-vf") + 1],
-    "fps=4,select=eq(n\\,4),scale=960:540:flags=bicubic",
+    "fps=4,select=eq(n\\,4),scale=1920:1080:flags=bicubic",
   );
+  assert.equal(DEFAULTS.maxPngOutputBytes, 12 * 1024 * 1024);
   assert.equal(call.args.at(-1), "pipe:1");
 });
 
@@ -209,7 +212,7 @@ test("OCR sampleIndex 0..7을 같은 fps=4 stream의 frame index로 엄격히 �
     assert.equal(args.includes("-ss"), false);
     assert.equal(
       args[args.indexOf("-vf") + 1],
-      `fps=4,select=eq(n\\,${sampleIndex}),scale=960:540:flags=bicubic`,
+      `fps=4,select=eq(n\\,${sampleIndex}),scale=1920:1080:flags=bicubic`,
     );
     assert.deepEqual(args, buildOcrPngArgs(sampleIndex));
   }
@@ -295,7 +298,11 @@ test("gray 8개 길이와 PNG 크기·단일 이미지 구조가 다르면 거�
     error => error.code === "invalid_gray_frame",
   );
 
-  for (const png of [syntheticPng(959, 540), syntheticPng(960, 539), syntheticPng(960, 540, Buffer.from([1]))]) {
+  for (const png of [
+    syntheticPng(OCR_WIDTH - 1, OCR_HEIGHT),
+    syntheticPng(OCR_WIDTH, OCR_HEIGHT - 1),
+    syntheticPng(OCR_WIDTH, OCR_HEIGHT, Buffer.from([1])),
+  ]) {
     const fake = fakeSpawner(call => closeWith(call, { stdout: [png] }));
     await assert.rejects(
       extractor(fake).captureOcrPng(Buffer.from([1])),
@@ -450,7 +457,7 @@ test("one-shot API도 ffmpeg config와 signal·sampleIndex를 분리한다", asy
   const filterIndex = pngFake.calls[0].args.indexOf("-vf");
   assert.equal(
     pngFake.calls[0].args[filterIndex + 1],
-    "fps=4,select=eq(n\\,7),scale=960:540:flags=bicubic",
+    "fps=4,select=eq(n\\,7),scale=1920:1080:flags=bicubic",
   );
 
   await assert.rejects(captureGrayFrame(Buffer.from([1]), null), error => (

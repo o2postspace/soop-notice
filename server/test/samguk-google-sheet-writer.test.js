@@ -16,11 +16,25 @@ const {
   snapshotRow,
 } = require("../lib/samguk-google-sheet-writer");
 const {
+  CURRENT_SEASON_ID,
   DECIMAL_NUMERIC_FIELDS,
   NUMERIC_FIELD_MAXIMUMS,
 } = require("../lib/samguk-observations");
+const { normalizeSkillBuild } = require("../lib/samguk-skill-build");
 
 const NOW = Date.parse("2026-08-02T07:00:00.000Z");
+const SEASON_MARKER_RANGE = "'게임정보'!A1:C30";
+const SEASON_MARKER_VALUES = [["시즌", "season_id", CURRENT_SEASON_ID]];
+const SKILL_BUILD = normalizeSkillBuild({
+  version: 1,
+  preset: 2,
+  ownedPoints: 6,
+  skills: Array.from({ length: 6 }, (_value, index) => ({
+    name: `절기 ${index + 1}`,
+    requiredPoints: index + 1,
+    allocatedPoints: index,
+  })),
+});
 
 function temporaryToken(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "samguk-google-writer-"));
@@ -39,6 +53,7 @@ function temporaryToken(t) {
 
 function snapshot(overrides = {}) {
   return {
+    seasonId: CURRENT_SEASON_ID,
     observationId: "OBS-CROSS-1234567890ABCDEF",
     playerId: "P001",
     fields: {
@@ -79,6 +94,7 @@ function snapshot(overrides = {}) {
       moveSpeedIncrease: 0,
       healthIncrease: 366,
       skillHasteIncrease: 20,
+      skillBuild: SKILL_BUILD,
     },
     observedAt: "2026-08-02T06:00:00.000Z",
     verification: "broadcast-repeat",
@@ -205,6 +221,24 @@ test("snapshot은 출처 중복·검증 의미 불일치와 2000년 이전 관�
   assert.deepEqual(crossSource.sourceTypes, ["broadcast", "fmkorea"]);
 });
 
+test("snapshot은 명시한 현재 season만 허용하고 skillBuild를 AY canonical 문자열로 유지한다", () => {
+  const normalized = normalizeSnapshot(snapshot(), NOW);
+  assert.equal(normalized.seasonId, CURRENT_SEASON_ID);
+  assert.equal(normalized.fields.skillBuild, SKILL_BUILD);
+  assert.equal(EXPECTED_HEADERS.at(-1), "절기배분");
+
+  const missingSeason = snapshot();
+  delete missingSeason.seasonId;
+  assertInvalidSnapshot(missingSeason);
+  assertInvalidSnapshot(snapshot({ seasonId: "samgukji-2026-08-03" }));
+  assertInvalidSnapshot(snapshot({
+    fields: {
+      ...snapshot().fields,
+      skillBuild: JSON.stringify({ ...JSON.parse(SKILL_BUILD), skills: [] }),
+    },
+  }));
+});
+
 test("Gamcom 삼국지 페이지는 최고값 기준 출처로 정규화한다", () => {
   const gamcomUrl = "https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84";
   const normalized = normalizeSnapshot(snapshot({
@@ -284,6 +318,7 @@ test("appendSnapshots는 90개를 한 lock과 한 상태 조회로 분류한 뒤
             { values: [EXPECTED_HEADERS] },
             { values: [existingDuplicate, partialRow] },
             { values: roster },
+            { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
           ] });
         }
         if (!batchData) {
@@ -325,7 +360,7 @@ test("appendSnapshots는 90개를 한 lock과 한 상태 조회로 분류한 뒤
   assert.equal(batchData.length, 89);
   assert.deepEqual(
     batchData.map(item => item.range),
-    Array.from({ length: 89 }, (_value, index) => `'관측입력'!A${index + 4}:AX${index + 4}`),
+    Array.from({ length: 89 }, (_value, index) => `'관측입력'!A${index + 4}:AY${index + 4}`),
   );
   assert.ok(batchData.every(item => item.majorDimension === "ROWS" && item.values.length === 1));
   assert.deepEqual(readbackRanges, batchData.map(item => item.range));
@@ -384,6 +419,7 @@ test("appendSnapshots는 기존 ID 충돌이나 공간 부족이면 batchUpdate 
         { values: [EXPECTED_HEADERS] },
         { values: [conflictingRow] },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
       conflictWrites += 1;
       throw new Error(`unexpected write: ${url}`);
@@ -417,6 +453,7 @@ test("appendSnapshots는 기존 ID 충돌이나 공간 부족이면 batchUpdate 
         { values: [EXPECTED_HEADERS] },
         { values: fullRows },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
       fullWrites += 1;
       throw new Error(`unexpected write: ${url}`);
@@ -430,7 +467,7 @@ test("appendSnapshots는 기존 ID 충돌이나 공간 부족이면 batchUpdate 
   assert.equal(fullWrites, 0);
 });
 
-test("OAuth writer는 첫 A:AX 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {
+test("OAuth writer는 첫 A:AY 완전 빈행만 정확히 쓰고 전체 행을 재검증한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const indexRows = Array.from({ length: 90 }, (_value, index) => [
     `OBS-SEED-${String(index + 1).padStart(4, "0")}`,
@@ -458,13 +495,14 @@ test("OAuth writer는 첫 A:AX 완전 빈행만 정확히 쓰고 전체 행을 �
           { values: [EXPECTED_HEADERS] },
           { values: indexRows },
           { values: [["P001"], ["P002"]] },
+          { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
         ] });
       }
       if (init.method === "PUT") {
         writtenRow = JSON.parse(init.body).values[0];
-        return response({ updatedRows: 1, updatedRange: "관측입력!A92:AX92" });
+        return response({ updatedRows: 1, updatedRange: "관측입력!A92:AY92" });
       }
-      if (url.includes("A92%3AAX92")) return response({ values: [writtenRow] });
+      if (url.includes("A92%3AAY92")) return response({ values: [writtenRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
@@ -475,9 +513,9 @@ test("OAuth writer는 첫 A:AX 완전 빈행만 정확히 쓰고 전체 행을 �
     appendedRow: 92,
   });
   assert.equal(released, 1);
-  assert.equal(OBSERVATION_LAST_COLUMN, "AX");
+  assert.equal(OBSERVATION_LAST_COLUMN, "AY");
   assert.equal(writtenRow.length, EXPECTED_HEADERS.length);
-  assert.equal(EXPECTED_HEADERS.length, 50);
+  assert.equal(EXPECTED_HEADERS.length, 51);
   assert.equal(writtenRow[0], "OBS-CROSS-1234567890ABCDEF");
   assert.equal(writtenRow[1], "P001");
   assert.equal(writtenRow[22], 95);
@@ -490,9 +528,44 @@ test("OAuth writer는 첫 A:AX 완전 빈행만 정확히 쓰고 전체 행을 �
   assert.equal(writtenRow[30], 110);
   assert.deepEqual(writtenRow.slice(31), [
     176.9, "조조", 88.25, 12.5, 7.25, 18.5, 150.75, 4.5, 22.25, 6.5, 1900,
-    24.4, 0, 12.2, 9.1, 42.7, 0, 366, 20,
+    24.4, 0, 12.2, 9.1, 42.7, 0, 366, 20, SKILL_BUILD,
   ]);
   assert.equal(requests.filter(item => item.method === "PUT").length, 1);
+});
+
+test("OAuth writer는 실제 게임정보 season marker가 없거나 다르면 mutation 전에 중단한다", async (t) => {
+  const { directory, tokenPath } = temporaryToken(t);
+  for (const markerValues of [[], [["시즌", "season_id", "samgukji-2026-08-03"]]]) {
+    let mutations = 0;
+    const writer = createSamgukGoogleSheetWriter({
+      tokenPath,
+      sheetId: "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY",
+      lockPath: path.join(directory, `season-${markerValues.length}.guard`),
+      now: () => NOW,
+      acquireLock: () => ({ release() {} }),
+      fetchImpl: async (url, init = {}) => {
+        if (url === "https://oauth2.googleapis.com/token") {
+          return response({ access_token: "access-token", expires_in: 3600 });
+        }
+        if (url.includes("fields=properties%28timeZone%29")) {
+          return response({ properties: { timeZone: "Asia/Seoul" } });
+        }
+        if (url.includes("/values:batchGet")) return response({ valueRanges: [
+          { values: [EXPECTED_HEADERS] },
+          { values: [[]] },
+          { values: [["P001"]] },
+          { range: SEASON_MARKER_RANGE, values: markerValues },
+        ] });
+        if (init.method === "PUT" || init.method === "POST") mutations += 1;
+        throw new Error(`unexpected request: ${url}`);
+      },
+    });
+    await assert.rejects(
+      writer.appendSnapshot(snapshot()),
+      error => error?.code === "invalid_season",
+    );
+    assert.equal(mutations, 0);
+  }
 });
 
 test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다", async (t) => {
@@ -511,8 +584,9 @@ test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다"
         { values: [EXPECTED_HEADERS] },
         { values: [["OBS-CROSS-1234567890ABCDEF", "P001"]] },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
-      if (url.includes("A2%3AAX2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAY2")) return response({ values: [expectedRow] });
       assert.notEqual(init.method, "PUT");
       throw new Error(`unexpected request: ${url}`);
     },
@@ -528,7 +602,7 @@ test("기존 observationId는 내용이 같을 때만 duplicate로 처리한다"
   });
 });
 
-test("첫 완전 빈 A:AX 행만 고르고 쓰기 직전 부분 점유를 다시 확인한다", async (t) => {
+test("첫 완전 빈 A:AY 행만 고르고 쓰기 직전 부분 점유를 다시 확인한다", async (t) => {
   const { directory, tokenPath } = temporaryToken(t);
   const partialRow = Array(EXPECTED_HEADERS.length).fill("");
   partialRow[23] = "수동 메모";
@@ -553,14 +627,15 @@ test("첫 완전 빈 A:AX 행만 고르고 쓰기 직전 부분 점유를 다시
         { values: [EXPECTED_HEADERS] },
         { values: [partialRow, []] },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
-      if (url.includes("A3%3AAX3") && init.method !== "PUT") {
+      if (url.includes("A3%3AAY3") && init.method !== "PUT") {
         return response({ values: [writtenRow] });
       }
       if (init.method === "PUT") {
         putCalls += 1;
         writtenRow = JSON.parse(init.body).values[0];
-        return response({ updatedRows: 1, updatedRange: "관측입력!A3:AX3" });
+        return response({ updatedRows: 1, updatedRange: "관측입력!A3:AY3" });
       }
       throw new Error(`unexpected request: ${url}`);
     },
@@ -572,7 +647,7 @@ test("첫 완전 빈 A:AX 행만 고르고 쓰기 직전 부분 점유를 다시
     appendedRow: 3,
   });
   assert.equal(putCalls, 1);
-  assert.ok(requestedUrls.some(url => url.includes("A2%3AAX5001")));
+  assert.ok(requestedUrls.some(url => url.includes("A2%3AAY5001")));
   assert.ok(requestedUrls.some(url => url.includes("valueRenderOption=FORMULA")));
 
   let racePutCalls = 0;
@@ -594,8 +669,9 @@ test("첫 완전 빈 A:AX 행만 고르고 쓰기 직전 부분 점유를 다시
         { values: [EXPECTED_HEADERS] },
         { values: [[]] },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
-      if (url.includes("A2%3AAX2") && init.method !== "PUT") {
+      if (url.includes("A2%3AAY2") && init.method !== "PUT") {
         return response({ values: [partialRow] });
       }
       if (init.method === "PUT") racePutCalls += 1;
@@ -636,8 +712,9 @@ test("비JSON 429·5xx는 최대 3회 안에서 재시도하고 성공 응답만
         { values: [EXPECTED_HEADERS] },
         { values: [[snapshot().observationId, "P001"]] },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
-      if (url.includes("A2%3AAX2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAY2")) return response({ values: [expectedRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });
@@ -703,8 +780,9 @@ test("401은 access token을 한 번만 새로 받고 요청을 다시 인증한
         { values: [EXPECTED_HEADERS] },
         { values: [[snapshot().observationId, "P001"]] },
         { values: [["P001"]] },
+        { range: SEASON_MARKER_RANGE, values: SEASON_MARKER_VALUES },
       ] });
-      if (url.includes("A2%3AAX2")) return response({ values: [expectedRow] });
+      if (url.includes("A2%3AAY2")) return response({ values: [expectedRow] });
       throw new Error(`unexpected request: ${url}`);
     },
   });

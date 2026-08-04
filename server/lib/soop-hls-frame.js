@@ -9,6 +9,8 @@ const DEFAULT_MAX_BATCH_BYTES = 32 * 1024 * 1024;
 const MAX_BATCH_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAX_SEGMENTS = 6;
 const MAX_SEGMENTS = 12;
+const DEFAULT_SEGMENT_CONCURRENCY = 3;
+const MAX_SEGMENT_CONCURRENCY = 4;
 const DEFAULT_INITIAL_SEGMENT_COUNT = 1;
 const MAX_SEGMENT_BYTES = 64 * 1024 * 1024;
 const MAX_URL_LENGTH = 16 * 1024;
@@ -26,6 +28,7 @@ const SEGMENT_BATCH_FETCH_OPTION_KEYS = new Set([
   ...SEGMENT_FETCH_OPTION_KEYS,
   "maxBatchBytes",
   "maxSegments",
+  "segmentConcurrency",
 ]);
 const FETCH_CALL_OPTION_KEYS = new Set(["signal"]);
 const BATCH_FETCH_CALL_OPTION_KEYS = new Set([
@@ -364,7 +367,7 @@ function parseSoopHlsMediaPlaylist(playlist, playlistUrl) {
   return parseMediaPlaylistDetails(playlist, playlistUrl).finitePlaylist;
 }
 
-async function readBufferLimited(response, maxBytes, stage) {
+async function readBufferLimited(response, maxBytes, stage, byteBudget = null) {
   const contentLength = response.headers?.get?.("content-length");
   if (typeof contentLength === "string" && /^[0-9]+$/.test(contentLength)) {
     const declaredLength = Number(contentLength);
@@ -386,8 +389,9 @@ async function readBufferLimited(response, maxBytes, stage) {
       } catch {
         fail("invalid_playlist", stage);
       }
-      total += chunk.length;
-      if (total > maxBytes) {
+      const nextTotal = total + chunk.length;
+      if (!Number.isSafeInteger(nextTotal) || nextTotal > maxBytes
+        || (byteBudget && !byteBudget.claim(chunk.length))) {
         try {
           await reader.cancel();
         } catch {
@@ -395,6 +399,7 @@ async function readBufferLimited(response, maxBytes, stage) {
         }
         fail("response_too_large", stage);
       }
+      total = nextTotal;
       chunks.push(chunk);
     }
     return Buffer.concat(chunks, total);
@@ -402,7 +407,9 @@ async function readBufferLimited(response, maxBytes, stage) {
 
   if (typeof response.arrayBuffer !== "function") fail("invalid_playlist", stage);
   const body = Buffer.from(await response.arrayBuffer());
-  if (body.length > maxBytes) fail("response_too_large", stage);
+  if (body.length > maxBytes || (byteBudget && !byteBudget.claim(body.length))) {
+    fail("response_too_large", stage);
+  }
   return body;
 }
 
@@ -445,6 +452,12 @@ function normalizeBatchFetchOptions(options) {
       DEFAULT_MAX_SEGMENTS,
       1,
       MAX_SEGMENTS,
+    ),
+    segmentConcurrency: integerInRange(
+      options.segmentConcurrency,
+      DEFAULT_SEGMENT_CONCURRENCY,
+      1,
+      MAX_SEGMENT_CONCURRENCY,
     ),
   };
 }
@@ -512,7 +525,12 @@ async function fetchOfficialBody(url, config) {
       const responseUrl = response.url
         ? parseOfficialHttpsUrl(response.url, config.urlErrorCode, config.stage)
         : currentUrl;
-      const body = await readBufferLimited(response, config.maxBytes, config.stage);
+      const body = await readBufferLimited(
+        response,
+        config.maxBytes,
+        config.stage,
+        config.byteBudget,
+      );
       return { body, responseUrl };
     }
   })();
@@ -581,6 +599,76 @@ function selectBatchSegments(segments, callOptions, maxSegments) {
   return tailSegments(segments.slice(cursorIndex + 1), maxSegments);
 }
 
+function createByteBudget(maxBytes) {
+  let usedBytes = 0;
+  return Object.freeze({
+    claim(bytes) {
+      if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > maxBytes - usedBytes) return false;
+      usedBytes += bytes;
+      return true;
+    },
+  });
+}
+
+async function fetchBatchSegments(selected, config, signal) {
+  if (selected.length === 0) return Object.freeze([]);
+  const controller = new AbortController();
+  const byteBudget = createByteBudget(config.maxBatchBytes);
+  const fetched = new Array(selected.length);
+  let nextIndex = 0;
+  let firstError = null;
+  let abortListener = null;
+
+  try {
+    if (signal) {
+      if (abortSignalState(signal)) fail("aborted", "segment");
+      abortListener = () => controller.abort();
+      addAbortListener(signal, abortListener);
+      if (abortSignalState(signal)) abortListener();
+    }
+
+    async function worker() {
+      while (!firstError && !abortSignalState(controller.signal)) {
+        const index = nextIndex;
+        if (index >= selected.length) return;
+        nextIndex += 1;
+        const segment = selected[index];
+        try {
+          const body = await fetchSegmentBody(segment.segmentUrl, {
+            ...config,
+            signal: controller.signal,
+            byteBudget,
+          });
+          fetched[index] = Object.freeze({
+            segmentId: segment.segmentId,
+            mediaSequence: segment.mediaSequence,
+            body,
+          });
+        } catch (error) {
+          if (!firstError) firstError = error;
+          controller.abort();
+        }
+      }
+    }
+
+    const workerCount = Math.min(config.segmentConcurrency, selected.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    if (signal && abortSignalState(signal)) fail("aborted", "segment");
+    if (firstError) {
+      if (isSoopHlsFrameError(firstError)) {
+        throw new SoopHlsFrameError(
+          safeErrorProperty(firstError, "code"),
+          safeErrorProperty(firstError, "stage"),
+        );
+      }
+      fail("upstream_error", "segment");
+    }
+    return Object.freeze(fetched);
+  } finally {
+    if (abortListener) removeAbortListener(signal, abortListener);
+  }
+}
+
 function createSoopHlsFrameFetcher(options = {}) {
   const config = normalizeFetchOptions(options);
 
@@ -621,27 +709,7 @@ function createSoopHlsFrameSegmentBatchFetcher(options = {}) {
     const requestConfig = { ...config, signal: normalizedCallOptions.signal };
     const { segments } = await fetchPlaylistDetails(hlsUrl, requestConfig);
     const selected = selectBatchSegments(segments, normalizedCallOptions, config.maxSegments);
-    const fetched = [];
-    let batchBytes = 0;
-    for (const segment of selected) {
-      const remainingBytes = config.maxBatchBytes - batchBytes;
-      if (remainingBytes <= 0) fail("response_too_large", "segment");
-      const body = await fetchSegmentBody(
-        segment.segmentUrl,
-        requestConfig,
-        Math.min(config.maxSegmentBytes, remainingBytes),
-      );
-      batchBytes += body.length;
-      if (!Number.isSafeInteger(batchBytes) || batchBytes > config.maxBatchBytes) {
-        fail("response_too_large", "segment");
-      }
-      fetched.push(Object.freeze({
-        segmentId: segment.segmentId,
-        mediaSequence: segment.mediaSequence,
-        body,
-      }));
-    }
-    return Object.freeze(fetched);
+    return fetchBatchSegments(selected, config, normalizedCallOptions.signal);
   };
 }
 
@@ -701,6 +769,7 @@ module.exports = {
   DEFAULT_MAX_BATCH_BYTES,
   DEFAULT_MAX_RESPONSE_BYTES,
   DEFAULT_MAX_SEGMENTS,
+  DEFAULT_SEGMENT_CONCURRENCY,
   DEFAULT_MAX_SEGMENT_BYTES,
   DEFAULT_TIMEOUT_MS,
   FFMPEG_FRAME_ARGS,

@@ -8,8 +8,10 @@ const GRAY_HEIGHT = 27;
 const GRAY_FRAME_BYTES = GRAY_WIDTH * GRAY_HEIGHT;
 const GRAY_FRAME_COUNT = 8;
 const GRAY_OUTPUT_BYTES = GRAY_FRAME_BYTES * GRAY_FRAME_COUNT;
-const OCR_WIDTH = 960;
-const OCR_HEIGHT = 540;
+// 작은 UI 글자는 960x540으로 먼저 축소하면 Python 쪽 재확대로 복구되지 않는다.
+// HLS의 1080p 글자 획을 보존한 채 OCR adapter로 넘긴다.
+const OCR_WIDTH = 1920;
+const OCR_HEIGHT = 1080;
 const OCR_SAMPLE_INDEX_DEFAULT = 4;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -17,7 +19,7 @@ const DEFAULTS = Object.freeze({
   timeoutMs: 8_000,
   maxInputBytes: 8 * 1024 * 1024,
   maxGrayOutputBytes: GRAY_OUTPUT_BYTES,
-  maxPngOutputBytes: 4 * 1024 * 1024,
+  maxPngOutputBytes: 12 * 1024 * 1024,
   maxStderrBytes: 16 * 1024,
 });
 

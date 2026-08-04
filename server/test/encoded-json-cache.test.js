@@ -1,9 +1,14 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { brotliDecompressSync, gunzipSync } = require("node:zlib");
 const {
   createEncodedJsonCache,
   etagMatches,
+  markCacheInvalidated,
+  readCacheInvalidationToken,
   selectEncoding,
   sendEncodedJson,
 } = require("../lib/encoded-json-cache");
@@ -127,6 +132,55 @@ test("갱신 실패 시 마지막 정상 응답을 유지하고 짧은 TTL 뒤 �
   const refreshed = await cache.get();
   assert.notEqual(refreshed, initial);
   assert.equal(calls, 3);
+});
+
+test("외부 invalidation token 변경은 TTL과 진행 중 refresh를 폐기한다", async () => {
+  let token = "before";
+  let loads = 0;
+  const releases = [];
+  const cache = createEncodedJsonCache({
+    load: () => new Promise(resolve => {
+      const version = ++loads;
+      releases.push(() => resolve({ version }));
+    }),
+    ttlMs: 60_000,
+    getInvalidationToken: () => token,
+  });
+
+  const oldRequest = cache.get();
+  assert.equal(loads, 1);
+  token = "after";
+  const newRequest = cache.get();
+  assert.equal(loads, 2);
+
+  releases[0]();
+  releases[1]();
+  const [oldEntry, newEntry] = await Promise.all([oldRequest, newRequest]);
+  assert.deepEqual(JSON.parse(oldEntry.variants.identity.body), { version: 1 });
+  assert.deepEqual(JSON.parse(newEntry.variants.identity.body), { version: 2 });
+  assert.equal(await cache.get(), newEntry);
+  assert.equal(loads, 2);
+});
+
+test("cache invalidation stamp는 원자 교체되고 매번 고유 token을 만든다", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "encoded-cache-stamp-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const stampPath = path.join(directory, "samguk.stamp");
+  let nonce = 0;
+
+  assert.equal(readCacheInvalidationToken(stampPath), null);
+  const first = markCacheInvalidated(stampPath, {
+    now: () => 1_000,
+    nonce: () => `nonce-${++nonce}`,
+  });
+  const second = markCacheInvalidated(stampPath, {
+    now: () => 1_000,
+    nonce: () => `nonce-${++nonce}`,
+  });
+
+  assert.notEqual(first, second);
+  assert.equal(readCacheInvalidationToken(stampPath), second);
+  assert.equal(fs.statSync(stampPath).mode & 0o777, 0o600);
 });
 
 test("Accept-Encoding의 q값과 identity 제외를 반영한다", () => {

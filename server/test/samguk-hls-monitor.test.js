@@ -11,8 +11,10 @@ const {
   buildFallbackTargets,
   createSamgukHlsMonitor,
   normalizeTargets,
+  OCR_STREAM_QUALITY,
   safeErrorCode,
 } = require("../lib/samguk-hls-monitor");
+const { CURRENT_SEASON_ID } = require("../lib/samguk-observations");
 const { FRAME_BYTES } = require("../lib/samguk-ui-gate");
 
 const BASE_TIME = Date.parse("2026-08-02T12:00:00.000Z");
@@ -38,9 +40,10 @@ function target() {
   };
 }
 
-function errorWithCode(code) {
+function errorWithCode(code, stage) {
   const error = new Error("민감한 upstream URL과 token은 노출되면 안 됩니다.");
   error.code = code;
+  if (stage !== undefined) error.stage = stage;
   return error;
 }
 
@@ -93,15 +96,24 @@ function monitorFixture(overrides = {}) {
   };
 }
 
-test("fallback roster를 중복 없는 P001~P090 target과 baseline으로 만든다", () => {
+test("후국지 fallback roster는 P001~P090 target과 Gamcom season=2 baseline만 유지한다", () => {
   const targets = buildFallbackTargets();
   const baselines = buildFallbackBaselines();
   assert.equal(targets.length, 90);
   assert.equal(targets[0].id, "P001");
   assert.equal(targets.at(-1).id, "P090");
   assert.equal(new Set(targets.map(item => item.bjId)).size, 90);
-  assert.ok(baselines.length > 0 && baselines.length <= 90 * 12);
-  assert.equal(baselines.some(item => item.field === "powerScore"), false);
+  assert.equal(baselines.length, 545);
+  assert.deepEqual(baselines.filter(item => item.playerId === "P001"), [
+    { playerId: "P001", field: "horse", value: "백룡마" },
+    { playerId: "P001", field: "horseLevel", value: 0 },
+    { playerId: "P001", field: "weapon", value: 5 },
+    { playerId: "P001", field: "strength", value: 20 },
+    { playerId: "P001", field: "agility", value: 0 },
+    { playerId: "P001", field: "vitality", value: 0 },
+    { playerId: "P001", field: "intelligence", value: 0 },
+  ]);
+  assert.equal(baselines.filter(item => item.field === "weapon").length, 5);
   assert.equal(DEFAULT_HUD_PROBE_INTERVAL_MS, 10 * 60_000);
 });
 
@@ -131,7 +143,7 @@ test("HUD probe interval은 기본 10분이며 안전한 운영 범위만 허용
   }
 });
 
-test("normal scan은 SD segment의 gray sample만 판별하고 HD는 열지 않는다", async () => {
+test("normal scan은 SD segment의 gray sample만 판별하고 ORIGINAL은 열지 않는다", async () => {
   const qualities = [];
   const fixture = monitorFixture({
     async fetchSegment(url) {
@@ -143,6 +155,51 @@ test("normal scan은 SD segment의 gray sample만 판별하고 HD는 열지 않�
   assert.equal(result.live, true);
   assert.equal(result.uiCandidate, false);
   assert.deepEqual(qualities, ["SD"]);
+});
+
+test("SD와 ORIGINAL batch는 별도 fetcher를 사용하고 기존 단일 fetcher도 호환한다", async () => {
+  const splitCalls = [];
+  const split = monitorFixture({
+    async fetchSegments(url) {
+      splitCalls.push(["sd-fetcher", url.slice("memory:".length)]);
+      return [batchSegment(1, "sd")];
+    },
+    async fetchOcrSegments(url) {
+      splitCalls.push(["ocr-fetcher", url.slice("memory:".length)]);
+      return [batchSegment(1, "original")];
+    },
+    async decodeGrayFrame() { return grayFrameBatch([]); },
+  });
+  await split.monitor.scanGate(target());
+  await split.monitor.scanOcr(target());
+  assert.deepEqual(splitCalls, [
+    ["sd-fetcher", "SD"],
+    ["ocr-fetcher", OCR_STREAM_QUALITY],
+  ]);
+
+  const sharedCalls = [];
+  const shared = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      sharedCalls.push(quality);
+      return [batchSegment(1, quality)];
+    },
+    async decodeGrayFrame() { return grayFrameBatch([]); },
+  });
+  await shared.monitor.scanGate(target());
+  await shared.monitor.scanOcr(target());
+  assert.deepEqual(sharedCalls, ["SD", OCR_STREAM_QUALITY]);
+});
+
+test("ORIGINAL 전용 fetcher는 SD batch fetcher와 함께 설정해야 한다", () => {
+  assert.throws(
+    () => monitorFixture({
+      fetchSegment: async () => Buffer.from("sd"),
+      fetchSegments: undefined,
+      fetchOcrSegments: async () => [batchSegment(1)],
+    }),
+    error => error instanceof SamgukHlsMonitorError && error.code === "invalid_config",
+  );
 });
 
 test("같은 SD segment는 다시 decode하지 않는다", async () => {
@@ -161,8 +218,11 @@ test("같은 SD segment는 다시 decode하지 않는다", async () => {
   assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.duplicateSegments, 1);
 });
 
-test("SD 실제 누락과 후보 때만 여는 HD 비관측 구간을 분리 계측한다", async () => {
-  const sequences = { SD: [[batchSegment(10)], [batchSegment(12)]], HD: [[batchSegment(20)], [batchSegment(23)]] };
+test("SD 실제 누락과 후보 때만 여는 ORIGINAL 비관측 구간을 분리 계측한다", async () => {
+  const sequences = {
+    SD: [[batchSegment(10)], [batchSegment(12)]],
+    [OCR_STREAM_QUALITY]: [[batchSegment(20)], [batchSegment(23)]],
+  };
   const fixture = monitorFixture({
     async fetchSegments(url) {
       const quality = url.slice("memory:".length);
@@ -171,7 +231,7 @@ test("SD 실제 누락과 후보 때만 여는 HD 비관측 구간을 분리 계
     async decodeGrayFrame() { return grayFrameBatch([]); },
     async decodePngFrame() { return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: false, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: false, results: [] };
     },
     queuePath: "/tmp/test-gap-metrics.ndjson",
   });
@@ -190,7 +250,44 @@ test("SD 실제 누락과 후보 때만 여는 HD 비관측 구간을 분리 계
   assert.equal(stats.hdSegmentsUnobserved, 2);
 });
 
-test("burst HD OCR 두 frame이 같을 때만 두 관측값을 queue에 한 번 기록한다", async () => {
+test("서로 다른 ORIGINAL burst 사이의 의도적 비관측 sequence는 누락으로 합산하지 않는다", async () => {
+  let sdSequence = 10;
+  const originalSequences = [20, 40];
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      const sequence = quality === "SD" ? sdSequence++ : originalSequences.shift();
+      return [batchSegment(sequence, `${quality}-${sequence}`)];
+    },
+    async decodeGrayFrame() { return grayFrameBatch([1]); },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(_segment, { sampleIndex }) {
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
+    },
+    async runOcr() {
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: false,
+        results: [],
+      };
+    },
+    queuePath: "/tmp/test-original-burst-gap.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  await fixture.monitor.executeTask({ lane: "burst", target: target() });
+
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.hdSequenceGaps, 0);
+  assert.equal(stats.hdSegmentsUnobserved, 0);
+  assert.equal(stats.candidateSequenceMisses, 2);
+});
+
+test("burst ORIGINAL OCR 두 frame이 같을 때만 두 관측값을 queue에 한 번 기록한다", async () => {
   let now = BASE_TIME;
   let sdSequence = 0;
   let hdSequence = 0;
@@ -217,6 +314,7 @@ test("burst HD OCR 두 frame이 같을 때만 두 관측값을 queue에 한 번 
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 11, confidence: 0.99 }],
       };
@@ -286,6 +384,7 @@ test("재시작 overlay는 Sheet 승격 전 confirmed 값을 stable로 복원하
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 11, confidence: 0.99 }],
       };
@@ -335,6 +434,7 @@ test("invalid Sheet 시각은 valid startup overlay를 덮지 못하고 legacy o
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 11, confidence: 0.99 }],
       };
@@ -360,6 +460,7 @@ test("invalid Sheet 시각은 valid startup overlay를 덮지 못하고 legacy o
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 10, confidence: 0.99 }],
       };
@@ -393,6 +494,7 @@ test("refresh의 invalid Sheet 시각은 valid overlay를 보존하고 최신 va
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 11, confidence: 0.99 }],
       };
@@ -425,7 +527,7 @@ test("timestamp 없는 legacy overlay는 refresh에 해당 Sheet key가 오면 �
     baselineOverlays: [{ playerId: "P001", field: "strength", value: 11 }],
     async decodePngFrame() { return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: false, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: false, results: [] };
     },
     queuePath: "/tmp/test-legacy-overlay-refresh.ndjson",
     changeTracker: {
@@ -465,6 +567,7 @@ test("overlay보다 동시·최신 Sheet 확인시각이 우선하고 invalid ov
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: ocrValue, confidence: 0.99 }],
       };
@@ -502,6 +605,7 @@ test("overlay보다 동시·최신 Sheet 확인시각이 우선하고 invalid ov
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 10, confidence: 0.99 }],
       };
@@ -534,18 +638,93 @@ test("decode 실패한 segment는 hash를 확정하지 않고 같은 segment를 
 });
 
 test("만료된 HLS URL 오류는 cache를 한 번 무효화하고 즉시 재해석한다", async () => {
-  let attempts = 0;
+  for (const code of ["upstream_http", "invalid_playlist"]) {
+    let attempts = 0;
+    const fixture = monitorFixture({
+      async fetchSegment() {
+        attempts += 1;
+        if (attempts === 1) throw errorWithCode(code, "playlist");
+        return Buffer.from("fresh-segment");
+      },
+    });
+    const result = await fixture.monitor.scanGate(target());
+    assert.equal(result.duplicate, false);
+    assert.equal(attempts, 2);
+    assert.deepEqual(fixture.invalidations, [["sample_bj", "SD"]]);
+    const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+    assert.equal(stats.hlsRetries, 1);
+    assert.equal(stats.hlsPlaylistRetryErrors, 1);
+    assert.equal(stats.hlsRetryCacheInvalidations, 1);
+  }
+});
+
+test("segment 오류와 playlist timeout은 cache를 지우지 않고 같은 URL로 재시도한다", async () => {
+  for (const [code, stage, counter] of [
+    ["upstream_http", "segment", "hlsSegmentRetryErrors"],
+    ["upstream_timeout", "playlist", "hlsPlaylistRetryErrors"],
+    ["upstream_error", "playlist", "hlsPlaylistRetryErrors"],
+    ["invalid_playlist", "segment", "hlsSegmentRetryErrors"],
+  ]) {
+    let attempts = 0;
+    const fixture = monitorFixture({
+      async fetchSegment() {
+        attempts += 1;
+        if (attempts === 1) throw errorWithCode(code, stage);
+        return Buffer.from(`${stage}-recovered`);
+      },
+    });
+    const result = await fixture.monitor.scanGate(target());
+    assert.equal(result.duplicate, false);
+    assert.equal(attempts, 2);
+    assert.deepEqual(fixture.invalidations, []);
+    const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+    assert.equal(stats.hlsRetries, 1);
+    assert.equal(stats[counter], 1);
+    assert.equal(stats.hlsRetryCacheInvalidations, 0);
+  }
+});
+
+test("resolver timeout은 cache invalidation 없이 resolver만 재시도한다", async () => {
+  let resolveCalls = 0;
+  const invalidations = [];
   const fixture = monitorFixture({
-    async fetchSegment() {
-      attempts += 1;
-      if (attempts === 1) throw errorWithCode("upstream_http");
-      return Buffer.from("fresh-segment");
+    hlsCache: {
+      async get() {
+        resolveCalls += 1;
+        if (resolveCalls === 1) throw errorWithCode("upstream_timeout");
+        return { hlsUrl: "memory:SD" };
+      },
+      async invalidate(bjId, quality) { invalidations.push([bjId, quality]); },
     },
   });
   const result = await fixture.monitor.scanGate(target());
   assert.equal(result.duplicate, false);
+  assert.equal(resolveCalls, 2);
+  assert.deepEqual(invalidations, []);
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.hlsResolverRetryErrors, 1);
+  assert.equal(stats.hlsRetryCacheInvalidations, 0);
+});
+
+test("재시도 소진 stage는 안전한 고정 counter로만 계측한다", async () => {
+  let attempts = 0;
+  const fixture = monitorFixture({
+    async fetchSegment() {
+      attempts += 1;
+      const error = errorWithCode("upstream_timeout", "https://secret.example/token");
+      throw error;
+    },
+  });
+  await assert.rejects(() => fixture.monitor.scanGate(target()), error => (
+    error.code === "upstream_timeout"
+  ));
   assert.equal(attempts, 2);
-  assert.deepEqual(fixture.invalidations, [["sample_bj", "SD"]]);
+  assert.deepEqual(fixture.invalidations, []);
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.hlsUnknownRetryErrors, 1);
+  assert.equal(stats.hlsUnknownFailures, 1);
+  assert.equal(stats.lastHlsErrorStage, "unknown");
+  assert.equal(JSON.stringify(stats).includes("secret.example"), false);
 });
 
 test("not_live는 offline으로 전환하고 오류의 민감한 message를 snapshot에 넣지 않는다", async () => {
@@ -568,7 +747,7 @@ test("candidate 방송만 normal lane에서 burst lane으로 동적 전환한다
     gate: () => ({ uiCandidate: true, reason: "candidate" }),
     async decodePngFrame() { return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: false, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: false, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });
@@ -599,7 +778,7 @@ test("OCR 활성 상태여도 normal lane에서는 OCR을 실행하지 않고 bu
     async decodePngFrame() { return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); },
     async runOcr() {
       ocrRuns += 1;
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: false, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: false, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });
@@ -614,6 +793,9 @@ test("외부 오류 code는 안전한 고정 code만 통과시킨다", () => {
   assert.equal(safeErrorCode({ code: "BAD token=secret" }), "scan_failed");
   assert.equal(safeErrorCode({ code: "token_secret" }), "scan_failed");
   assert.equal(safeErrorCode(new Error("secret")), "scan_failed");
+  assert.equal(safeErrorCode(Object.defineProperty({}, "code", {
+    get() { throw new Error("secret getter"); },
+  })), "scan_failed");
 });
 
 test("현재 Sheet 참가자를 SOOP ID로 target에 매핑해 baseline을 만든다", () => {
@@ -678,6 +860,59 @@ test("runLoop는 실제 promise를 lease 만료로 중복 실행하지 않고 ab
   assert.equal(maxConcurrent, 1);
   assert.equal(monitor.getSnapshot().stats.failures, 0);
   assert.equal(monitor.getSnapshot().stats.lastErrorCode, null);
+});
+
+test("전체 task 상한은 normal+burst 합계가 메모리 예산을 넘지 않게 dispatch를 제한한다", async () => {
+  const targets = Array.from({ length: 3 }, (_value, index) => {
+    const number = index + 1;
+    const playerId = `P${String(number).padStart(3, "0")}`;
+    return {
+      id: playerId,
+      playerId,
+      bjId: `sample_bj_${number}`,
+      sourceUrl: `https://play.sooplive.com/sample_bj_${number}`,
+      enabled: true,
+    };
+  });
+  const releases = [];
+  const monitor = createSamgukHlsMonitor({
+    targets,
+    baselines: [],
+    now: BASE_TIME,
+    clock: () => BASE_TIME,
+    schedulerOptions: {
+      ...DEFAULT_SCHEDULER_OPTIONS,
+      normalConcurrency: 3,
+      maxActiveTasks: 2,
+      initialSpreadMs: 0,
+      jitterRatio: 0,
+    },
+    hlsCache: {
+      async get(bjId) { return { hlsUrl: `memory:${bjId}` }; },
+      async invalidate() {},
+    },
+    async fetchSegment() {
+      return new Promise(resolve => releases.push(() => resolve(Buffer.from("segment"))));
+    },
+    async decodeGrayFrame() { return Buffer.alloc(FRAME_BYTES, 0); },
+  });
+
+  const first = monitor.dispatch(BASE_TIME);
+  assert.equal(first.tasks.length, 2);
+  assert.equal(monitor.dispatch(BASE_TIME).tasks.length, 0);
+  assert.equal(monitor.getSnapshot(BASE_TIME).activeTasks, 2);
+  assert.equal(monitor.getSnapshot(BASE_TIME).maxActiveTasks, 2);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(releases.length, 2);
+  releases.splice(0).forEach(release => release());
+  await Promise.all(first.promises);
+
+  const second = monitor.dispatch(BASE_TIME);
+  assert.equal(second.tasks.length, 1);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(releases.length, 1);
+  releases.splice(0).forEach(release => release());
+  await Promise.all(second.promises);
 });
 
 test("task deadline은 lease 전에 하위 요청을 중단하고 명시적 실패로 적용한다", async () => {
@@ -807,7 +1042,7 @@ test("동시 task는 독립 signal을 사용해 한 task deadline이 완료된 t
 });
 
 test("task별 같은 signal을 HLS resolve·fetch·gray/PNG decode·OCR 전 단계에 전달한다", async () => {
-  const seen = { SD: [], HD: [] };
+  const seen = { SD: [], [OCR_STREAM_QUALITY]: [] };
   const contexts = [];
   const fixture = monitorFixture({
     hlsCache: {
@@ -831,13 +1066,13 @@ test("task별 같은 signal을 HLS resolve·fetch·gray/PNG decode·OCR 전 단�
     },
     gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
     async decodePngFrame(_segment, { signal, sampleIndex }) {
-      seen.HD.push([`png:${sampleIndex}`, signal]);
+      seen[OCR_STREAM_QUALITY].push([`png:${sampleIndex}`, signal]);
       return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
     },
     async runOcr(_png, context, { signal }) {
-      seen.HD.push(["ocr", signal]);
+      seen[OCR_STREAM_QUALITY].push(["ocr", signal]);
       contexts.push(context);
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: true, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });
@@ -848,9 +1083,12 @@ test("task별 같은 signal을 HLS resolve·fetch·gray/PNG decode·OCR 전 단�
   dispatched = fixture.monitor.dispatch(BASE_TIME + DEFAULT_SCHEDULER_OPTIONS.burstIntervalMs);
   await Promise.all(dispatched.promises);
 
-  const normalSignals = seen.SD.map(([, signal]) => signal);
-  const burstSignals = seen.HD.map(([, signal]) => signal);
+  const normalSignal = seen.SD.find(([stage]) => stage === "gray")[1];
+  const normalSignals = seen.SD.filter(([, signal]) => signal === normalSignal).map(([, signal]) => signal);
+  const burstSdSignals = seen.SD.filter(([, signal]) => signal !== normalSignal).map(([, signal]) => signal);
+  const burstSignals = seen[OCR_STREAM_QUALITY].map(([, signal]) => signal);
   assert.ok(normalSignals.length >= 3 && normalSignals.every(signal => signal === normalSignals[0]));
+  assert.ok(burstSdSignals.length >= 2 && burstSdSignals.every(signal => signal === burstSignals[0]));
   assert.ok(burstSignals.length >= 6 && burstSignals.every(signal => signal === burstSignals[0]));
   assert.notEqual(normalSignals[0], burstSignals[0]);
   assert.ok(contexts.length > 0);
@@ -901,11 +1139,204 @@ test("SD cursor 뒤 밀린 segment를 오래된 순서로 따라잡고 짧은 UI
   assert.equal(calls[0].afterSegmentId, undefined);
   assert.equal(calls[0].initialSegmentCount, 1);
   assert.equal(calls[1].afterSegmentId, batchSegment(100).segmentId);
-  assert.equal(calls[1].initialSegmentCount, 6);
+  assert.equal(calls[1].initialSegmentCount, 12);
   assert.equal(calls[2].afterSegmentId, batchSegment(102).segmentId);
   const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
   assert.equal(stats.catchupSegments, 2);
   assert.equal(stats.segmentsProcessed, 4);
+});
+
+test("burst 중 SD fresh segment도 gate decode하며 cursor gap 없이 전진한다", async () => {
+  const sdBatches = [
+    [batchSegment(100, "SD-100")],
+    [batchSegment(101, "SD-101"), batchSegment(102, "SD-102"), batchSegment(103, "SD-103")],
+    [batchSegment(104, "SD-104")],
+  ];
+  const grayDecoded = [];
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      return quality === "SD"
+        ? sdBatches.shift()
+        : [batchSegment(100, "ORIGINAL-100")];
+    },
+    async decodeGrayFrame(segment) {
+      const label = segment.toString();
+      grayDecoded.push(label);
+      return grayFrameBatch(label === "SD-100" ? [1] : []);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(_segment, { sampleIndex }) {
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
+    },
+    async runOcr() {
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: false,
+        results: [],
+      };
+    },
+    queuePath: "/tmp/test-burst-sd-cursor.ndjson",
+  });
+
+  const normal = await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  const burst = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  const resumed = await fixture.monitor.executeTask({ lane: "normal", target: target() });
+
+  assert.equal(normal.uiCandidate, true);
+  assert.equal(burst.endBurst, true);
+  assert.equal(resumed.uiCandidate, false);
+  assert.deepEqual(grayDecoded, ["SD-100", "SD-101", "SD-102", "SD-103", "SD-104"]);
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.burstSdSegmentsAdvanced, 3);
+  assert.equal(stats.burstSdGateSegments, 3);
+  assert.equal(stats.burstSdSyncErrors, 0);
+  assert.equal(stats.sdSequenceGaps, 0);
+  assert.equal(stats.sdSegmentsMissed, 0);
+});
+
+test("burst OCR 실패 시 병렬로 받은 SD cursor는 확정하지 않고 normal에서 재검사한다", async () => {
+  const sdOptions = [];
+  const sdBatches = [
+    [batchSegment(110, "SD-110")],
+    [batchSegment(111, "SD-111"), batchSegment(112, "SD-112")],
+    [batchSegment(111, "SD-111"), batchSegment(112, "SD-112")],
+  ];
+  const grayDecoded = [];
+  const fixture = monitorFixture({
+    async fetchSegments(url, options) {
+      const quality = url.slice("memory:".length);
+      if (quality === "SD") {
+        sdOptions.push(options);
+        return sdBatches.shift();
+      }
+      return [batchSegment(110, "ORIGINAL-110")];
+    },
+    async decodeGrayFrame(segment) {
+      const label = segment.toString();
+      grayDecoded.push(label);
+      return grayFrameBatch(label === "SD-110" ? [1] : []);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(_segment, { sampleIndex }) {
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
+    },
+    async runOcr() { throw errorWithCode("ocr_failed"); },
+    queuePath: "/tmp/test-burst-sd-cursor-ocr-failure.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  await assert.rejects(
+    fixture.monitor.executeTask({ lane: "burst", target: target() }),
+    error => error.code === "ocr_failed",
+  );
+  const resumed = await fixture.monitor.executeTask({ lane: "normal", target: target() });
+
+  assert.equal(resumed.gate.processedSegments, 2);
+  assert.equal(sdOptions[1].afterSegmentId, batchSegment(110).segmentId);
+  assert.equal(sdOptions[2].afterSegmentId, batchSegment(110).segmentId);
+  assert.deepEqual(grayDecoded, ["SD-110", "SD-111", "SD-112", "SD-111", "SD-112"]);
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.burstSdSegmentsAdvanced, 0);
+  assert.equal(stats.sdSequenceGaps, 0);
+});
+
+test("burst 중 연속 SD 후보는 기존 archive를 덮지 않고 32개 FIFO로 보존·OCR한다", async () => {
+  let sdCall = 0;
+  let originalCall = 0;
+  let releaseOcr;
+  const ocrRelease = new Promise(resolve => { releaseOcr = resolve; });
+  const archiveBodies = new Map();
+  let archiveIndex = 0;
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      if (quality === "SD") {
+        sdCall += 1;
+        if (sdCall === 1) return [batchSegment(100, "SD-100")];
+        if (sdCall === 2) {
+          return Array.from({ length: 12 }, (_value, index) => (
+            batchSegment(101 + index, `SD-${101 + index}`)
+          ));
+        }
+        if (sdCall === 3) {
+          return Array.from({ length: 12 }, (_value, index) => (
+            batchSegment(113 + index, `SD-${113 + index}`)
+          ));
+        }
+        if (sdCall === 4) {
+          return Array.from({ length: 9 }, (_value, index) => (
+            batchSegment(125 + index, `SD-${125 + index}`)
+          ));
+        }
+        return [];
+      }
+      const sequence = 100 + originalCall;
+      originalCall += 1;
+      return [batchSegment(sequence, `ORIGINAL-${sequence}`)];
+    },
+    async decodeGrayFrame(segment) {
+      const label = segment.toString();
+      return grayFrameBatch(label.startsWith("SD-") ? [2] : []);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(segment, { sampleIndex }) {
+      const sequence = Number(segment.toString().match(/(\d+)$/)?.[1] || 0);
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([sequence & 0xff, sampleIndex])]);
+    },
+    async runOcr() {
+      await ocrRelease;
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: false,
+        results: [],
+      };
+    },
+    async archiveCandidateFrame(png) {
+      const reference = `fifo-${++archiveIndex}.png`;
+      archiveBodies.set(reference, png);
+      return reference;
+    },
+    async readCandidateFrame(reference) { return archiveBodies.get(reference); },
+    queuePath: "/tmp/test-burst-candidate-fifo.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  const firstPromise = fixture.monitor.executeTask({ lane: "burst", target: target() });
+  while (fixture.monitor.getSnapshot(BASE_TIME).stats.burstSdGateSegments < 12) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  await fixture.monitor.syncBurstSdCursor(target());
+  await fixture.monitor.syncBurstSdCursor(target());
+  const queuedSnapshot = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(queuedSnapshot.candidateQueueAdds, 32);
+  assert.equal(queuedSnapshot.candidateQueueDrops, 1);
+  assert.equal(queuedSnapshot.candidateQueueDepth, 32);
+
+  releaseOcr();
+  const first = await firstPromise;
+  assert.equal(first.continuedForQueuedCandidate, true);
+  assert.equal(first.ocr.frames.every(frame => frame.mediaSequence === 100), true);
+
+  const queued = [];
+  for (let index = 0; index < 32; index += 1) {
+    queued.push(await fixture.monitor.executeTask({ lane: "burst", target: target() }));
+  }
+  assert.deepEqual(
+    queued.map(result => result.ocr.frames[0]?.mediaSequence),
+    Array.from({ length: 32 }, (_value, index) => 101 + index),
+  );
+  const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
+  assert.equal(stats.burstSdGateSegments, 33);
+  assert.equal(stats.burstSdUiCandidates, 32);
+  assert.equal(stats.candidateQueueAdds, 32);
+  assert.equal(stats.candidateQueueDrops, 1);
+  assert.equal(stats.candidateQueueDepth, 0);
+  assert.ok(stats.candidateFramesLoaded >= 66);
 });
 
 test("batch 중간 decode 실패 시 성공한 cursor까지만 확정하고 실패 segment부터 재시도한다", async () => {
@@ -934,7 +1365,7 @@ test("batch 중간 decode 실패 시 성공한 cursor까지만 확정하고 실�
   assert.equal(calls[1].afterSegmentId, batchSegment(200).segmentId);
 });
 
-test("SD 후보와 같은 HD media sequence부터 OCR하고 숨김 두 frame이면 한 번에 burst를 끝낸다", async () => {
+test("SD 후보와 같은 ORIGINAL media sequence부터 OCR하고 숨김 두 frame이면 한 번에 burst를 끝낸다", async () => {
   const decoded = [];
   const fetchCalls = [];
   const fixture = monitorFixture({
@@ -955,7 +1386,7 @@ test("SD 후보와 같은 HD media sequence부터 OCR하고 숨김 두 frame이�
       return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]);
     },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: false, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: false, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });
@@ -966,11 +1397,224 @@ test("SD 후보와 같은 HD media sequence부터 OCR하고 숨김 두 frame이�
   assert.equal(burst.endBurst, true);
   assert.equal(burst.ocr.sequenceMatched, true);
   assert.deepEqual(decoded, ["hd-candidate", "hd-after"]);
-  assert.equal(fetchCalls[1].options.initialSegmentCount, 6);
+  const originalFetch = fetchCalls.find(call => call.quality === OCR_STREAM_QUALITY);
+  assert.equal(originalFetch.options.initialSegmentCount, 6);
   assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.earlyBurstEnds, 1);
 });
 
-test("SD 후보 순간의 HD frame을 즉시 보존하고 sequence가 달라도 저장 segment에서 OCR한다", async () => {
+test("SD와 ORIGINAL sequence가 같으면 후보 전·해당·후 frame을 즉시 보존한다", async () => {
+  const grayDecoded = [];
+  const pngDecoded = [];
+  const archiveBodies = new Map();
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      return quality === "SD"
+        ? [batchSegment(301, "sd-candidate")]
+        : [
+          batchSegment(300, "original-before"),
+          batchSegment(301, "original-candidate"),
+          batchSegment(302, "original-after"),
+        ];
+    },
+    async decodeGrayFrame(segment) {
+      const label = segment.toString();
+      grayDecoded.push(label);
+      return grayFrameBatch(label === "sd-candidate" ? [2] : []);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(segment, options) {
+      pngDecoded.push([segment.toString(), options.sampleIndex]);
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([options.sampleIndex])]);
+    },
+    async runOcr() {
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: true,
+        results: [],
+      };
+    },
+    async archiveCandidateFrame(png) {
+      const reference = `exact-${archiveBodies.size + 1}.png`;
+      archiveBodies.set(reference, png);
+      return reference;
+    },
+    async readCandidateFrame(reference) { return archiveBodies.get(reference); },
+    queuePath: "/tmp/test-exact-original-prefetch.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  assert.deepEqual(grayDecoded, ["sd-candidate"]);
+  const burst = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+  assert.deepEqual(grayDecoded, ["sd-candidate"]);
+  assert.deepEqual(pngDecoded, [
+    ["sd-candidate", 2],
+    ["sd-candidate", 3],
+    ["original-candidate", 2],
+    ["original-before", 7],
+    ["original-after", 0],
+    ["original-candidate", 3],
+  ]);
+  assert.equal(burst.ocr.frames.length, 4);
+});
+
+test("보존 ring 앞쪽이 숨김이어도 뒤쪽 ORIGINAL 후보까지 전부 OCR한다", async () => {
+  const archiveBodies = new Map();
+  const decoded = [];
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      return url === "memory:SD"
+        ? [batchSegment(301, "sd-candidate")]
+        : [
+          batchSegment(300, "original-before"),
+          batchSegment(301, "original-exact"),
+          batchSegment(302, "original-after"),
+        ];
+    },
+    async decodeGrayFrame(segment) {
+      return grayFrameBatch(segment.toString() === "sd-candidate" ? [2] : []);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(segment, { sampleIndex }) {
+      const label = segment.toString();
+      decoded.push([label, sampleIndex]);
+      return Buffer.concat([
+        PNG_SIGNATURE,
+        Buffer.from([label === "original-after" ? 1 : 0, sampleIndex]),
+      ]);
+    },
+    async runOcr(png) {
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: png.at(-2) === 1,
+        results: [],
+      };
+    },
+    async archiveCandidateFrame(png) {
+      const reference = `ring-${archiveBodies.size + 1}.png`;
+      archiveBodies.set(reference, png);
+      return reference;
+    },
+    async readCandidateFrame(reference) { return archiveBodies.get(reference); },
+    queuePath: "/tmp/test-archived-ring-tail.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  const burst = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+
+  assert.deepEqual(decoded, [
+    ["sd-candidate", 2],
+    ["sd-candidate", 3],
+    ["original-exact", 2],
+    ["original-before", 7],
+    ["original-after", 0],
+    ["original-exact", 3],
+  ]);
+  assert.equal(burst.ocr.frames.length, 4);
+  assert.equal(burst.ocr.panelVisible, true);
+  assert.equal(burst.ocr.endBurst, false);
+});
+
+test("90-stream 순간 후보 prefetch도 ORIGINAL 동시 작업을 12개로 제한한다", async () => {
+  const targets = Array.from({ length: 13 }, (_value, index) => {
+    const playerId = `P${String(index + 1).padStart(3, "0")}`;
+    const bjId = `sample_${index + 1}`;
+    return {
+      id: playerId,
+      playerId,
+      bjId,
+      sourceUrl: `https://play.sooplive.com/${bjId}`,
+      enabled: true,
+    };
+  });
+  let releaseOriginal;
+  const originalReady = new Promise(resolve => { releaseOriginal = resolve; });
+  let originalCalls = 0;
+  let archiveIndex = 0;
+  let releaseFallback;
+  const fallbackReady = new Promise(resolve => { releaseFallback = resolve; });
+  const archiveBodies = new Map();
+  const archiveTargets = new Map();
+  const loaded = [];
+  const monitor = createSamgukHlsMonitor({
+    targets,
+    baselines: [],
+    clock: () => BASE_TIME,
+    schedulerOptions: {
+      ...DEFAULT_SCHEDULER_OPTIONS,
+      initialSpreadMs: 0,
+      jitterRatio: 0,
+    },
+    hlsCache: {
+      async get(_bjId, quality) { return { hlsUrl: `memory:${quality}` }; },
+      async invalidate() {},
+    },
+    async fetchSegments(url) {
+      if (url === "memory:ORIGINAL") {
+        originalCalls += 1;
+        await originalReady;
+        return [batchSegment(10, "original-candidate")];
+      }
+      return [batchSegment(10, "sd-candidate")];
+    },
+    async decodeGrayFrame() { return grayFrameBatch([2]); },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(_segment, { sampleIndex }) {
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
+    },
+    async runOcr() {
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: true,
+        results: [],
+      };
+    },
+    async archiveCandidateFrame(png, metadata) {
+      if (metadata.targetId === "P013") await fallbackReady;
+      const reference = `bounded-${++archiveIndex}.png`;
+      archiveBodies.set(reference, png);
+      archiveTargets.set(reference, metadata.targetId);
+      return reference;
+    },
+    async readCandidateFrame(reference) {
+      loaded.push(reference);
+      return archiveBodies.get(reference);
+    },
+    queuePath: "/tmp/test-bounded-eager-prefetch.ndjson",
+  });
+
+  await Promise.all(targets.map(item => monitor.executeTask({ lane: "normal", target: item })));
+  assert.equal(originalCalls, 12);
+  assert.equal(monitor.getSnapshot(BASE_TIME).stats.candidatePrefetchesActive, 12);
+  assert.equal(monitor.getSnapshot(BASE_TIME).stats.candidatePrefetchSaturated, 1);
+  assert.equal(monitor.getSnapshot(BASE_TIME).stats.candidateFallbackArchiveStarts, 1);
+  assert.equal(monitor.getSnapshot(BASE_TIME).stats.candidateFallbackArchivesActive, 1);
+  assert.equal(monitor.getSnapshot(BASE_TIME).stats.candidateFallbackArchiveSaturated, 0);
+
+  releaseFallback();
+  while (monitor.getSnapshot(BASE_TIME).stats.candidateFallbackArchivesActive > 0) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  const fallbackOcr = await monitor.scanOcr(targets[12]);
+  assert.equal(originalCalls, 12);
+  assert.equal(fallbackOcr.frames.length, 2);
+  assert.equal(loaded.length, 2);
+  assert.equal(loaded.every(reference => archiveTargets.get(reference) === "P013"), true);
+
+  releaseOriginal();
+  while (monitor.getSnapshot(BASE_TIME).stats.candidatePrefetchesActive > 0) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(monitor.getSnapshot(BASE_TIME).stats.candidatePrefetchStarts, 12);
+});
+
+test("SD 후보는 normal 반환과 동시에 ORIGINAL prefetch를 시작하고 sequence가 달라도 저장본으로 OCR한다", async () => {
   const fetchQualities = [];
   const archived = [];
   const archiveBodies = new Map();
@@ -998,7 +1642,7 @@ test("SD 후보 순간의 HD frame을 즉시 보존하고 sequence가 달라도 
       return Buffer.concat([PNG_SIGNATURE, Buffer.from([options.sampleIndex])]);
     },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: true, results: [] };
     },
     async archiveCandidateFrame(png, context) {
       archived.push({ png, context });
@@ -1015,21 +1659,25 @@ test("SD 후보 순간의 HD frame을 즉시 보존하고 sequence가 달라도 
 
   const normal = await fixture.monitor.executeTask({ lane: "normal", target: target() });
   assert.equal(normal.uiCandidate, true);
-  assert.deepEqual(fetchQualities, ["SD", "HD"]);
-  assert.equal(archived.length, 2);
 
   const burst = await fixture.monitor.executeTask({ lane: "burst", target: target() });
   assert.equal(burst.ocr.sequenceMissed, false);
   assert.equal(burst.ocr.frames.length, 2);
-  assert.deepEqual(fetchQualities, ["SD", "HD"]);
+  assert.equal(fetchQualities[0], "SD");
+  assert.deepEqual(fetchQualities.slice(1).sort(), [OCR_STREAM_QUALITY, "SD"].sort());
   assert.deepEqual(pngDecoded, [
+    ["sd-candidate", 1],
+    ["sd-candidate", 2],
     ["hd-candidate", 2],
     ["hd-candidate", 3],
   ]);
-  assert.deepEqual(loaded, ["candidate-1.png", "candidate-2.png"]);
+  assert.deepEqual(loaded, ["candidate-3.png", "candidate-4.png"]);
   const stats = fixture.monitor.getSnapshot(BASE_TIME).stats;
   assert.equal(stats.candidateFramePrefetches, 1);
-  assert.equal(stats.candidateFramesArchived, 2);
+  assert.equal(stats.candidatePrefetchStarts, 1);
+  assert.equal(stats.candidatePrefetchesActive, 0);
+  assert.equal(stats.candidateFramesArchived, 4);
+  assert.equal(stats.candidateSdFallbackArchivedFrames, 2);
   assert.equal(stats.candidateFramesLoaded, 2);
   assert.equal(stats.candidateFramesPending, 0);
   assert.equal(stats.candidateFrameCaptureErrors, 0);
@@ -1057,7 +1705,7 @@ test("보존 frame 읽기 실패 뒤에도 pending을 유지해 다음 burst에�
       return png;
     },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: true, results: [] };
     },
     queuePath: "/tmp/test-prefetched-retry.ndjson",
   });
@@ -1073,7 +1721,7 @@ test("보존 frame 읽기 실패 뒤에도 pending을 유지해 다음 burst에�
   assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.candidateFramesPending, 0);
 });
 
-test("HD가 SD 후보 sequence보다 늦게 도착하면 이전 구간은 건너뛰고 같은 sequence를 기다린다", async () => {
+test("ORIGINAL이 SD 후보 sequence보다 늦게 도착하면 이전 구간은 건너뛰고 같은 sequence를 기다린다", async () => {
   let hdCall = 0;
   let ocrRuns = 0;
   const hdOptions = [];
@@ -1091,7 +1739,7 @@ test("HD가 SD 후보 sequence보다 늦게 도착하면 이전 구간은 건너
     async decodePngFrame() { return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); },
     async runOcr() {
       ocrRuns += 1;
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: true, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });
@@ -1100,10 +1748,65 @@ test("HD가 SD 후보 sequence보다 늦게 도착하면 이전 구간은 건너
   const waiting = await fixture.monitor.executeTask({ lane: "burst", target: target() });
   const matched = await fixture.monitor.executeTask({ lane: "burst", target: target() });
   assert.equal(waiting.ocr.waitingForCandidateSequence, true);
-  assert.equal(waiting.uiCandidate, false);
+  assert.equal(waiting.uiCandidate, true);
   assert.equal(ocrRuns, 1);
   assert.equal(matched.ocr.sequenceMatched, true);
   assert.equal(hdOptions[1].afterSegmentId, batchSegment(400).segmentId);
+});
+
+test("ORIGINAL이 늦어도 감지 당시 SD fallback frame을 보존해 바로 OCR한다", async () => {
+  let originalCall = 0;
+  const archivedSequences = [];
+  const archiveBodies = new Map();
+  const decodedLabels = [];
+  const fixture = monitorFixture({
+    async fetchSegments(url) {
+      const quality = url.slice("memory:".length);
+      if (quality === "SD") return [batchSegment(401, "sd-candidate")];
+      originalCall += 1;
+      return originalCall === 1
+        ? [batchSegment(399, "original-old-399"), batchSegment(400, "original-old-400")]
+        : [batchSegment(401, "original-candidate-401")];
+    },
+    async decodeGrayFrame(segment) {
+      return grayFrameBatch(segment.toString() === "sd-candidate" ? [2] : []);
+    },
+    gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+    async decodePngFrame(segment, { sampleIndex }) {
+      decodedLabels.push([segment.toString(), sampleIndex]);
+      return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
+    },
+    async runOcr() {
+      return {
+        version: 2,
+        profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
+        panelVisible: true,
+        results: [],
+      };
+    },
+    async archiveCandidateFrame(png, context) {
+      archivedSequences.push(context.mediaSequence);
+      const reference = `lag-${archiveBodies.size + 1}.png`;
+      archiveBodies.set(reference, png);
+      return reference;
+    },
+    async readCandidateFrame(reference) { return archiveBodies.get(reference); },
+    queuePath: "/tmp/test-eager-original-lag.ndjson",
+  });
+
+  await fixture.monitor.executeTask({ lane: "normal", target: target() });
+  const burst = await fixture.monitor.executeTask({ lane: "burst", target: target() });
+
+  assert.equal(originalCall, 1);
+  assert.deepEqual(archivedSequences, [401, 401]);
+  assert.deepEqual(decodedLabels, [
+    ["sd-candidate", 2],
+    ["sd-candidate", 3],
+  ]);
+  assert.equal(burst.ocr.frames.length, 2);
+  assert.equal(burst.ocr.frames.every(frame => frame.mediaSequence === 401), true);
+  assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.candidateSdFallbackUses, 1);
 });
 
 test("batch segment ID와 media sequence 순서를 신뢰하지 않고 monitor 경계에서 재검증한다", async () => {
@@ -1118,7 +1821,7 @@ test("batch segment ID와 media sequence 순서를 신뢰하지 않고 monitor �
   );
 });
 
-test("같은 segment의 인접 frame은 보류하고 다음 segment에서 같은 값일 때 교차확인한다", async () => {
+test("순간 panel 값은 같은 segment의 서로 다른 frame으로 확인하고 중복 승격하지 않는다", async () => {
   const sampleIndices = [];
   const appendCalls = [];
   let hdRequests = 0;
@@ -1141,6 +1844,7 @@ test("같은 segment의 인접 frame은 보류하고 다음 segment에서 같은
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [{ field: "strength", value: 11, confidence: 0.99 }],
       };
@@ -1157,12 +1861,12 @@ test("같은 segment의 인접 frame은 보류하고 다음 segment에서 같은
   assert.equal(normal.gate.sampleIndex, 3);
   assert.equal(firstBurst.ocr.sequenceMatched, true);
   assert.deepEqual(sampleIndices, [3, 4]);
-  assert.equal(appendCalls.length, 0);
+  assert.equal(appendCalls.length, 1);
+  assert.equal(appendCalls[0].length, 2);
 
   await fixture.monitor.executeTask({ lane: "burst", target: target() });
   assert.deepEqual(sampleIndices, [3, 4, 3, 4]);
   assert.equal(appendCalls.length, 1);
-  assert.equal(appendCalls[0].length, 2);
   assert.equal(new Set(appendCalls[0].map(item => item.sourceId)).size, 2);
   assert.equal(new Set(appendCalls[0].map(item => item.evidenceHash)).size, 2);
 });
@@ -1191,6 +1895,7 @@ test("generic gate가 HUD를 놓쳐도 분산 probe가 플레이어·말 HP를 �
       return {
         version: 2,
         profileId: "hud-combat-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: true,
         results: [
           { field: "maxHealth", value: 1239, confidence: 0.99 },
@@ -1233,6 +1938,46 @@ test("generic gate가 HUD를 놓쳐도 분산 probe가 플레이어·말 HP를 �
   assert.equal(stats.earlyBurstEnds, 1);
 });
 
+test("HUD panelVisible만 있거나 HP만 있으면 burst를 유지하지 않고 실제 panel field만 유지한다", async () => {
+  async function runHud(results) {
+    const fixture = monitorFixture({
+      profileId: "hud-combat-v1",
+      async fetchSegments(url) {
+        const quality = url.slice("memory:".length);
+        return [batchSegment(800, `${quality}-800`)];
+      },
+      async decodeGrayFrame() { return grayFrameBatch([2]); },
+      gate(frame) { return { uiCandidate: frame[0] === 1, reason: "test" }; },
+      async decodePngFrame(_segment, { sampleIndex }) {
+        return Buffer.concat([PNG_SIGNATURE, Buffer.from([sampleIndex])]);
+      },
+      async runOcr() {
+        return {
+          version: 2,
+          profileId: "hud-combat-v1",
+          seasonId: CURRENT_SEASON_ID,
+          panelVisible: true,
+          results,
+        };
+      },
+      queuePath: "/tmp/test-hud-burst-visibility.ndjson",
+    });
+    await fixture.monitor.executeTask({ lane: "normal", target: target() });
+    return fixture.monitor.executeTask({ lane: "burst", target: target() });
+  }
+
+  const empty = await runHud([]);
+  const passive = await runHud([{ field: "maxHealth", value: 1234, confidence: 0.99 }]);
+  const transient = await runHud([{ field: "strength", value: 77, confidence: 0.99 }]);
+
+  assert.equal(empty.uiCandidate, false);
+  assert.equal(passive.uiCandidate, false);
+  assert.equal(transient.uiCandidate, true);
+  assert.equal(empty.ocr.frames.every(frame => frame.burstVisible === false), true);
+  assert.equal(passive.ocr.frames.every(frame => frame.burstVisible === false), true);
+  assert.equal(transient.ocr.frames.some(frame => frame.burstVisible === true), true);
+});
+
 test("segment의 모든 후보 run을 수집하고 뒤쪽 후보까지 OCR한 후에만 hidden 종료를 판단한다", async () => {
   const gatedSamples = [];
   const decodedSamples = [];
@@ -1255,6 +2000,7 @@ test("segment의 모든 후보 run을 수집하고 뒤쪽 후보까지 OCR한 �
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: sampleIndex >= 6,
         results: [],
       };
@@ -1277,7 +2023,7 @@ test("segment의 모든 후보 run을 수집하고 뒤쪽 후보까지 OCR한 �
   assert.equal(burst.ocr.endBurst, false);
 });
 
-test("burst 후속 HD segment도 8-sample gate로 뒤 sample의 두 번째 UI를 찾아 선택 OCR한다", async () => {
+test("burst 후속 ORIGINAL segment도 8-sample gate로 뒤 sample의 두 번째 UI를 찾아 선택 OCR한다", async () => {
   const grayDecoded = [];
   const pngDecoded = [];
   const fixture = monitorFixture({
@@ -1306,6 +2052,7 @@ test("burst 후속 HD segment도 8-sample gate로 뒤 sample의 두 번째 UI를
       return {
         version: 2,
         profileId: "stats-panel-v1",
+        seasonId: CURRENT_SEASON_ID,
         panelVisible: (!isFollowup && sampleIndex === 1) || (isFollowup && sampleIndex === 6),
         results: [],
       };
@@ -1328,7 +2075,7 @@ test("burst 후속 HD segment도 8-sample gate로 뒤 sample의 두 번째 UI를
   assert.equal(fixture.monitor.getSnapshot(BASE_TIME).stats.ocrRuns, 4);
 });
 
-test("후속 HD segment의 8개 gate가 모두 숨김이면 PNG 없이 segment당 hidden 1회로 세어 두 번에 종료한다", async () => {
+test("후속 ORIGINAL segment의 8개 gate가 모두 숨김이면 PNG 없이 segment당 hidden 1회로 세어 두 번에 종료한다", async () => {
   const grayDecoded = [];
   const pngDecoded = [];
   const fixture = monitorFixture({
@@ -1352,7 +2099,7 @@ test("후속 HD segment의 8개 gate가 모두 숨김이면 PNG 없이 segment�
       return Buffer.concat([PNG_SIGNATURE, Buffer.from([options.sampleIndex])]);
     },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: true, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: true, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });
@@ -1446,7 +2193,7 @@ test("Sheet baseline은 값이 실제 변경될 때만 tracker에 원자 재적�
   const fixture = monitorFixture({
     async decodePngFrame() { return Buffer.concat([PNG_SIGNATURE, Buffer.from([1])]); },
     async runOcr() {
-      return { version: 2, profileId: "stats-panel-v1", panelVisible: false, results: [] };
+      return { version: 2, profileId: "stats-panel-v1", seasonId: CURRENT_SEASON_ID, panelVisible: false, results: [] };
     },
     queuePath: "/tmp/test-observations.ndjson",
   });

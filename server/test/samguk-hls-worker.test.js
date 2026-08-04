@@ -17,8 +17,10 @@ const {
   loadQueuedBaselineOverlays,
   main,
   normalizeWorkerConfig,
+  safeErrorIdentity,
   safeHeartbeat,
 } = require("../workers/samguk-hls-monitor");
+const { CURRENT_SEASON_ID } = require("../lib/samguk-observations");
 
 const FIXED_NOW = Date.parse("2026-08-02T12:00:00.000Z");
 const CONFIRMED_AT = Date.parse("2026-08-02T10:00:02.000Z");
@@ -30,6 +32,7 @@ function broadcastObservation({
   observedAt = "2026-08-02T10:00:00.000Z",
 } = {}) {
   return {
+    seasonId: CURRENT_SEASON_ID,
     playerId: "P001",
     field: "strength",
     value,
@@ -66,16 +69,19 @@ function rejectsConfig(input) {
   );
 }
 
-test("v2 기본 설정은 90개 SD 감시와 제한된 HD burst 값을 고정한다", () => {
+test("v2 기본 설정은 90개 SD 감시와 제한된 ORIGINAL burst·전체 동시성을 고정한다", () => {
   const normalized = config();
   assert.equal(normalized.mode, "all-90");
   assert.equal(normalized.hls.cacheTtlMs, 60_000);
   assert.equal(normalized.hls.maxBatchBytes, 32 * 1024 * 1024);
-  assert.equal(normalized.hls.maxCatchupSegments, 6);
+  assert.equal(normalized.hls.maxCatchupSegments, 12);
+  assert.equal(normalized.hls.segmentConcurrency, 1);
+  assert.equal(normalized.hls.ocrSegmentConcurrency, 3);
   assert.equal(normalized.ocr.baselineRefreshMs, 60_000);
-  assert.equal(normalized.scheduler.liveIntervalMs, 2_000);
-  assert.equal(normalized.scheduler.normalConcurrency, 40);
-  assert.equal(normalized.scheduler.burstConcurrency, 3);
+  assert.equal(normalized.scheduler.liveIntervalMs, 1_000);
+  assert.equal(normalized.scheduler.normalConcurrency, 56);
+  assert.equal(normalized.scheduler.burstConcurrency, 8);
+  assert.equal(normalized.scheduler.maxActiveTasks, 64);
   assert.equal(normalized.scheduler.taskLeaseMs, 120_000);
   assert.equal(normalized.ocr.enabled, false);
   assert.equal(configuredTargets(normalized).length, 90);
@@ -89,9 +95,12 @@ test("nested config·주기·OCR command와 알 수 없는 key를 엄격히 검�
     { version: 2, permissionConfirmed: "yes" },
     { version: 2, permissionConfirmed: false, hls: null },
     { version: 2, permissionConfirmed: false, hls: { maxCatchupSegments: 13 } },
+    { version: 2, permissionConfirmed: false, hls: { segmentConcurrency: 5 } },
+    { version: 2, permissionConfirmed: false, hls: { ocrSegmentConcurrency: 5 } },
     { version: 2, permissionConfirmed: false, hls: { maxBatchBytes: 64 * 1024 * 1024 + 1 } },
     { version: 2, permissionConfirmed: false, ffmpeg: { path: "ffmpeg" } },
     { version: 2, permissionConfirmed: false, scheduler: { burstIntervalMs: 3_000 } },
+    { version: 2, permissionConfirmed: false, scheduler: { normalConcurrency: 65, maxActiveTasks: 64 } },
     { version: 2, mode: "partial", permissionConfirmed: false },
     { version: 2, mode: "single-target-dry-run", permissionConfirmed: false },
     {
@@ -177,11 +186,14 @@ test("명시적 활성화와 권한 확인, mode별 target 수를 모두 요구�
   );
 });
 
-test("runtime은 SD/HD resolver, cache, segment fetcher와 ffmpeg를 한 번씩 조립한다", () => {
-  const normalized = singleTargetConfig({ permissionConfirmed: true });
-  const calls = { resolver: [], cache: null, segment: null, frame: null, monitor: null };
+test("runtime은 SD/ORIGINAL segment fetcher의 동시성을 분리해 조립한다", () => {
+  const normalized = singleTargetConfig({
+    permissionConfirmed: true,
+    hls: { segmentConcurrency: 2, ocrSegmentConcurrency: 4 },
+  });
+  const calls = { resolver: [], cache: null, segment: [], frame: null, monitor: null };
   const fakeCache = { get() {}, invalidate() {}, getSnapshot() {} };
-  const fakeSegment = async () => Buffer.from([1]);
+  const fakeSegments = [async () => Buffer.from([1]), async () => Buffer.from([2])];
   const fakeFrames = { captureGrayFrame: async () => Buffer.alloc(1296), captureOcrPng: async () => Buffer.alloc(8) };
   const fakeMonitor = { runLoop() {}, getSnapshot() {} };
   const runtime = createRuntime(normalized, {
@@ -192,22 +204,29 @@ test("runtime은 SD/HD resolver, cache, segment fetcher와 ffmpeg를 한 번씩 
       return async () => ({});
     },
     cacheFactory(options) { calls.cache = options; return fakeCache; },
-    segmentFetcherFactory(options) { calls.segment = options; return fakeSegment; },
+    segmentFetcherFactory(options) {
+      calls.segment.push(options);
+      return fakeSegments[calls.segment.length - 1];
+    },
     frameFactory(options) { calls.frame = options; return fakeFrames; },
     monitorFactory(options) { calls.monitor = options; return fakeMonitor; },
   });
 
-  assert.deepEqual(calls.resolver.map(item => item.quality), ["SD", "HD"]);
+  assert.deepEqual(calls.resolver.map(item => item.quality), ["SD", "ORIGINAL"]);
   assert.equal(calls.cache.maxBjIds, 1);
-  assert.equal(calls.segment.maxSegmentBytes, normalized.hls.maxSegmentBytes);
-  assert.equal(calls.segment.maxBatchBytes, normalized.hls.maxBatchBytes);
-  assert.equal(calls.segment.maxSegments, normalized.hls.maxCatchupSegments);
+  assert.equal(calls.segment.length, 2);
+  assert.equal(calls.segment[0].maxSegmentBytes, normalized.hls.maxSegmentBytes);
+  assert.equal(calls.segment[0].maxBatchBytes, normalized.hls.maxBatchBytes);
+  assert.equal(calls.segment[0].maxSegments, normalized.hls.maxCatchupSegments);
+  assert.equal(calls.segment[0].segmentConcurrency, normalized.hls.segmentConcurrency);
+  assert.equal(calls.segment[1].segmentConcurrency, normalized.hls.ocrSegmentConcurrency);
   assert.equal(calls.frame.ffmpegPath, "/usr/bin/ffmpeg");
   assert.equal(calls.monitor.targets.length, 90);
   assert.equal(calls.monitor.targets.filter(item => item.enabled).length, 1);
   assert.equal(calls.monitor.runOcr, undefined);
-  assert.equal(calls.monitor.fetchSegments, fakeSegment);
-  assert.equal(calls.monitor.maxCatchupSegments, 6);
+  assert.equal(calls.monitor.fetchSegments, fakeSegments[0]);
+  assert.equal(calls.monitor.fetchOcrSegments, fakeSegments[1]);
+  assert.equal(calls.monitor.maxCatchupSegments, 12);
   assert.equal(runtime.monitor, fakeMonitor);
 });
 
@@ -328,6 +347,7 @@ test("최신 Google Sheet만 OCR baseline으로 변환한다", async () => {
     service: {
       async load() {
         return {
+          seasonId: CURRENT_SEASON_ID,
           source: "google-sheet",
           stale: false,
           members: [{
@@ -359,6 +379,16 @@ test("최신 Google Sheet만 OCR baseline으로 변환한다", async () => {
   await assert.rejects(
     () => loadCurrentBaselines(targets, {
       service: { async load() { return { source: "fallback-seed", stale: true, members: [] }; } },
+    }),
+    error => error.code === "baseline_unavailable",
+  );
+  await assert.rejects(
+    () => loadCurrentBaselines(targets, {
+      service: {
+        async load() {
+          return { seasonId: "samguk-2026-08-01", source: "google-sheet", stale: false, members: [] };
+        },
+      },
     }),
     error => error.code === "baseline_unavailable",
   );
@@ -593,6 +623,141 @@ test("OCR main은 장기 실행 중 최신 Sheet baseline을 주기적으로 다
   }
 });
 
+test("기본 baseline loader는 Sheet service를 한 번 생성해 refresh에서도 재사용한다", async (t) => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "samguk-hls-sheet-reuse-test-"));
+  t.after(() => fs.rmSync(stateDir, { recursive: true, force: true }));
+  const normalized = singleTargetConfig({
+    permissionConfirmed: true,
+    ocr: {
+      enabled: true,
+      command: "/opt/samguk/venv/bin/python",
+      args: ["/opt/samguk/adapter.py"],
+    },
+  });
+  const targets = configuredTargets(normalized);
+  const warnings = [];
+  let serviceCreates = 0;
+  let serviceLoads = 0;
+  let refreshCalls = 0;
+  let startupBaselines;
+  const sheetService = {
+    async load() {
+      serviceLoads += 1;
+      const payload = {
+        seasonId: CURRENT_SEASON_ID,
+        source: "google-sheet",
+        stale: false,
+        members: targets.map(target => ({ soopId: target.bjId, level: 10 })),
+      };
+      if (serviceLoads === 1) return payload;
+      return {
+        ...payload,
+        source: "google-sheet-last-good",
+        stale: true,
+      };
+    },
+  };
+
+  await main({
+    env: {
+      SAMGUK_HLS_MONITOR_ENABLED: "1",
+      SAMGUK_HLS_MONITOR_CONFIG: "/not/read/in/test.json",
+      SAMGUK_HLS_MONITOR_STATE_DIR: stateDir,
+    },
+    logger: { log() {}, warn: message => warnings.push(message) },
+    loadConfig: () => normalized,
+    createSamgukSheetServiceFn() {
+      serviceCreates += 1;
+      return sheetService;
+    },
+    runtimeFactory: (_config, options) => {
+      startupBaselines = options.baselines;
+      return {
+        monitor: {
+          async runLoop() { await new Promise(resolve => setTimeout(resolve, 35)); },
+          refreshBaselines() { refreshCalls += 1; },
+          getSnapshot: () => ({ activeTasks: 0, ocrEnabled: true, scheduler: { counts: {} }, stats: {} }),
+        },
+        hlsCache: { getSnapshot: () => ({ bjCount: 0, cachedCount: 0, pendingCount: 0 }) },
+      };
+    },
+    baselineRefreshMs: 10,
+    heartbeatMs: 1_000,
+  });
+
+  assert.equal(serviceCreates, 1);
+  assert.ok(serviceLoads >= 2);
+  assert.equal(startupBaselines.length, 90);
+  assert.deepEqual(
+    startupBaselines.find(item => item.playerId === "P001"),
+    { playerId: "P001", field: "level", value: 10 },
+  );
+  assert.equal(refreshCalls, 0);
+  assert.ok(warnings.includes(
+    '[samguk-hls-monitor] baseline_refresh_failed {"code":"baseline_unavailable","name":"SamgukHlsWorkerError"}',
+  ));
+});
+
+test("baseline refresh 실패 로그는 정규화된 code와 name만 남긴다", async (t) => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "samguk-hls-baseline-error-log-test-"));
+  t.after(() => fs.rmSync(stateDir, { recursive: true, force: true }));
+  const normalized = singleTargetConfig({
+    permissionConfirmed: true,
+    ocr: {
+      enabled: true,
+      command: "/opt/samguk/venv/bin/python",
+      args: ["/opt/samguk/adapter.py"],
+    },
+  });
+  const warnings = [];
+  let loadCalls = 0;
+  const refreshError = new Error("https://oauth.example/token?secret=must-not-leak");
+  refreshError.code = "upstream_timeout";
+  refreshError.name = "SamgukSheetError";
+
+  await main({
+    env: {
+      SAMGUK_HLS_MONITOR_ENABLED: "1",
+      SAMGUK_HLS_MONITOR_CONFIG: "/not/read/in/test.json",
+      SAMGUK_HLS_MONITOR_STATE_DIR: stateDir,
+    },
+    logger: { log() {}, warn: message => warnings.push(message) },
+    loadConfig: () => normalized,
+    baselineLoader: async () => {
+      loadCalls += 1;
+      if (loadCalls === 1) return [{ playerId: "P001", field: "level", value: 10 }];
+      throw refreshError;
+    },
+    runtimeFactory: () => ({
+      monitor: {
+        async runLoop() { await new Promise(resolve => setTimeout(resolve, 25)); },
+        refreshBaselines() {},
+        getSnapshot: () => ({ activeTasks: 0, ocrEnabled: true, scheduler: { counts: {} }, stats: {} }),
+      },
+      hlsCache: { getSnapshot: () => ({ bjCount: 0, cachedCount: 0, pendingCount: 0 }) },
+    }),
+    baselineRefreshMs: 10,
+    heartbeatMs: 1_000,
+  });
+
+  assert.ok(warnings.includes(
+    '[samguk-hls-monitor] baseline_refresh_failed {"code":"upstream_timeout","name":"SamgukSheetError"}',
+  ));
+  assert.doesNotMatch(warnings.join("\n"), /must-not-leak|oauth\.example/);
+});
+
+test("오류 identity의 비정상 값과 getter 예외는 로그용 fallback으로 치환한다", () => {
+  const unsafe = { code: "SecretToken123", name: "SecretToken123" };
+  assert.deepEqual(safeErrorIdentity(unsafe), { code: "unknown", name: "Error" });
+
+  const throwing = {};
+  Object.defineProperties(throwing, {
+    code: { get() { throw new Error("code-secret"); } },
+    name: { get() { throw new Error("name-secret"); } },
+  });
+  assert.deepEqual(safeErrorIdentity(throwing), { code: "unknown", name: "Error" });
+});
+
 test("runLoop 실패 뒤 늦게 끝난 baseline refresh는 monitor 상태를 변경하지 않는다", async (t) => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "samguk-hls-late-refresh-test-"));
   t.after(() => fs.rmSync(stateDir, { recursive: true, force: true }));
@@ -659,6 +824,7 @@ test("heartbeat에는 aggregate만 남기고 URL·AID·BJ ID를 포함하지 않
   ];
   const snapshot = {
     activeTasks: 2,
+    maxActiveTasks: 64,
     ocrEnabled: true,
     scheduler: { counts: { live: 1, burst: 1 }, targets: targetStates },
     stats: { tasks: 100, lastErrorCode: null },
@@ -673,6 +839,7 @@ test("heartbeat에는 aggregate만 남기고 URL·AID·BJ ID를 포함하지 않
   assert.equal(heartbeat.totalTargetCount, 2);
   assert.equal(heartbeat.enabledCount, 1);
   assert.equal(heartbeat.disabledCount, 1);
+  assert.equal(heartbeat.maxActiveTasks, 64);
   assert.match(heartbeat.targetSetDigest, /^[a-f0-9]{16}$/);
   assert.equal(heartbeat.targetSetDigest, reordered.targetSetDigest);
   const visible = JSON.stringify(heartbeat);

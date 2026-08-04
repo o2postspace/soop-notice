@@ -10,6 +10,7 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const {
   ALLOWED_FIELDS,
+  CURRENT_SEASON_ID,
   MIN_BROADCAST_CONFIDENCE,
   PLAYER_ID_PATTERN,
   appendObservationQueue,
@@ -456,6 +457,7 @@ function createMonitor(options) {
 
       const timestamp = new Date(observedAtMs).toISOString();
       const observation = normalizeObservation({
+        seasonId: CURRENT_SEASON_ID,
         playerId: target.playerId,
         field: roi.field,
         value: ocr.value,

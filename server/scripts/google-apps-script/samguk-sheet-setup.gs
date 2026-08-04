@@ -1,5 +1,5 @@
 /**
- * SOOPNOTICE 삼국지 Google Sheet 원장 설치기.
+ * SOOPNOTICE 후국지 Google Sheet 원장 설치기.
  *
  * 사용법
  * 1. 대상 Spreadsheet에 바인딩된 Apps Script 프로젝트를 엽니다.
@@ -11,7 +11,8 @@
  * 백업_YYYYMMDD_HHmmss_탭이름으로 보존하고 공통 열을 새 탭으로 이관합니다.
  */
 
-var SAMGUK_SETUP_VERSION = "2026.08.03.8";
+var SAMGUK_SETUP_VERSION = "2026.08.05.1";
+var SAMGUK_SETUP_SEASON_ID = "hugukji-2026-08-04";
 var SAMGUK_SETUP_MAX_INPUT_ROW = 5001;
 var SAMGUK_SETUP_PROTECTION_PREFIX = "[SOOPNOTICE_SETUP]";
 var SAMGUK_SETUP_SHEET_ORDER = [
@@ -20,7 +21,7 @@ var SAMGUK_SETUP_SHEET_ORDER = [
 ];
 
 var SAMGUK_SETUP_HEADERS = {
-  "사용법": ["삼국지 방송 추적 운영 시트"],
+  "사용법": ["후국지 방송 추적 운영 시트"],
   "게임정보": ["분류", "항목", "내용", "출처URL", "기준일", "검수상태"],
   "기준정보": [
     "국가", "", "활동상태", "", "근거종류", "", "검증상태", "", "모니터링상태", "",
@@ -44,7 +45,7 @@ var SAMGUK_SETUP_HEADERS = {
     "체력", "현재장수", "방어력", "공격력증가(%)", "피해감소(%)", "치명타확률(%)",
     "치명타피해(%)", "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
     "무력보너스", "기민보너스", "기력보너스", "지모보너스",
-    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량"
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량", "절기배분"
   ],
   "현재현황": [
     "player_id", "국가", "세력/길드", "닉네임", "SOOP_ID", "장수/직업", "레벨", "말",
@@ -56,7 +57,8 @@ var SAMGUK_SETUP_HEADERS = {
     "공격력증가(%)", "피해감소(%)", "치명타확률(%)", "치명타피해(%)",
     "스킬쿨타임감소(%)", "스킬피해증가(%)", "이동속도증가(%)", "말최대체력",
     "무력보너스", "기민보너스", "기력보너스", "지모보너스",
-    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량"
+    "공격력증가량", "이동속도증가량", "체력증가량", "절기가속증가량", "절기배분",
+    "스킬강화합", "스킬강화현황"
   ],
   "장비현황": [
     "닉네임", "SOOP_ID", "무기각인1", "무기각인2", "무기각인3",
@@ -99,8 +101,8 @@ var SAMGUK_SETUP_SPECS = {
   "기준정보": { rows: 20, freezeRows: 1, freezeColumns: 0, tabColor: "#8497B0" },
   "참가자": { rows: 91, freezeRows: 1, freezeColumns: 1, filter: "A1:J91", tabColor: "#70AD47" },
   "방송모니터링": { rows: 91, freezeRows: 1, freezeColumns: 1, filter: "A1:P91", tabColor: "#00B0F0" },
-  "관측입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:AX5001", tabColor: "#FFC000" },
-  "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:BC91", tabColor: "#4472C4" },
+  "관측입력": { rows: 5001, freezeRows: 1, freezeColumns: 5, filter: "A1:AY5001", tabColor: "#FFC000" },
+  "현재현황": { rows: 91, freezeRows: 1, freezeColumns: 6, filter: "A1:BF91", tabColor: "#4472C4" },
   "장비현황": { rows: 91, freezeRows: 1, freezeColumns: 2, filter: "A1:R91", tabColor: "#BF9000" },
   "무력랭킹": { rows: 91, freezeRows: 1, freezeColumns: 0, filter: "A1:T91", tabColor: "#C00000" },
   "외부참고": { rows: 91, freezeRows: 1, freezeColumns: 3, filter: "A1:X91", tabColor: "#5B9BD5" },
@@ -131,7 +133,7 @@ var SAMGUK_SETUP_HEADER_ALIASES = {
 };
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu("삼국지 원장")
+  SpreadsheetApp.getUi().createMenu("후국지 원장")
     .addItem("원장 설치/업데이트", "setupSamgukSheet")
     .addItem("보호 다시 적용", "reapplySamgukSheetProtections")
     .addToUi();
@@ -145,7 +147,7 @@ function setupSamgukSheet() {
   try {
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     if (!spreadsheet) throw new Error("바인딩된 Spreadsheet가 없습니다.");
-    spreadsheet.rename("SOOPNOTICE 삼국지 운영원장");
+    spreadsheet.rename("SOOPNOTICE 후국지 운영원장");
     spreadsheet.setSpreadsheetLocale("ko_KR");
     spreadsheet.setSpreadsheetTimeZone("Asia/Seoul");
 
@@ -176,7 +178,7 @@ function setupSamgukSheet() {
     SpreadsheetApp.flush();
     spreadsheet.toast(
       "14개 운영 탭 설치 완료" + (backups.length ? " · 구형 탭 백업 " + backups.length + "개" : ""),
-      "삼국지 원장",
+      "후국지 원장",
       8
     );
     return { version: SAMGUK_SETUP_VERSION, sheets: SAMGUK_SETUP_SHEET_ORDER.slice(), backups: backups };
@@ -194,7 +196,7 @@ function reapplySamgukSheetProtections() {
     sheets[name] = sheet;
   });
   samgukApplyAllProtections_(sheets);
-  spreadsheet.toast("보호 설정을 다시 적용했습니다.", "삼국지 원장", 5);
+  spreadsheet.toast("보호 설정을 다시 적용했습니다.", "후국지 원장", 5);
 }
 
 function samgukValidateSetupSeed_() {
@@ -202,6 +204,7 @@ function samgukValidateSetupSeed_() {
     throw new Error("samguk-sheet-seed.generated.gs가 필요합니다.");
   }
   if (SAMGUK_SETUP_SEED.version !== 1
+      || SAMGUK_SETUP_SEED.seasonId !== SAMGUK_SETUP_SEASON_ID
       || !Array.isArray(SAMGUK_SETUP_SEED.members)
       || SAMGUK_SETUP_SEED.members.length !== 90
       || !Array.isArray(SAMGUK_SETUP_SEED.territories)
@@ -474,19 +477,19 @@ function samgukSeedOperationalSheets_(sheets) {
     ]);
     monitoringRows.push([
       member.playerId, member.nation, member.crew, member.name, member.soopId, liveUrl,
-      "확인필요", "", "", "대기", "", "", "default", member.observedAt, "", ""
+      "확인필요", "", "", "대기", "", "", "default", "", "", ""
     ]);
     observationRows.push([
       "INIT-" + memberSeedDate + "-" + String(index + 1).padStart(3, "0"),
-      member.playerId, samgukDateOrBlank_(member.observedAt), "시트", member.evidence,
+      member.playerId, samgukDateOrBlank_(member.observedAt), samgukSeedSourceLabel_(member.sourceType), member.evidence,
       samgukBlankIfNull_(member.level), samgukBlankIfNull_(member.horse),
       samgukBlankIfNull_(member.horseLevel), samgukBlankIfNull_(member.weapon),
       samgukBlankIfNull_(member.helmet), samgukBlankIfNull_(member.armor),
       samgukBlankIfNull_(member.shoes), samgukBlankIfNull_(member.strength),
       samgukBlankIfNull_(member.agility), samgukBlankIfNull_(member.vitality),
       samgukBlankIfNull_(member.intelligence), samgukBlankIfNull_(member.powerScore),
-      1, "기준값", "", "INIT-" + memberSeedDate, "초기 1회 수집", "",
-      "공개 현황의 설치 기준 스냅샷.", samgukBlankIfNull_(member.maxHealth),
+      samgukBlankIfNull_(member.sourceCount) || 1, member.reviewStatus || "기준값", "", "INIT-" + memberSeedDate, "초기 1회 수집", "",
+      "후국지 Gamcom season=2 초기 기준 스냅샷(0 포함).", samgukBlankIfNull_(member.maxHealth),
       samgukBlankIfNull_(member.basicAttackDamage), samgukBlankIfNull_(member.basicAttackSampleCount),
       samgukBlankIfNull_(member.basicAttackTarget), samgukBlankIfNull_(member.combatConditions),
       samgukDateOrBlank_(member.observedAt), samgukBlankIfNull_(member.attackPower),
@@ -499,11 +502,11 @@ function samgukSeedOperationalSheets_(sheets) {
       samgukBlankIfNull_(member.strengthBonus), samgukBlankIfNull_(member.agilityBonus),
       samgukBlankIfNull_(member.vitalityBonus), samgukBlankIfNull_(member.intelligenceBonus),
       samgukBlankIfNull_(member.attackPowerIncrease), samgukBlankIfNull_(member.moveSpeedIncrease),
-      samgukBlankIfNull_(member.healthIncrease), samgukBlankIfNull_(member.skillHasteIncrease)
+      samgukBlankIfNull_(member.healthIncrease), samgukBlankIfNull_(member.skillHasteIncrease), ""
     ]);
     equipmentRows.push([
       member.name, member.soopId, "", "", "", "", "", "", "", "", "", "", "", "",
-      "", "", "시트", 1
+      "", "", "", ""
     ]);
   });
   samgukSeedRowsByKey_(sheets["참가자"], participantRows, 1, 91);
@@ -518,10 +521,11 @@ function samgukSeedOperationalSheets_(sheets) {
     var captured = territory.owner === "미점령" ? "미점령" : "점령";
     territoryRows.push([
       "TINIT-" + seedDate + "-" + String(index + 1).padStart(3, "0"),
-      territory.id, samgukDateOrBlank_(territory.observedAt), "시트", territory.evidence,
+      territory.id, samgukDateOrBlank_(territory.observedAt), samgukSeedSourceLabel_(territory.sourceType), territory.evidence,
       territory.number, territory.x, territory.y, territory.owner, territory.capital ? "Y" : "N",
-      territory.facility, territory.level, territory.number === 27 ? "Y" : "N", captured,
-      "", "기준값", 1, "", "공개 지도 초기 기준 스냅샷.", samgukDateOrBlank_(territory.observedAt)
+      territory.facility, territory.level, territory.special ? "Y" : "N", captured,
+      "", territory.reviewStatus || "기준값", samgukBlankIfNull_(territory.sourceCount) || 1, "",
+      "후국지 Gamcom season=2 초기 영토 기준값.", samgukDateOrBlank_(territory.observedAt)
     ]);
   });
   samgukClearBlankIdPrefill_(sheets["영토입력"], 2, SAMGUK_SETUP_MAX_INPUT_ROW);
@@ -542,6 +546,10 @@ function samgukSeedObject_(raw, fields) {
 
 function samgukBlankIfNull_(value) {
   return value === null || value === undefined ? "" : value;
+}
+
+function samgukSeedSourceLabel_(value) {
+  return String(value || "").toLowerCase() === "gamcom" ? "Gamcom" : (value || "시트");
 }
 
 function samgukDateOrBlank_(value) {
@@ -637,6 +645,18 @@ function samgukMaxAcceptedValueFormula_(row, sheetName, keyColumn, statusColumn,
   return "=IFERROR(MAX(FILTER(" + valueRange + "," + keyRange + "=$A" + row + "," + accepted + "," + valueRange + "<>\"\")),\"\")";
 }
 
+function samgukLatestAcceptedNonBlankValueFormula_(row, sheetName, keyColumn, statusColumn, timestampColumn, sourceColumn) {
+  var keyRange = sheetName + "!$" + keyColumn + "$2:$" + keyColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var statusRange = sheetName + "!$" + statusColumn + "$2:$" + statusColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var timestampRange = sheetName + "!$" + timestampColumn + "$2:$" + timestampColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var valueRange = sheetName + "!$" + sourceColumn + "$2:$" + sourceColumn + "$" + SAMGUK_SETUP_MAX_INPUT_ROW;
+  var rowRange = "ROW(" + keyRange + ")";
+  var accepted = "((" + statusRange + "=\"기준값\")+(" + statusRange + "=\"교차검증\")+(" + statusRange + "=\"방송교차검증\"))>0";
+  var maximum = "MAX(FILTER(" + timestampRange + "," + keyRange + "=$A" + row + "," + accepted + "," + valueRange + "<>\"\"))";
+  var filtered = "FILTER(" + rowRange + "," + keyRange + "=$A" + row + "," + accepted + "," + timestampRange + "=" + maximum + "," + valueRange + "<>\"\")";
+  return "=IFERROR(INDEX(" + sheetName + "!$" + sourceColumn + ":$" + sourceColumn + ",INDEX(" + filtered + ",ROWS(" + filtered + "))),\"\")";
+}
+
 function samgukInstallCurrentFormulas_(sheet) {
   var sourceColumns = {
     7: "F", 8: "G", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
@@ -645,7 +665,7 @@ function samgukInstallCurrentFormulas_(sheet) {
     36: "AE", 37: "AF", 38: "AG", 39: "AH", 40: "AI", 41: "AJ",
     42: "AK", 43: "AL", 44: "AM", 45: "AN", 46: "AO", 47: "AP",
     48: "AQ", 49: "AR", 50: "AS", 51: "AT", 52: "AU", 53: "AV",
-    54: "AW", 55: "AX"
+    54: "AW", 55: "AX", 56: "AY"
   };
   var monotonicColumns = {
     7: "F", 9: "H", 10: "I", 11: "J", 12: "K", 13: "L",
@@ -654,7 +674,7 @@ function samgukInstallCurrentFormulas_(sheet) {
   };
   var rows = [];
   for (var row = 2; row <= 91; row += 1) {
-    var values = new Array(55).fill("");
+    var values = new Array(58).fill("");
     values[0] = "=IF(참가자!A" + row + "=\"\",\"\",참가자!A" + row + ")";
     for (var column = 2; column <= 6; column += 1) {
       var letter = String.fromCharCode(64 + column);
@@ -663,9 +683,11 @@ function samgukInstallCurrentFormulas_(sheet) {
     values[29] = samgukLatestSnapshotRowFormula_("관측입력", "B", "S", "C", row);
     Object.keys(sourceColumns).forEach(function(columnText) {
       var targetColumn = Number(columnText);
-      values[targetColumn - 1] = monotonicColumns[targetColumn]
-        ? samgukMaxAcceptedValueFormula_(row, "관측입력", "B", "S", monotonicColumns[targetColumn])
-        : samgukSnapshotValueFormula_(row, "AD", "관측입력", sourceColumns[targetColumn]);
+      values[targetColumn - 1] = targetColumn === 56
+        ? samgukLatestAcceptedNonBlankValueFormula_(row, "관측입력", "B", "S", "C", sourceColumns[targetColumn])
+        : monotonicColumns[targetColumn]
+          ? samgukMaxAcceptedValueFormula_(row, "관측입력", "B", "S", monotonicColumns[targetColumn])
+          : samgukSnapshotValueFormula_(row, "AD", "관측입력", sourceColumns[targetColumn]);
     });
     values[13] = "=IF(COUNT(J" + row + ":M" + row + ")=0,\"\",SUM(J" + row + ":M" + row + "))";
     values[24] = "=IF(T" + row + "=\"\",\"미확인\",IF(NOW()-T" + row + "<=1/24,\"최신\",IF(NOW()-T" + row + "<=6/24,\"확인 필요\",\"오래됨\")))";
@@ -673,9 +695,24 @@ function samgukInstallCurrentFormulas_(sheet) {
     values[26] = "=IF(COUNT($S$2:$S$91)>0,S" + row + ",O" + row + ")";
     values[27] = "=IF(OR(AA" + row + "=\"\",AA" + row + "<=0),\"\",RANK.EQ(AA" + row + ",$AA$2:$AA$91,0))";
     values[28] = "=IF(OR(AA" + row + "=\"\",AA" + row + "<=0),\"\",RANK.EQ(AA" + row + ",$AA$2:$AA$91,0)+COUNTIF($AA$2:AA" + row + ",AA" + row + ")-1)";
+    var allocationValues = samgukSkillAllocationValuesFormula_("BD" + row);
+    values[56] = "=IF(BD" + row + "=\"\",\"\",SUM(" + allocationValues + "))";
+    values[57] = "=IF(BD" + row + "=\"\",\"\",\"투자 \"&BE" + row
+      + "&\" · 강화 \"&COUNTIF(" + allocationValues + ",\">0\")&\"/\"&COUNT(" + allocationValues + ")"
+      + "&\" · 남은 \"&IFERROR(VALUE(REGEXEXTRACT(BD" + row + ","
+      + samgukFormulaText_("\"ownedPoints\":([0-9]+)") + ")),\"—\"))";
     rows.push(values);
   }
-  sheet.getRange(2, 1, 90, 55).setValues(rows);
+  sheet.getRange(2, 1, 90, 58).setValues(rows);
+}
+
+function samgukFormulaText_(value) {
+  return '"' + String(value).replace(/"/g, '""') + '"';
+}
+
+function samgukSkillAllocationValuesFormula_(cell) {
+  return "ARRAYFORMULA(IFERROR(VALUE(REGEXEXTRACT(SPLIT(" + cell + ","
+    + samgukFormulaText_("\"allocatedPoints\":") + ",FALSE,TRUE),\"^[0-9]+\")),))";
 }
 
 function samgukInstallRankingFormulas_(sheet) {
@@ -740,6 +777,7 @@ function samgukConfigureAllSheets_(sheets) {
   sheets["관측입력"].getRange("AE2:AF5001").setNumberFormat("0.##");
   sheets["관측입력"].getRange("AH2:AO5001").setNumberFormat("0.##");
   sheets["관측입력"].getRange("AQ2:AX5001").setNumberFormat("0.##");
+  sheets["관측입력"].getRange("AY2:AY5001").setNumberFormat("@").setWrap(true);
   sheets["영토입력"].getRange("C2:C5001").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["영토입력"].getRange("T2:T5001").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["현재현황"].getRange("T2:T91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
@@ -748,6 +786,9 @@ function samgukConfigureAllSheets_(sheets) {
   sheets["현재현황"].getRange("AJ2:AK91").setNumberFormat("0.##");
   sheets["현재현황"].getRange("AM2:AT91").setNumberFormat("0.##");
   sheets["현재현황"].getRange("AV2:BC91").setNumberFormat("0.##");
+  sheets["현재현황"].getRange("BD2:BD91").setNumberFormat("@").setWrap(true);
+  sheets["현재현황"].getRange("BE2:BE91").setNumberFormat("0");
+  sheets["현재현황"].getRange("BF2:BF91").setNumberFormat("@").setWrap(true);
   sheets["장비현황"].getRange("O2:O91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["무력랭킹"].getRange("P2:P91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
   sheets["외부참고"].getRange("S2:U91").setNumberFormat("yyyy-mm-dd hh:mm:ss");
@@ -789,6 +830,7 @@ function samgukApplyValidations_(sheets) {
   samgukNumberValidation_(sheets["관측입력"].getRange("AI2:AO5001"), 1000);
   samgukNumberValidation_(sheets["관측입력"].getRange("AP2:AP5001"), 1000000);
   samgukNumberValidation_(sheets["관측입력"].getRange("AQ2:AX5001"), 1000000);
+  samgukSkillBuildValidation_(sheets["관측입력"].getRange("AY2:AY5001"));
 
   samgukListValidation_(sheets["영토입력"].getRange("B2:B5001"), sheets["영토현황"].getRange("A2:A61"));
   samgukListValidation_(sheets["영토입력"].getRange("D2:D5001"), reference.getRange("E2:E16"));
@@ -825,6 +867,43 @@ function samgukNumberValidation_(targetRange, maximum) {
   targetRange.setDataValidation(rule);
 }
 
+function samgukSkillBuildValidation_(targetRange) {
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireFormulaSatisfied('=OR(AY2="",SAMGUK_IS_VALID_SKILL_BUILD(AY2))')
+    .setAllowInvalid(false)
+    .setHelpText("비우거나 canonical 절기배분 JSON을 입력하세요.")
+    .build();
+  targetRange.setDataValidation(rule);
+}
+
+/** @customfunction */
+function SAMGUK_IS_VALID_SKILL_BUILD(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return true;
+  try {
+    var parsed = typeof value === "string" ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+    var keys = Object.keys(parsed).sort().join(",");
+    if (keys !== "ownedPoints,preset,skills,version" || parsed.version !== 1) return false;
+    if (parsed.preset !== null
+        && (!Number.isInteger(parsed.preset) || parsed.preset < 1 || parsed.preset > 4)) return false;
+    if (!Number.isInteger(parsed.ownedPoints) || parsed.ownedPoints < 0 || parsed.ownedPoints > 1000000) return false;
+    if (!Array.isArray(parsed.skills) || [6, 9].indexOf(parsed.skills.length) === -1) return false;
+    var seen = {};
+    return parsed.skills.every(function(skill) {
+      if (!skill || typeof skill !== "object" || Array.isArray(skill)
+          || Object.keys(skill).sort().join(",") !== "allocatedPoints,name,requiredPoints") return false;
+      if (typeof skill.name !== "string" || skill.name !== skill.name.trim()
+          || !skill.name || skill.name.length > 80 || /[\u0000-\u001F\u007F]/.test(skill.name)
+          || Object.prototype.hasOwnProperty.call(seen, skill.name)) return false;
+      seen[skill.name] = true;
+      return Number.isInteger(skill.requiredPoints) && skill.requiredPoints >= 0 && skill.requiredPoints <= 1000000
+        && Number.isInteger(skill.allocatedPoints) && skill.allocatedPoints >= 0 && skill.allocatedPoints <= 1000000;
+    });
+  } catch (error) {
+    return false;
+  }
+}
+
 function samgukApplyAllProtections_(sheets) {
   SAMGUK_SETUP_SHEET_ORDER.forEach(function(name) { samgukRemoveManagedProtections_(sheets[name]); });
 
@@ -835,7 +914,7 @@ function samgukApplyAllProtections_(sheets) {
 
   samgukProtectInputSheet_(sheets["참가자"], ["B2:J91"]);
   samgukProtectInputSheet_(sheets["방송모니터링"], ["G2:P91"]);
-  samgukProtectInputSheet_(sheets["관측입력"], ["B2:Q5001", "X2:AC5001", "AE2:AX5001"]);
+  samgukProtectInputSheet_(sheets["관측입력"], ["B2:Q5001", "X2:AC5001", "AE2:AY5001"]);
   samgukProtectInputSheet_(sheets["장비현황"], ["C2:R91"]);
   samgukProtectInputSheet_(sheets["영토입력"], ["B2:O5001", "S2:S5001"]);
   samgukProtectInputSheet_(sheets["OCR설정"], ["C2:K40"]);

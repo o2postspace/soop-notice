@@ -1,6 +1,6 @@
 "use strict";
 
-const POWER_INDEX_VERSION = "v1.5";
+const POWER_INDEX_VERSION = "v1.6";
 const POWER_WEIGHTS = Object.freeze({
   stats: 30,
   gear: 35,
@@ -26,9 +26,14 @@ const POWER_STATUSES = Object.freeze({
 const RULER_JOBS = new Set(["조조", "유비", "손권"]);
 const STAT_FIELDS = Object.freeze(["strength", "agility", "vitality", "intelligence"]);
 const STATS_INTERNAL_WEIGHTS = Object.freeze({ level: 0.40, abilities: 0.60 });
-// 기량은 참가자 분포에 따라 점수가 흔들리지 않도록 네 수치의 실제 합계를
-// 고정 기준으로 선형 환산한다. 현재 공개 범위(최고 506)에 성장 여유를 둔다.
-const ABILITY_TOTAL_CAP = 600;
+const POWER_DISPLAY_SCALE = 125;
+const ABILITY_POWER_PER_POINT = 1;
+// 최종 표시점수에서 기량합 1점이 정확히 파워 1점이 되도록 내부 0~100
+// 구성요소의 분모만 맞춘다. 참가자 백분위나 별도 배율은 적용하지 않는다.
+const ABILITY_TOTAL_CAP = POWER_DISPLAY_SCALE
+  * POWER_WEIGHTS.stats
+  * STATS_INTERNAL_WEIGHTS.abilities
+  / ABILITY_POWER_PER_POINT;
 const GEAR_MAX_LEVEL = 15;
 const HORSE_MAX_LEVEL = 80;
 // 공개 자료로 확인된 말 강화 허용 범위는 유지한다. 적토마 희귀도는 별도
@@ -297,6 +302,7 @@ function calculateStats(member, context) {
     abilityTotal: round(knownTotal),
     abilityComplete: abilitiesKnown,
     abilityScore: round(abilityLower),
+    abilityPowerPoints: round(knownTotal * ABILITY_POWER_PER_POINT),
     abilityCap: ABILITY_TOTAL_CAP,
     abilityPercentile: null,
     statPercentiles: Object.freeze(statPercentiles),
@@ -476,6 +482,7 @@ function calculateRosterPowerIndexes(roster) {
 }
 
 module.exports = {
+  ABILITY_POWER_PER_POINT,
   ABILITY_TOTAL_CAP,
   ENGRAVING_PRIOR_N,
   FIELD_STATES,
@@ -485,6 +492,7 @@ module.exports = {
   HORSE_SCORING_LEVEL_CAP,
   HORSE_GRADE_BONUSES,
   POWER_INDEX_VERSION,
+  POWER_DISPLAY_SCALE,
   POWER_STATUSES,
   POWER_WEIGHTS,
   RED_HARE_BASE_BONUS,

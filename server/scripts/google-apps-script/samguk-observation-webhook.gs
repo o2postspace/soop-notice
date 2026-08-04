@@ -11,8 +11,10 @@
 
 var SAMGUK_OBSERVATION_SHEET = "관측입력";
 var SAMGUK_PARTICIPANT_SHEET = "참가자";
+var SAMGUK_RULE_SHEET = "게임정보";
 var SAMGUK_MAX_OBSERVATION_ROW = 5001;
 var SAMGUK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+var SAMGUK_CURRENT_SEASON_ID = "hugukji-2026-08-04";
 var SAMGUK_REQUIRED_FIELDS = [
   "level", "horse", "horseLevel", "weapon", "helmet", "armor", "shoes",
   "strength", "agility", "vitality", "intelligence", "powerScore", "maxHealth",
@@ -120,6 +122,7 @@ function samgukSpreadsheet_() {
 
 function samgukAppendSnapshot_(snapshot) {
   var spreadsheet = samgukSpreadsheet_();
+  samgukAssertCurrentSeason_(spreadsheet);
   var sheet = spreadsheet.getSheetByName(SAMGUK_OBSERVATION_SHEET);
   var participants = spreadsheet.getSheetByName(SAMGUK_PARTICIPANT_SHEET);
   if (!sheet || !participants) throw new Error("required_sheet_missing");
@@ -159,7 +162,8 @@ function samgukAppendSnapshot_(snapshot) {
     strengthBonus: "무력보너스", agilityBonus: "기민보너스",
     vitalityBonus: "기력보너스", intelligenceBonus: "지모보너스",
     attackPowerIncrease: "공격력증가량", moveSpeedIncrease: "이동속도증가량",
-    healthIncrease: "체력증가량", skillHasteIncrease: "절기가속증가량"
+    healthIncrease: "체력증가량", skillHasteIncrease: "절기가속증가량",
+    skillBuild: "절기배분"
   };
   var record = {
     observation_id: snapshot.observationId,
@@ -181,13 +185,16 @@ function samgukAppendSnapshot_(snapshot) {
   SAMGUK_REQUIRED_FIELDS.forEach(function(key) {
     record[fieldHeaders[key]] = snapshot.fields[key] === null ? "" : snapshot.fields[key];
   });
+  record[fieldHeaders.skillBuild] = snapshot.fields.skillBuild === null
+    ? ""
+    : JSON.stringify(snapshot.fields.skillBuild);
   headers.forEach(function(header, index) {
     if (Object.prototype.hasOwnProperty.call(record, header)) {
       values[index] = samgukSafeCellValue_(record[header]);
     }
   });
   var requiredHeaders = ["observation_id", "player_id", "확인시각", "근거종류", "검증상태"]
-    .concat(SAMGUK_REQUIRED_FIELDS.map(function(key) { return fieldHeaders[key]; }));
+    .concat(SAMGUK_REQUIRED_FIELDS.map(function(key) { return fieldHeaders[key]; }), [fieldHeaders.skillBuild]);
   requiredHeaders.forEach(function(header) {
     if (headers.indexOf(header) < 0) throw new Error("missing_header:" + header);
   });
@@ -206,6 +213,22 @@ function samgukAppendSnapshot_(snapshot) {
     throw new Error("write_verification_failed");
   }
   return samgukJsonResponse_({ ok: true, duplicate: false, appendedRow: targetRow });
+}
+
+function samgukAssertCurrentSeason_(spreadsheet) {
+  var rules = spreadsheet.getSheetByName(SAMGUK_RULE_SHEET);
+  if (!rules) throw new Error("required_sheet_missing");
+  var rowCount = Math.max(1, Math.min(30, rules.getLastRow()));
+  var rows = rules.getRange(1, 1, rowCount, 3).getDisplayValues();
+  var markers = rows.filter(function(row) {
+    return String(row[1] || "").trim().toLowerCase() === "season_id";
+  });
+  if (markers.length !== 1
+      || String(markers[0][0] || "").trim() !== "시즌"
+      || String(markers[0][1] || "").trim() !== "season_id"
+      || String(markers[0][2] || "").trim() !== SAMGUK_CURRENT_SEASON_ID) {
+    throw new Error("invalid_season");
+  }
 }
 
 /**
@@ -227,6 +250,9 @@ function samgukFindFirstEmptyObservationRow_(sheet, columnCount) {
 
 function samgukValidateSnapshot_(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) throw new Error("invalid_snapshot");
+  if (snapshot.seasonId !== SAMGUK_CURRENT_SEASON_ID) {
+    throw new Error("invalid_season");
+  }
   if (!/^OBS-[A-Z0-9-]{8,120}$/.test(String(snapshot.observationId || ""))) throw new Error("invalid_observation_id");
   if (!/^P\d{3}$/.test(String(snapshot.playerId || ""))) throw new Error("invalid_player_id");
   if (["cross-source", "broadcast-repeat", "gamcom-max"].indexOf(snapshot.verification) < 0) {
@@ -273,6 +299,9 @@ function samgukValidateSnapshot_(snapshot) {
       throw new Error("invalid_field:" + key);
     }
   });
+  snapshot.fields.skillBuild = Object.prototype.hasOwnProperty.call(snapshot.fields, "skillBuild")
+    ? samgukValidateSkillBuild_(snapshot.fields.skillBuild)
+    : null;
   if (!Array.isArray(snapshot.sourceUrls) || snapshot.sourceUrls.length < 1 || snapshot.sourceUrls.length > 10) throw new Error("invalid_sources");
   snapshot.sourceUrls = snapshot.sourceUrls.map(function(value) {
     var url = String(value || "");
@@ -291,6 +320,48 @@ function samgukValidateSnapshot_(snapshot) {
   }
   snapshot.ocrConfidence = snapshot.ocrConfidence === undefined ? null : snapshot.ocrConfidence;
   return snapshot;
+}
+
+function samgukValidateSkillBuild_(value) {
+  if (value === null) return null;
+  if (typeof value === "string") {
+    if (value.length < 2 || value.length > 8192) throw new Error("invalid_field:skillBuild");
+    try {
+      value = JSON.parse(value);
+    } catch (error) {
+      throw new Error("invalid_field:skillBuild");
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)
+      || Object.keys(value).sort().join(",") !== "ownedPoints,preset,skills,version"
+      || value.version !== 1) throw new Error("invalid_field:skillBuild");
+  if (value.preset !== null
+      && (!Number.isInteger(value.preset) || value.preset < 1 || value.preset > 4)) {
+    throw new Error("invalid_field:skillBuild");
+  }
+  if (!Number.isInteger(value.ownedPoints) || value.ownedPoints < 0 || value.ownedPoints > 1000000
+      || !Array.isArray(value.skills) || [6, 9].indexOf(value.skills.length) === -1) {
+    throw new Error("invalid_field:skillBuild");
+  }
+  var seen = {};
+  var skills = value.skills.map(function(skill) {
+    if (!skill || typeof skill !== "object" || Array.isArray(skill)
+        || Object.keys(skill).sort().join(",") !== "allocatedPoints,name,requiredPoints"
+        || typeof skill.name !== "string" || skill.name !== skill.name.trim()
+        || !skill.name || skill.name.length > 80 || /[\u0000-\u001F\u007F]/.test(skill.name)
+        || Object.prototype.hasOwnProperty.call(seen, skill.name)
+        || !Number.isInteger(skill.requiredPoints) || skill.requiredPoints < 0 || skill.requiredPoints > 1000000
+        || !Number.isInteger(skill.allocatedPoints) || skill.allocatedPoints < 0 || skill.allocatedPoints > 1000000) {
+      throw new Error("invalid_field:skillBuild");
+    }
+    seen[skill.name] = true;
+    return {
+      name: skill.name,
+      requiredPoints: skill.requiredPoints,
+      allocatedPoints: skill.allocatedPoints
+    };
+  });
+  return { version: 1, preset: value.preset, ownedPoints: value.ownedPoints, skills: skills };
 }
 
 /** ContentService는 HTTP status setter가 없어 JSON status로 호출자에게 분류를 전달합니다. */

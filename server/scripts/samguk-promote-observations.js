@@ -11,6 +11,7 @@ const {
 } = require("../lib/samguk-promotion-audit");
 const {
   ALLOWED_FIELDS,
+  CURRENT_SEASON_ID,
   DEFAULT_CONSENSUS_WINDOW_MS,
   MONOTONIC_NUMERIC_FIELDS,
   compactObservationQueue,
@@ -22,8 +23,99 @@ const {
 } = require("../lib/samguk-observations");
 
 const DEFAULT_QUEUE_PATH = path.resolve(__dirname, "../data/samguk-observations.ndjson");
+const DEFAULT_BASELINE_RETRY_ATTEMPTS = 3;
+const DEFAULT_BASELINE_RETRY_BASE_MS = 250;
+const DEFAULT_BASELINE_RETRY_MAX_MS = 2_000;
+const MAX_BASELINE_RETRY_ATTEMPTS = 5;
+const MAX_BASELINE_RETRY_DELAY_MS = 10_000;
 const MAX_SNAPSHOT_SOURCE_COUNT = 10;
 const PLAYER_IDS = new Map(FALLBACK.members.map((member, index) => [member.soopId, `P${String(index + 1).padStart(3, "0")}`]));
+
+function resolveCacheStampPath(queuePath = DEFAULT_QUEUE_PATH, configuredPath = process.env.SAMGUK_API_CACHE_STAMP_PATH) {
+  const configured = String(configuredPath || "").trim();
+  const resolvedQueuePath = path.isAbsolute(queuePath)
+    ? path.normalize(queuePath)
+    : path.resolve(__dirname, "..", queuePath);
+  if (!configured) return `${resolvedQueuePath}.api-cache-stamp`;
+  return path.isAbsolute(configured)
+    ? path.normalize(configured)
+    : path.resolve(__dirname, "..", configured);
+}
+
+function boundedPositiveInteger(value, fallback, maximum, label) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
+    if (value === undefined || value === null || value === "") return fallback;
+    throw new RangeError(`${label}는 1~${maximum} 범위의 정수여야 합니다.`);
+  }
+  return parsed;
+}
+
+function delay(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function isFreshBaseline(payload) {
+  return Boolean(payload
+    && payload.stale === false
+    && payload.source === "google-sheet"
+    && payload.seasonId === CURRENT_SEASON_ID);
+}
+
+async function loadFreshBaseline(service, options = {}) {
+  if (!service || typeof service.load !== "function") {
+    throw new TypeError("Google Sheet service.load가 필요합니다.");
+  }
+  const attempts = boundedPositiveInteger(
+    options.attempts,
+    DEFAULT_BASELINE_RETRY_ATTEMPTS,
+    MAX_BASELINE_RETRY_ATTEMPTS,
+    "baseline retry attempts",
+  );
+  const baseDelayMs = boundedPositiveInteger(
+    options.baseDelayMs,
+    DEFAULT_BASELINE_RETRY_BASE_MS,
+    MAX_BASELINE_RETRY_DELAY_MS,
+    "baseline retry base delay",
+  );
+  const maxDelayMs = boundedPositiveInteger(
+    options.maxDelayMs,
+    DEFAULT_BASELINE_RETRY_MAX_MS,
+    MAX_BASELINE_RETRY_DELAY_MS,
+    "baseline retry max delay",
+  );
+  const sleepFn = options.sleepFn || delay;
+  if (typeof sleepFn !== "function") throw new TypeError("baseline retry sleepFn은 함수여야 합니다.");
+
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const payload = await service.load();
+      if (isFreshBaseline(payload)) return { payload, attempts: attempt };
+      if (payload?.seasonId && payload.seasonId !== CURRENT_SEASON_ID) {
+        const error = new Error(`Google Sheet seasonId는 '${CURRENT_SEASON_ID}'여야 합니다.`);
+        error.code = "invalid_season";
+        throw error;
+      }
+      const error = new Error("최신 Google Sheet baseline을 읽지 못했습니다.");
+      error.code = "baseline_unavailable";
+      lastError = error;
+    } catch (error) {
+      lastError = error;
+      if (new Set(["config_error", "invalid_config", "invalid_season"]).has(error?.code)) throw error;
+    }
+
+    if (attempt < attempts) {
+      const waitMs = Math.min(maxDelayMs, baseDelayMs * (2 ** (attempt - 1)));
+      await sleepFn(waitMs, attempt);
+    }
+  }
+
+  const error = new Error(`${attempts}회 재시도 후에도 최신 Google Sheet를 읽지 못해 승격을 중단합니다.`);
+  error.code = "baseline_unavailable";
+  if (lastError) error.cause = lastError;
+  throw error;
+}
 
 function usage() {
   return [
@@ -57,6 +149,9 @@ function parseArguments(argv) {
 }
 
 function baselineObservations(payload, now = Date.now()) {
+  if (!payload || payload.seasonId !== CURRENT_SEASON_ID) {
+    throw new Error(`Google Sheet seasonId는 '${CURRENT_SEASON_ID}'여야 합니다.`);
+  }
   const observations = [];
   for (const member of payload.members) {
     const playerId = PLAYER_IDS.get(member.soopId);
@@ -65,6 +160,7 @@ function baselineObservations(payload, now = Date.now()) {
       const value = member[field];
       if (value === null || value === undefined || value === "") continue;
       observations.push({
+        seasonId: payload.seasonId,
         playerId,
         field,
         value,
@@ -132,6 +228,7 @@ function buildPromotionSnapshots(payload, queued, { windowMs, now = Date.now() }
         : candidate.sourceTypes.length
     )));
     snapshots.push({
+      seasonId: payload.seasonId,
       observationId: `OBS-CROSS-${digest.slice(0, 24).toUpperCase()}`,
       playerId,
       fields,
@@ -188,6 +285,7 @@ function compactQueuedObservations(payload, snapshots, queued, { now = Date.now(
         continue;
       }
       const normalized = normalizeObservation({
+        seasonId: snapshot.seasonId,
         playerId: snapshot.playerId,
         field,
         value,
@@ -269,10 +367,13 @@ async function promote(options = {}) {
   }
   if (typeof archiveFn !== "function") throw new TypeError("archiveFn은 함수여야 합니다.");
   const service = options.service || createSamgukSheetService();
-  const payload = await service.load();
-  if (payload.stale || payload.source !== "google-sheet") {
-    throw new Error("최신 Google Sheet를 읽지 못해 승격을 중단합니다.");
-  }
+  const baseline = await loadFreshBaseline(service, {
+    attempts: options.baselineRetryAttempts ?? process.env.SAMGUK_BASELINE_RETRY_ATTEMPTS,
+    baseDelayMs: options.baselineRetryBaseMs ?? process.env.SAMGUK_BASELINE_RETRY_BASE_MS,
+    maxDelayMs: options.baselineRetryMaxMs ?? process.env.SAMGUK_BASELINE_RETRY_MAX_MS,
+    sleepFn: options.sleepFn,
+  });
+  const payload = baseline.payload;
   const now = options.now ? options.now() : Date.now();
   const snapshots = buildPromotionSnapshots(payload, queued, {
     windowMs: options.windowMs ?? DEFAULT_CONSENSUS_WINDOW_MS,
@@ -337,6 +438,7 @@ async function promote(options = {}) {
     written: results.length,
     results,
     compaction,
+    baselineAttempts: baseline.attempts,
   };
 }
 
@@ -358,14 +460,21 @@ if (require.main === module) {
 }
 
 module.exports = {
+  DEFAULT_BASELINE_RETRY_ATTEMPTS,
+  DEFAULT_BASELINE_RETRY_BASE_MS,
+  DEFAULT_BASELINE_RETRY_MAX_MS,
   DEFAULT_QUEUE_PATH,
+  MAX_BASELINE_RETRY_ATTEMPTS,
   MAX_SNAPSHOT_SOURCE_COUNT,
   PLAYER_IDS,
   baselineObservations,
   buildPromotionSnapshots,
   compactQueuedObservations,
   completeFields,
+  isFreshBaseline,
+  loadFreshBaseline,
   main,
   parseArguments,
   promote,
+  resolveCacheStampPath,
 };

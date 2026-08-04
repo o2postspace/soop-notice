@@ -8,7 +8,7 @@
  * - 원문에 갱신시각이 없으므로 외부수집시각과 별도로 표시합니다.
  */
 
-var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.03.5";
+var SAMGUK_GAMCOM_SYNC_VERSION = "2026.08.04.2";
 var SAMGUK_GAMCOM_SPREADSHEET_ID = "1xC3leW9fFl4ytHI6i2UkQ8iViBFIwjLrug66lYmVckY";
 var SAMGUK_GAMCOM_REFERENCE_SHEET = "외부참고";
 var SAMGUK_GAMCOM_CURRENT_SHEET = "현재현황";
@@ -16,13 +16,15 @@ var SAMGUK_GAMCOM_OBSERVATION_SHEET = "관측입력";
 var SAMGUK_GAMCOM_PARTICIPANT_SHEET = "참가자";
 var SAMGUK_GAMCOM_TERRITORY_CURRENT_SHEET = "영토현황";
 var SAMGUK_GAMCOM_TERRITORY_INPUT_SHEET = "영토입력";
+var SAMGUK_GAMCOM_RULE_SHEET = "게임정보";
+var SAMGUK_GAMCOM_SEASON_ID = "hugukji-2026-08-04";
 var SAMGUK_GAMCOM_MAX_OBSERVATION_ROW = 5001;
 var SAMGUK_GAMCOM_URLS = {
-  "위나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84",
-  "촉나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89",
-  "오나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%98%A4"
+  "위나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%9C%84?season=2",
+  "촉나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89?season=2",
+  "오나라": "https://gamcom-3kingdom.vercel.app/factions/%EC%98%A4?season=2"
 };
-var SAMGUK_GAMCOM_TERRITORY_URL = "https://gamcom-3kingdom.vercel.app/api/castles?fresh=1";
+var SAMGUK_GAMCOM_TERRITORY_URL = "https://gamcom-3kingdom.vercel.app/api/castles?fresh=1&season=2";
 var SAMGUK_GAMCOM_REFERENCE_HEADERS = [
   "player_id", "SOOP_ID", "국가", "세력/길드", "닉네임", "장수/직업",
   "말", "말강화", "무기강화", "두갑강화", "흉갑강화", "각갑강화",
@@ -37,7 +39,8 @@ var SAMGUK_GAMCOM_SNAPSHOT_FIELDS = [
   "attackPowerBonusPct", "damageReductionPct", "criticalChancePct", "criticalDamagePct",
   "skillCooldownReductionPct", "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
   "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
-  "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease"
+  "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
+  "skillBuild"
 ];
 var SAMGUK_GAMCOM_FIELD_HEADERS = {
   level: "레벨", horse: "말", horseLevel: "말강화", weapon: "무기강화",
@@ -53,7 +56,8 @@ var SAMGUK_GAMCOM_FIELD_HEADERS = {
     strengthBonus: "무력보너스", agilityBonus: "기민보너스",
     vitalityBonus: "기력보너스", intelligenceBonus: "지모보너스",
     attackPowerIncrease: "공격력증가량", moveSpeedIncrease: "이동속도증가량",
-    healthIncrease: "체력증가량", skillHasteIncrease: "절기가속증가량"
+    healthIncrease: "체력증가량", skillHasteIncrease: "절기가속증가량",
+    skillBuild: "절기배분"
 };
 var SAMGUK_GAMCOM_NUMERIC_FIELDS = [
   "horseLevel", "weapon", "helmet", "armor", "shoes",
@@ -72,6 +76,7 @@ function syncSamgukGamcom() {
   try {
     var spreadsheet = SpreadsheetApp.openById(SAMGUK_GAMCOM_SPREADSHEET_ID);
     if (spreadsheet.getSpreadsheetTimeZone() !== "Asia/Seoul") throw new Error("invalid_sheet_timezone");
+    samgukGamcomAssertCurrentSeason_(spreadsheet);
     var currentSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_CURRENT_SHEET);
     var observationSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_OBSERVATION_SHEET);
     var participantSheet = spreadsheet.getSheetByName(SAMGUK_GAMCOM_PARTICIPANT_SHEET);
@@ -138,6 +143,22 @@ function syncSamgukGamcom() {
     throw error;
   } finally {
     lock.releaseLock();
+  }
+}
+
+function samgukGamcomAssertCurrentSeason_(spreadsheet) {
+  var rules = spreadsheet.getSheetByName(SAMGUK_GAMCOM_RULE_SHEET);
+  if (!rules) throw new Error("required_sheet_missing");
+  var rowCount = Math.max(1, Math.min(30, rules.getLastRow()));
+  var rows = rules.getRange(1, 1, rowCount, 3).getDisplayValues();
+  var markers = rows.filter(function(row) {
+    return String(row[1] || "").trim().toLowerCase() === "season_id";
+  });
+  if (markers.length !== 1
+      || String(markers[0][0] || "").trim() !== "시즌"
+      || String(markers[0][1] || "").trim() !== "season_id"
+      || String(markers[0][2] || "").trim() !== SAMGUK_GAMCOM_SEASON_ID) {
+    throw new Error("invalid_season");
   }
 }
 
@@ -220,7 +241,7 @@ function samgukGamcomReadCurrentTerritories_(sheet) {
   var lastColumn = sheet.getLastColumn();
   var headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
   var columns = samgukGamcomHeaderMap_(headers);
-  ["영토ID", "번호", "X", "Y", "소유국", "수도", "시설", "레벨"].forEach(function(header) {
+  ["영토ID", "번호", "X", "Y", "소유국", "수도", "시설", "레벨", "특수지"].forEach(function(header) {
     if (columns[header] === undefined) throw new Error("territory_current_missing_header:" + header);
   });
   var values = sheet.getRange(2, 1, 60, lastColumn).getValues();
@@ -234,7 +255,8 @@ function samgukGamcomReadCurrentTerritories_(sheet) {
       owner: samgukGamcomTerritoryOwner_(row[columns["소유국"]]),
       capital: samgukGamcomTerritoryBoolean_(row[columns["수도"]], number),
       facility: String(row[columns["시설"]] || "없음").normalize("NFKC").trim(),
-      level: samgukGamcomRequiredInteger_(row[columns["레벨"]], 0, 999, "territory_level")
+      level: samgukGamcomRequiredInteger_(row[columns["레벨"]], 0, 999, "territory_level"),
+      special: samgukGamcomTerritoryBoolean_(row[columns["특수지"]], number)
     };
     if (!territory.owner || ["없음", "병영", "성채", "장원"].indexOf(territory.facility) < 0) {
       throw new Error("territory_current_invalid_state:" + (index + 2));
@@ -285,6 +307,7 @@ function samgukGamcomParseTerritories_(payload, currentTerritories) {
       var id = samgukGamcomTerritoryId_(raw.castleKey, number);
       if (id !== expectedId) throw new Error("gamcom_territory_id_mismatch:" + number);
       if (typeof raw.isCapital !== "boolean") throw new Error("gamcom_territory_invalid_capital:" + number);
+      if (typeof raw.isCheonrimun !== "boolean") throw new Error("gamcom_territory_invalid_special:" + number);
       var owner = samgukGamcomTerritoryOwner_(raw.owner);
       var facility = String(raw.facilityType || "").normalize("NFKC").trim();
       if (!owner) throw new Error("gamcom_territory_invalid_owner:" + number);
@@ -302,7 +325,8 @@ function samgukGamcomParseTerritories_(payload, currentTerritories) {
         owner: owner,
         capital: raw.isCapital,
         facility: facility,
-        level: samgukGamcomRequiredInteger_(raw.level, 0, 999, "gamcom_territory_level")
+        level: samgukGamcomRequiredInteger_(raw.level, 0, 999, "gamcom_territory_level"),
+        special: raw.isCheonrimun
       });
     });
   });
@@ -365,19 +389,20 @@ function samgukGamcomTerritoryRows_(sheet, currentTerritories, externalTerritori
   var snapshotMaterial = JSON.stringify(externalTerritories.map(function(territory) {
     return {
       id: territory.id, number: territory.number, x: territory.x, y: territory.y,
-      owner: territory.owner, capital: territory.capital, facility: territory.facility, level: territory.level
+      owner: territory.owner, capital: territory.capital, facility: territory.facility, level: territory.level,
+      special: territory.special
     };
   }));
   var snapshotHash = samgukGamcomSha256_(snapshotMaterial);
   var currentById = {};
   currentTerritories.forEach(function(territory) { currentById[territory.id] = territory; });
-  var labels = { owner: "소유국", capital: "수도", facility: "시설", level: "레벨" };
+  var labels = { owner: "소유국", capital: "수도", facility: "시설", level: "레벨", special: "특수지" };
   var rows = externalTerritories.map(function(territory) {
     var previous = currentById[territory.id];
     if (!previous || previous.number !== territory.number || previous.x !== territory.x || previous.y !== territory.y) {
       throw new Error("gamcom_territory_immutable_mismatch:" + territory.number);
     }
-    var changedFields = ["owner", "capital", "facility", "level"].filter(function(field) {
+    var changedFields = ["owner", "capital", "facility", "level", "special"].filter(function(field) {
       return previous[field] !== territory[field];
     });
     if (!changedFields.length) return null;
@@ -401,7 +426,7 @@ function samgukGamcomTerritoryRows_(sheet, currentTerritories, externalTerritori
       "수도": territory.capital ? "Y" : "N",
       "시설": territory.facility,
       "레벨": territory.level,
-      "특수지": territory.number === 27 ? "Y" : "N",
+      "특수지": territory.special ? "Y" : "N",
       "점령상태": territory.owner === "미점령" ? "미점령" : "점령",
       "점령률": "",
       "검증상태": "기준값",

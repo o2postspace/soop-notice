@@ -11,15 +11,24 @@ const {
   buildGamcomTerritoryChanges,
   buildReferenceRows,
   fetchGamcomTerritories,
+  GAMCOM_FACTION_URLS,
   GAMCOM_TERRITORY_URL,
   mergeGamcomMembers,
   parseGamcomFactionPayload,
   parseGamcomTerritoryPayload,
   SNAPSHOT_FIELDS,
 } = require("../lib/samguk-gamcom-sync");
+const { CURRENT_SEASON_ID } = require("../lib/samguk-observations");
 
 const COLLECTED_AT = "2026-08-03T03:04:05.000Z";
 const SOURCE_URL = "https://gamcom-3kingdom.vercel.app/factions/%EC%B4%89";
+
+test("Gamcom 수집 URL은 후국지 season=2를 명시적으로 고정한다", () => {
+  assert.ok(Object.values(GAMCOM_FACTION_URLS).every(url => new URL(url).searchParams.get("season") === "2"));
+  const territoryUrl = new URL(GAMCOM_TERRITORY_URL);
+  assert.equal(territoryUrl.searchParams.get("fresh"), "1");
+  assert.equal(territoryUrl.searchParams.get("season"), "2");
+});
 
 function rawGamcomRow(index, overrides = {}) {
   return {
@@ -136,6 +145,7 @@ function normalizedTerritories(overrides = {}) {
       capital: [8, 25, 47].includes(number),
       facility: "없음",
       level: 3,
+      special: false,
       ...(overrides[number] || {}),
     };
   });
@@ -151,6 +161,7 @@ function rawTerritoryPayload(overrides = {}) {
       level: territory.level,
       owner: territory.owner,
       isCapital: territory.capital,
+      isCheonrimun: territory.special,
       facilityType: territory.facility,
       x: territory.x,
       y: territory.y,
@@ -175,6 +186,15 @@ function loadGamcomAppsScript() {
     "../scripts/google-apps-script/samguk-gamcom-sync.gs",
   ), "utf8"), context);
   return context;
+}
+
+function seasonMarkerSpreadsheet(rows) {
+  return {
+    getSheetByName: name => name === "게임정보" ? {
+      getLastRow: () => rows.length,
+      getRange: () => ({ getDisplayValues: () => rows }),
+    } : null,
+  };
 }
 
 test("Gamcom RSC text에서 30명 세력 데이터를 정규화한다", () => {
@@ -202,17 +222,38 @@ test("Gamcom RSC text에서 30명 세력 데이터를 정규화한다", () => {
   });
 });
 
-test("Node와 Apps Script의 Gamcom 완전 스냅샷 계약은 같은 37개 필드다", () => {
+test("Node와 Apps Script의 Gamcom 완전 스냅샷 계약은 같은 38개 필드다", () => {
   const context = loadGamcomAppsScript();
   const appsScriptFields = Array.from(context.SAMGUK_GAMCOM_SNAPSHOT_FIELDS);
 
-  assert.equal(SNAPSHOT_FIELDS.length, 37);
+  assert.equal(SNAPSHOT_FIELDS.length, 38);
   assert.deepEqual(appsScriptFields, Array.from(SNAPSHOT_FIELDS));
   assert.ok(SNAPSHOT_FIELDS.includes("maxHealth"));
   assert.ok(SNAPSHOT_FIELDS.includes("attackPower"));
   assert.ok(SNAPSHOT_FIELDS.includes("horseMaxHealth"));
   assert.ok(SNAPSHOT_FIELDS.includes("strengthBonus"));
   assert.ok(SNAPSHOT_FIELDS.includes("skillHasteIncrease"));
+  assert.ok(SNAPSHOT_FIELDS.includes("skillBuild"));
+});
+
+test("Gamcom Apps Script는 실제 운영원장의 후국지 시즌 마커만 허용한다", () => {
+  const context = loadGamcomAppsScript();
+  const valid = [["분류", "항목", "내용"], ["시즌", "season_id", CURRENT_SEASON_ID]];
+
+  assert.equal(context.SAMGUK_GAMCOM_SEASON_ID, CURRENT_SEASON_ID);
+  assert.doesNotThrow(() => context.samgukGamcomAssertCurrentSeason_(seasonMarkerSpreadsheet(valid)));
+  for (const rows of [
+    [["분류", "항목", "내용"]],
+    [["시즌", "season_id", "samgukji-2026-07-31"]],
+    [["기타", "season_id", CURRENT_SEASON_ID]],
+    [["시즌", "SEASON_ID", CURRENT_SEASON_ID]],
+    [...valid, ["시즌", "season_id", CURRENT_SEASON_ID]],
+  ]) {
+    assert.throws(
+      () => context.samgukGamcomAssertCurrentSeason_(seasonMarkerSpreadsheet(rows)),
+      /invalid_season/,
+    );
+  }
 });
 
 test("HTML의 self.__next_f.push 조각에서도 RSC rows를 추출한다", () => {
@@ -286,13 +327,15 @@ test("Gamcom 영토는 60칸 전체와 우리 원장의 불변 ID·번호·좌�
     territories.filter(territory => territory.capital).map(territory => [territory.number, territory.owner]),
     [[8, "위"], [25, "촉"], [47, "오"]],
   );
+  assert.ok(territories.every(territory => territory.special === false));
+  assert.equal(territories.find(territory => territory.number === 27).special, false);
 });
 
 test("Apps Script도 60칸을 검증하고 바뀐 영토만 기존 영토입력 20열로 만든다", () => {
   const context = loadGamcomAppsScript();
   const current = normalizedTerritories();
   const externalPayload = rawTerritoryPayload({
-    1: { owner: "위", facility: "병영", level: 4 },
+    1: { owner: "위", facility: "병영", level: 4, special: true },
     27: { owner: "위" },
   });
   const external = context.samgukGamcomParseTerritories_(JSON.stringify(externalPayload), current);
@@ -318,7 +361,8 @@ test("Apps Script도 60칸을 검증하고 바뀐 영토만 기존 영토입력 
   assert.equal(rows[0][headers.indexOf("영토ID")], "위-001");
   assert.equal(rows[0][headers.indexOf("소유국")], "위");
   assert.equal(rows[0][headers.indexOf("시설")], "병영");
-  assert.equal(rows[1][headers.indexOf("특수지")], "Y");
+  assert.equal(rows[0][headers.indexOf("특수지")], "Y");
+  assert.equal(rows[1][headers.indexOf("특수지")], "N");
   assert.equal(rows[1][headers.indexOf("근거종류")], "Gamcom");
   assert.match(rows[1][headers.indexOf("메모")], /원문 갱신시각 미제공/);
   assert.equal(rows[0][headers.indexOf("증거해시")], rows[1][headers.indexOf("증거해시")]);
@@ -356,6 +400,13 @@ test("Gamcom 영토의 누락·중복·불변 좌표 변경·잘못된 상태를
     /미점령/,
   );
 
+  const missingSpecial = rawTerritoryPayload();
+  delete missingSpecial.forces["위"][0].isCheonrimun;
+  assert.throws(
+    () => parseGamcomTerritoryPayload(JSON.stringify(missingSpecial), { currentTerritories: current }),
+    /특수지|boolean/,
+  );
+
   const missingCapital = rawTerritoryPayload();
   missingCapital.forces["오"][6].isCapital = false;
   assert.throws(
@@ -367,7 +418,7 @@ test("Gamcom 영토의 누락·중복·불변 좌표 변경·잘못된 상태를
 test("Gamcom 영토 변경분만 상태형 관측으로 만들고 낮아진 값과 재점령도 반영한다", () => {
   const baseline = normalizedTerritories();
   const occupied = normalizedTerritories({
-    1: { owner: "위", facility: "병영", level: 4 },
+    1: { owner: "위", facility: "병영", level: 4, special: true },
     27: { owner: "위" },
   });
   const first = buildGamcomTerritoryChanges(baseline, occupied, { collectedAt: COLLECTED_AT });
@@ -377,10 +428,11 @@ test("Gamcom 영토 변경분만 상태형 관측으로 만들고 낮아진 값�
   assert.equal(first.sourceUpdatedAt, null);
   assert.equal(first.changes[0].sourceType, "Gamcom");
   assert.equal(first.changes[0].evidence, GAMCOM_TERRITORY_URL);
-  assert.deepEqual(first.changes[0].changedFields, ["owner", "facility", "level"]);
+  assert.deepEqual(first.changes[0].changedFields, ["owner", "facility", "level", "special"]);
+  assert.equal(first.changes[0].special, true);
   assert.match(first.changes[0].note, /원문 갱신시각 미제공/);
   assert.equal(first.changes[1].number, 27);
-  assert.equal(first.changes[1].special, true);
+  assert.equal(first.changes[1].special, false);
   assert.equal(new Set(first.changes.map(change => change.evidenceHash)).size, 1);
 
   const reverted = buildGamcomTerritoryChanges(occupied, baseline, {
@@ -391,6 +443,16 @@ test("Gamcom 영토 변경분만 상태형 관측으로 만들고 낮아진 값�
   assert.equal(reverted.changes[0].facility, "없음");
   assert.equal(reverted.changes[0].level, 3, "영토 레벨도 MAX가 아닌 최신 상태를 써야 한다");
   assert.notEqual(reverted.changes[0].territoryObservationId, first.changes[0].territoryObservationId);
+
+  const season2SpecialReset = buildGamcomTerritoryChanges(
+    normalizedTerritories({ 27: { special: true } }),
+    baseline,
+    { collectedAt: "2026-08-03T03:34:05.000Z" },
+  );
+  assert.equal(season2SpecialReset.changedCount, 1);
+  assert.equal(season2SpecialReset.changes[0].number, 27);
+  assert.deepEqual(season2SpecialReset.changes[0].changedFields, ["special"]);
+  assert.equal(season2SpecialReset.changes[0].special, false);
 
   const unchanged = buildGamcomTerritoryChanges(baseline, baseline, { collectedAt: COLLECTED_AT });
   assert.equal(unchanged.changedCount, 0);
@@ -537,8 +599,10 @@ test("변경된 최댓값만 시트+Gamcom 기준값 스냅샷으로 만든다",
   });
 
   assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].seasonId, CURRENT_SEASON_ID);
   assert.equal(snapshots[0].playerId, "P001");
-  assert.equal(Object.keys(snapshots[0].fields).length, 37);
+  assert.equal(Object.keys(snapshots[0].fields).length, 38);
+  assert.equal(snapshots[0].fields.skillBuild, null);
   assert.equal(snapshots[0].fields.weapon, 9);
   assert.equal(snapshots[0].fields.maxHealth, 1575);
   assert.equal(snapshots[0].fields.attackPower, 110);

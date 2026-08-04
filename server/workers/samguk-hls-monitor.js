@@ -16,10 +16,12 @@ const {
   buildBaselinesFromMembers,
   buildFallbackTargets,
   createSamgukHlsMonitor,
+  OCR_STREAM_QUALITY,
 } = require("../lib/samguk-hls-monitor");
 const { createSamgukSheetService } = require("../lib/samguk-sheet");
 const { createSamgukOcrCommand } = require("../lib/samguk-ocr-command");
 const {
+  CURRENT_SEASON_ID,
   acquireObservationQueueLock,
   readObservationQueue,
   resolveLatestAccepted,
@@ -39,13 +41,44 @@ const ALL_TARGET_IDS = Object.freeze(Array.from(
   { length: ALL_TARGET_COUNT },
   (_value, index) => `P${String(index + 1).padStart(3, "0")}`,
 ));
+const SAFE_BASELINE_REFRESH_ERROR_CODES = new Set([
+  "baseline_unavailable",
+  "config_error",
+  "duplicate_baseline",
+  "empty_sheet",
+  "incomplete_sheet",
+  "invalid_baseline",
+  "invalid_config",
+  "invalid_response",
+  "invalid_roster",
+  "invalid_season",
+  "invalid_sheet",
+  "oauth_failed",
+  "response_too_large",
+  "schema_error",
+  "upstream_error",
+  "upstream_http",
+  "upstream_timeout",
+]);
+const SAFE_BASELINE_REFRESH_ERROR_NAMES = new Set([
+  "AbortError",
+  "Error",
+  "RangeError",
+  "SamgukHlsMonitorError",
+  "SamgukHlsWorkerError",
+  "SamgukSeasonResetError",
+  "SamgukSheetError",
+  "TypeError",
+]);
 const DEFAULT_HLS_CONFIG = Object.freeze({
   cacheTtlMs: 60_000,
   timeoutMs: 5_000,
   maxResponseBytes: 256 * 1024,
   maxSegmentBytes: 8 * 1024 * 1024,
   maxBatchBytes: 32 * 1024 * 1024,
-  maxCatchupSegments: 6,
+  maxCatchupSegments: 12,
+  segmentConcurrency: 1,
+  ocrSegmentConcurrency: 3,
 });
 const DEFAULT_FFMPEG_CONFIG = Object.freeze({
   path: "/usr/bin/ffmpeg",
@@ -73,6 +106,22 @@ class SamgukHlsWorkerError extends Error {
 
 function fail(code, message) {
   throw new SamgukHlsWorkerError(code, message);
+}
+
+function safeErrorIdentity(error) {
+  function read(property, allowed, fallback) {
+    let value;
+    try {
+      value = error?.[property];
+    } catch {
+      return fallback;
+    }
+    return typeof value === "string" && allowed.has(value) ? value : fallback;
+  }
+  return Object.freeze({
+    code: read("code", SAFE_BASELINE_REFRESH_ERROR_CODES, "unknown"),
+    name: read("name", SAFE_BASELINE_REFRESH_ERROR_NAMES, "Error"),
+  });
 }
 
 function isPlainObject(value) {
@@ -122,6 +171,8 @@ function normalizeHlsConfig(input = {}) {
       "maxSegmentBytes",
       "maxBatchBytes",
       "maxCatchupSegments",
+      "segmentConcurrency",
+      "ocrSegmentConcurrency",
     ]),
     "hls",
   );
@@ -155,6 +206,20 @@ function normalizeHlsConfig(input = {}) {
       1,
       12,
       "hls.maxCatchupSegments",
+    ),
+    segmentConcurrency: integerInRange(
+      input.segmentConcurrency,
+      DEFAULT_HLS_CONFIG.segmentConcurrency,
+      1,
+      4,
+      "hls.segmentConcurrency",
+    ),
+    ocrSegmentConcurrency: integerInRange(
+      input.ocrSegmentConcurrency,
+      DEFAULT_HLS_CONFIG.ocrSegmentConcurrency,
+      1,
+      4,
+      "hls.ocrSegmentConcurrency",
     ),
   });
 }
@@ -190,6 +255,7 @@ function normalizeSchedulerConfig(input = {}) {
     burstDurationMs: integerInRange(input.burstDurationMs, DEFAULT_SCHEDULER_OPTIONS.burstDurationMs, 1_000, 5 * 60_000, "scheduler.burstDurationMs"),
     normalConcurrency: integerInRange(input.normalConcurrency, DEFAULT_SCHEDULER_OPTIONS.normalConcurrency, 1, 90, "scheduler.normalConcurrency"),
     burstConcurrency: integerInRange(input.burstConcurrency, DEFAULT_SCHEDULER_OPTIONS.burstConcurrency, 1, 90, "scheduler.burstConcurrency"),
+    maxActiveTasks: integerInRange(input.maxActiveTasks, DEFAULT_SCHEDULER_OPTIONS.maxActiveTasks, 1, 90, "scheduler.maxActiveTasks"),
     jitterRatio: numberInRange(input.jitterRatio, DEFAULT_SCHEDULER_OPTIONS.jitterRatio, 0, 0.5, "scheduler.jitterRatio"),
     backoffBaseMs: integerInRange(input.backoffBaseMs, DEFAULT_SCHEDULER_OPTIONS.backoffBaseMs, 500, 10 * 60_000, "scheduler.backoffBaseMs"),
     backoffMaxMs: integerInRange(input.backoffMaxMs, DEFAULT_SCHEDULER_OPTIONS.backoffMaxMs, 500, 30 * 60_000, "scheduler.backoffMaxMs"),
@@ -200,6 +266,10 @@ function normalizeSchedulerConfig(input = {}) {
     || config.burstDurationMs < config.burstIntervalMs
     || config.backoffMaxMs < config.backoffBaseMs) {
     fail("invalid_config", "scheduler 주기 순서가 올바르지 않습니다.");
+  }
+  if (config.maxActiveTasks < config.normalConcurrency
+    || config.maxActiveTasks < config.burstConcurrency) {
+    fail("invalid_config", "scheduler.maxActiveTasks는 각 lane 동시성 이상이어야 합니다.");
   }
   return Object.freeze(config);
 }
@@ -490,7 +560,7 @@ function createRuntime(config, options = {}) {
   if (sharedFetchOptions.fetchImpl === undefined) delete sharedFetchOptions.fetchImpl;
   const resolvers = {
     SD: resolverFactory({ ...sharedFetchOptions, quality: "SD" }),
-    HD: resolverFactory({ ...sharedFetchOptions, quality: "HD" }),
+    [OCR_STREAM_QUALITY]: resolverFactory({ ...sharedFetchOptions, quality: OCR_STREAM_QUALITY }),
   };
   const hlsCache = cacheFactory({
     resolvers,
@@ -503,6 +573,14 @@ function createRuntime(config, options = {}) {
     maxSegmentBytes: config.hls.maxSegmentBytes,
     maxBatchBytes: config.hls.maxBatchBytes,
     maxSegments: config.hls.maxCatchupSegments,
+    segmentConcurrency: config.hls.segmentConcurrency,
+  });
+  const fetchOcrSegments = segmentFetcherFactory({
+    ...sharedFetchOptions,
+    maxSegmentBytes: config.hls.maxSegmentBytes,
+    maxBatchBytes: config.hls.maxBatchBytes,
+    maxSegments: config.hls.maxCatchupSegments,
+    segmentConcurrency: config.hls.ocrSegmentConcurrency,
   });
   const frames = frameFactory({
     ffmpegPath: config.ffmpeg.path,
@@ -523,6 +601,7 @@ function createRuntime(config, options = {}) {
     clock,
     hlsCache,
     fetchSegments,
+    fetchOcrSegments,
     maxCatchupSegments: config.hls.maxCatchupSegments,
     decodeGrayFrame: frames.captureGrayFrame,
     ...(ocr ? {
@@ -550,7 +629,8 @@ async function loadCurrentBaselines(targets, options = {}) {
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
   });
   const payload = await service.load();
-  if (!payload || payload.stale || payload.source !== "google-sheet") {
+  if (!payload || payload.stale || payload.source !== "google-sheet"
+      || payload.seasonId !== CURRENT_SEASON_ID) {
     fail("baseline_unavailable", "최신 Google Sheet를 읽지 못해 OCR 시작을 중단합니다.");
   }
   const baselines = buildBaselinesFromMembers(payload.members, targets);
@@ -592,6 +672,7 @@ function safeHeartbeat(snapshot, cacheSnapshot, mode = DEFAULT_WORKER_MODE) {
       .digest("hex")
       .slice(0, 16),
     activeTasks: snapshot.activeTasks,
+    maxActiveTasks: snapshot.maxActiveTasks,
     ocrEnabled: snapshot.ocrEnabled,
     counts: snapshot.scheduler.counts,
     stats: snapshot.stats,
@@ -631,9 +712,13 @@ async function main(options = {}) {
       env.SAMGUK_OBSERVATION_QUEUE_PATH || path.join(stateDir, "observations.ndjson"),
     );
     const baselineLoader = options.baselineLoader || loadCurrentBaselines;
-    const baselineLoadOptions = {
-      fetchImpl: options.sheetFetchImpl,
-    };
+    const baselineLoadOptions = config.ocr.enabled && baselineLoader === loadCurrentBaselines
+      ? {
+        service: (options.createSamgukSheetServiceFn || createSamgukSheetService)({
+          ...(options.sheetFetchImpl ? { fetchImpl: options.sheetFetchImpl } : {}),
+        }),
+      }
+      : { fetchImpl: options.sheetFetchImpl };
     const baselines = config.ocr.enabled
       ? await baselineLoader(targets, baselineLoadOptions)
       : [];
@@ -704,9 +789,11 @@ async function main(options = {}) {
               runtime.monitor.refreshBaselines(nextBaselines);
             }
           })
-          .catch(() => {
+          .catch((error) => {
             if (!controller.signal.aborted && generation === baselineRefreshGeneration) {
-              logger.warn?.("[samguk-hls-monitor] baseline_refresh_failed");
+              logger.warn?.(
+                `[samguk-hls-monitor] baseline_refresh_failed ${JSON.stringify(safeErrorIdentity(error))}`,
+              );
             }
           })
           .finally(() => {
@@ -768,5 +855,6 @@ module.exports = {
   loadQueuedBaselineOverlays,
   main,
   normalizeWorkerConfig,
+  safeErrorIdentity,
   safeHeartbeat,
 };

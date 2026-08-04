@@ -118,6 +118,23 @@ test("SD 품질을 player 요청과 broad_key 및 결과에 일관되게 반영�
   );
 });
 
+test("ORIGINAL 품질은 1080p 원본 broad_key를 요청한다", async () => {
+  const flow = publicFlowFetch();
+  const result = await resolveSoopHls("devil0108", {
+    fetchImpl: flow.fetchImpl,
+    quality: "ORIGINAL",
+    random: () => 0,
+  });
+
+  assert.equal(result.quality, "ORIGINAL");
+  assert.equal(new URLSearchParams(flow.calls[1].init.body).get("quality"), "ORIGINAL");
+  assert.equal(new URLSearchParams(flow.calls[2].init.body).get("quality"), "ORIGINAL");
+  assert.equal(
+    new URL(flow.calls[3].url).searchParams.get("broad_key"),
+    "296022399-common-original-hls",
+  );
+});
+
 test("지원하지 않는 품질은 fetch 전에 거부한다", async () => {
   let fetchCount = 0;
   const fetchImpl = async () => {

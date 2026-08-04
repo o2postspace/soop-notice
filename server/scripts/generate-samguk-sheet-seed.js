@@ -16,11 +16,12 @@ const MEMBER_FIELDS = [
   "skillDamageBonusPct", "moveSpeedBonusPct", "horseMaxHealth",
   "strengthBonus", "agilityBonus", "vitalityBonus", "intelligenceBonus",
   "attackPowerIncrease", "moveSpeedIncrease", "healthIncrease", "skillHasteIncrease",
+  "skillBuild", "sourceType", "sourceCount", "verificationStatus", "reviewStatus",
   "observedAt", "evidence",
 ];
 const TERRITORY_FIELDS = [
-  "id", "number", "x", "y", "owner", "capital", "facility", "level",
-  "observedAt", "evidence",
+  "id", "number", "x", "y", "owner", "capital", "facility", "level", "special",
+  "sourceType", "sourceCount", "verificationStatus", "reviewStatus", "observedAt", "evidence",
 ];
 const RULE_FIELDS = [
   "category", "title", "description", "sourceUrl", "sourceDate", "reviewStatus",
@@ -40,6 +41,7 @@ function buildSeed(fallback) {
   if (territoryNumbers.size !== 60) throw new Error("영토 번호가 중복되었습니다.");
   return {
     version: 1,
+    seasonId: fallback.seasonId,
     updatedAt: fallback.updatedAt,
     memberFields: MEMBER_FIELDS,
     members: fallback.members.map((member, index) => [

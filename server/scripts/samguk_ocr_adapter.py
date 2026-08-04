@@ -39,6 +39,7 @@ for _thread_env_key in (
 
 
 VERSION = 2
+CURRENT_SEASON_ID = "hugukji-2026-08-04"
 DEFAULT_PROFILE = "stats-panel-v1"
 MAX_PNG_BYTES = 16 * 1024 * 1024
 MAX_PIXELS = 4096 * 2160
@@ -68,6 +69,7 @@ HORSE_HEALTH_RATIO_RE = re.compile(
 COMBINED_GEAR_TITLE_RE = re.compile(
     r"^(무기|두갑|두건|투구|흉갑|갑옷|각갑|신발)\(\+(\d{1,2})\)$",
 )
+ITEM_ENHANCEMENT_TITLE_RE = re.compile(r"^([A-Za-z0-9가-힣]{2,40})\(\+(\d{1,2})\)$")
 
 MODEL_NAMES = (
     "PP-OCRv6_det_small.onnx",
@@ -113,17 +115,21 @@ INFO_LABEL_FIELDS = {
     "방어력": "defense",
     "공격력증가량": "attackPowerBonusPct",
     "받는피해감소": "damageReductionPct",
+    "받는피해검소": "damageReductionPct",
     "치명타확률": "criticalChancePct",
     "치명타대미지": "criticalDamagePct",
+    "차명타대미지": "criticalDamagePct",
     "치명타데미지": "criticalDamagePct",
     "크리티컬확률": "criticalChancePct",
     "크리티컬대미지": "criticalDamagePct",
     "크리티컬데미지": "criticalDamagePct",
     "절기대기시간감소": "skillCooldownReductionPct",
+    "철기대기시간검소": "skillCooldownReductionPct",
     "쿨타임감소율": "skillCooldownReductionPct",
     "절기피해량증가량": "skillDamageBonusPct",
     "절기피해량증가": "skillDamageBonusPct",
     "이동속도증가량": "moveSpeedBonusPct",
+    "이품속도증가량": "moveSpeedBonusPct",
     "이동속도증가율": "moveSpeedBonusPct",
 }
 INFO_FIELD_ROWS = (
@@ -149,6 +155,92 @@ ENHANCEMENT_MARKERS = (
 HORSE_PANEL_HEADERS = ("군마영",)
 HORSE_PANEL_TABS = ("장착", "강화", "합성")
 HUD_COMBAT_PROFILE = "hud-combat-v1"
+SKILL_BUILD_ROWS = (
+    ("유성보", 1),
+    ("호신강기", 1),
+    ("회선난", 1),
+    ("천패강림", 2),
+    ("비룡귀참", 2),
+    ("승천낙뢰", 2),
+)
+SKILL_NAME_ALIASES = {
+    "유성보": "유성보",
+    "류성보": "유성보",
+    "유성브": "유성보",
+    "류성브": "유성보",
+    "성보": "유성보",
+    "호신강기": "호신강기",
+    "호신감기": "호신강기",
+    "회선난": "회선난",
+    "회선란": "회선난",
+    "회신난": "회선난",
+    "해선남": "회선난",
+    "최선난": "회선난",
+    "천패강림": "천패강림",
+    "천파강림": "천패강림",
+    "천폐강림": "천패강림",
+    "천패강원": "천패강림",
+    "전패강원": "천패강림",
+    "전패강": "천패강림",
+    "전대강일": "천패강림",
+    "전매강일": "천패강림",
+    "전태강일": "천패강림",
+    "전태강희": "천패강림",
+    "비룡귀참": "비룡귀참",
+    "위룡귀참": "비룡귀참",
+    "비룡귀잠": "비룡귀참",
+    "비룡구참": "비룡귀참",
+    "비룡귀첨": "비룡귀참",
+    "비귀장": "비룡귀참",
+    "비장": "비룡귀참",
+    "비": "비룡귀참",
+    "승천낙뢰": "승천낙뢰",
+    "승천낙회": "승천낙뢰",
+    "승천낙뇌": "승천낙뢰",
+    "승천낙의": "승천낙뢰",
+    "승천남의": "승천낙뢰",
+    "승천난의": "승천낙뢰",
+    "승전난의": "승천낙뢰",
+}
+SKILL_EXACT_NAME_ALIASES = frozenset(("비",))
+SKILL_FALLBACK_ROW_STEP = 0.0685
+SKILL_FALLBACK_NAME_BOUNDS = (0.375, 0.214, 0.428, 0.247)
+SKILL_FALLBACK_REQUIRED_BOUNDS = (0.536, 0.202, 0.559, 0.236)
+SKILL_FALLBACK_ALLOCATED_BOUNDS = (0.594, 0.202, 0.618, 0.236)
+SKILL_FALLBACK_OWNED_BOUNDS = (0.486, 0.837, 0.499, 0.868)
+SKILL_NINE_ROW_COUNT = 9
+SKILL_NINE_ROW_STEP = 73 / 1080
+SKILL_NINE_NAME_BOUNDS = (718 / 1920, 236 / 1080, 825 / 1920, 266 / 1080)
+# Tooltip이 없는 강화창에서는 실제 아이콘과 충분히 비슷한 template만 쓴다.
+# 각 template은 장비창 제목/단계/button 구조와 함께 사용되므로 단독 분류하지 않는다.
+GEAR_ICON_TEMPLATES_B64 = {
+    "weapon": (
+        "WkM8PkJGTE9QTUQ/PENXXDg7SE5NUFJRVFdWUkpAOkJDR0hKSUpNT1FSUVBOSkY7QUJCRUdJTE5OTUtJSEY/"
+        "PmdoaGpqa2pra2xramlnZmcqKiosLS0uLi4uLi4vLi4tKSkrKysrKikoKSkpKiopKCgoKi0tLSwsKioqKisr"
+        "KigoKiwuLi0tKysqLSwrKywqKSkpKysrKyssKi0zODstKykqKioqKigqKy0+S1JXSS8rKysrKyooKC1AST8z"
+        "TXAvKysrKysqKicsQDMmU3s4LSsrKissKisoMz0qU4E7MCorKysqLioqOkIwT4tIJissKiorKS8rNEU0Tn5N"
+        "KSkoKSgoKCgsMD4zQYJKKC0pKSknJyw4PDozQ4JGJykoKCkpJic+UDgtPoNCJygpKikpKScoSEUnOodILCko"
+        "KysqKCgnM1I2PodPJikoKSooKCcnJztTO3lRLCgnJyYnJycmJiYuT3BZKCwqJyYlJiYlJSQmJjpHLCwqKCYm"
+        "JiYmJiYl",
+        "HBwcHR8fHx8eHR0bGRoaHBwcHR4fHx8fHx4dJy4kHhwcHB0dHx8fHx4eLElPViwcHBwdHR0dHR0dJElRWkQh"
+        "HRwcHR0dHRwdIDE5WVEgHh0cHB0dHR0dIiszRkQkHh8eHBwdHh0dIS8yOTghHR4dHRwcHR4cICEnMzEjHx0e"
+        "HhwcHB0eKSEiKyojIB8dHBwcHBwdKUguKCwfHx4eHRwbGxwcHidETDgcHR0eHhwbGhobGh8xPEk3HB0dHR0c"
+        "GxoaGxo6Sh4eHh0dHBwdHBsaGh0nMSIcHR0cHB0cHBsaGhodKSAbHR0cHBwdHBsbGhkZGR8eGxwcGxscHBsb"
+        "GhkZGRgZGhoaGhoaGhoaGRkYGBkTExMTExMTExMSExMTEhITNjY2NTY2NTY2NTY2NjU1NiwsLSwtLSwtLS0s"
+        "LCoqLC0lHhkeHh4fHx8fHh0dIiYcJC0oIiAfHh8eHyAnKiYdGRQWIiosLCksLSopJBsWFRwXFhIWGh0dHRsX"
+        "FBQXGBcY",
+    ),
+    "armor": (
+        "GxsbGxsbHywfGxsbGxsbGxsbGxsbHS9ZLhoaGxsaGxsbGxsmLCIgSS4lIyEbGhobGxsaMz0xRWBUYk4tHRob"
+        "GhsbHC4pRYFuRj8+PSIcHBoZHDcyIzpYWkMuQlAoIR0bGyRANSMzSUtEIzViQRoaGhgaNTMjMUc3IhAXWEkm"
+        "HxoaHy4mIDhCQBkTIjguHBwbGh8kHyRTYiwcGiIWHx4bGxseHyExQUUvNSUdHCAgGxscHh8pMj1SODgtIBob"
+        "GhsbHB0eICM8Sj05NjEcGxobGxwcHhsdQUYzMC4gHhwaGxscHB4dHy8uIyAhHRsaGhsbGhobGhgcHBoaGxsb"
+        "GhoaGhgYGRkZGhoZGRcXFxcXFxgXFxcXFxgYFxYWFhcXFxcXOzs6ODc2NjY3ODo7Ozs6OiwtLi0tLCwsLS0u"
+        "Ly8uLy4hHx8eHx8fHx8fHxwcIiggHScoJSEiIiEhISEmKiQeGhMYICksKysrLS0tJxkTERoZFhUZGxsaGhkZ"
+        "GBYUFRga",
+    ),
+}
+KNOWN_GEAR_ITEM_NAMES = {"창룡극": "weapon"}
 # 2026-08-03 실제 강화창의 각갑 아이콘(16x24 grayscale). 강화창 제목과
 # 3-scale 단계 합의가 동시에 성립할 때만 이 template을 사용한다.
 SHOES_ICON_TEMPLATE_WIDTH = 16
@@ -561,6 +653,36 @@ def _information_structure_confidence(
     return round(0.90 + 0.09 * geometry_quality, 5)
 
 
+def _information_percentage_consensus(
+    image: Any,
+    token: Token,
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> Optional[tuple[int | float, float]]:
+    """깨진 작은 백분율 token을 동일 bbox의 3배율 합의로 복구한다."""
+    height, width = image.shape[:2]
+    x0 = max(0, int(math.floor(token.x0)))
+    y0 = max(0, int(math.floor(token.y0)))
+    x1 = min(width, int(math.ceil(token.x1)) + 1)
+    y1 = min(height, int(math.ceil(token.y1)) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return None
+    crop = image[y0:y1, x0:x1]
+    votes: list[int | float] = []
+    scores: list[float] = []
+    for scale in (1, 2, 4):
+        text, score = line_reader(crop, scale)
+        value = _percentage_value(text)
+        if value is None or not 0 <= score <= 1:
+            return None
+        votes.append(value)
+        scores.append(score)
+    if len(set(votes)) != 1:
+        return None
+    # 세 독립 배율이 같은 짧은 값에 합의하고 고정 행/열 구조까지 통과한 경우의
+    # 합의 신뢰도다. 최종값은 아래 structural confidence 상한을 다시 적용한다.
+    return votes[0], max(token.confidence, min(scores), 0.95)
+
+
 def _information_panel(
     image: Any,
     normalized: Sequence[tuple[Token, str]],
@@ -574,10 +696,19 @@ def _information_panel(
     복원한다. 네 개의 백분율 값이 같은 열에 있을 때만 추출을 허용한다.
     """
     candidates: list[tuple[tuple[int, int, float], list[dict[str, Any]]]] = []
-    affiliations = [token for token, text in normalized if text == "소속"]
-    health_labels = [token for token, text in normalized if text == "체력"]
-
     info_titles = [token for token, text in normalized if text == "정보"]
+    affiliations = [
+        token for token, text in normalized
+        if text == "소속" or (
+            text == "속" and any(
+                title.cy < token.cy
+                and token.cy - title.cy <= 6.0 * token.height
+                and abs(token.cx - title.cx) <= 6.0 * token.height
+                for title in info_titles
+            )
+        )
+    ]
+    health_labels = [token for token, text in normalized if text in ("체력", "체락")]
     affiliation_values = [
         token for token, text in normalized if text in INFO_AFFILIATION_VALUES
     ]
@@ -776,6 +907,13 @@ def _information_panel(
                         parsed = _decimal_value(token.text)
                     elif kind == "percent":
                         parsed = _percentage_value(token.text)
+                        parsed_confidence = token.confidence
+                        if parsed is None or token.confidence < 0.95:
+                            consensus = _information_percentage_consensus(
+                                image, token, line_reader,
+                            )
+                            if consensus is not None:
+                                parsed, parsed_confidence = consensus
                     else:
                         parsed = _active_general_value(token.text)
                     if parsed is None:
@@ -784,7 +922,13 @@ def _information_panel(
                     y_quality = 1.0 - min(1.0, y_distance / row_tolerance)
                     right_quality = 1.0 - min(1.0, right_distance / (3.0 * refined_step))
                     geometry_quality = 0.75 * y_quality + 0.25 * right_quality
-                    row_candidates.append((distance, token, parsed, geometry_quality))
+                    candidate_token = token
+                    if kind == "percent":
+                        candidate_token = Token(
+                            token.text, parsed_confidence,
+                            token.x0, token.y0, token.x1, token.y1,
+                        )
+                    row_candidates.append((distance, candidate_token, parsed, geometry_quality))
                 if row_candidates:
                     _, value_token, value, geometry_quality = min(
                         row_candidates, key=lambda item: item[0],
@@ -933,36 +1077,135 @@ def _enhancement_stage_consensus(
 
 
 def _shoes_icon_similarity(image: Any, header: Token) -> float:
+    return _gear_icon_similarities(image, header).get("shoes", 0.0)
+
+
+def _gear_icon_similarities(image: Any, header: Token) -> dict[str, float]:
     try:
         import cv2
         import numpy as np
         height, width = image.shape[:2]
-        unit = header.height
-        x0 = max(0, int(header.cx - 0.64 * unit))
-        x1 = min(width, int(header.cx + 0.89 * unit))
-        y0 = max(0, int(header.y0 + 6.36 * unit))
-        y1 = min(height, int(header.y0 + 8.56 * unit))
-        if x1 <= x0 or y1 <= y0:
-            return 0.0
-        crop = image[y0:y1, x0:x1]
-        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
-        resized = cv2.resize(
-            gray,
-            (SHOES_ICON_TEMPLATE_WIDTH, SHOES_ICON_TEMPLATE_HEIGHT),
-            interpolation=cv2.INTER_AREA,
-        ).astype(np.float64)
-        template_bytes = base64.b64decode(SHOES_ICON_TEMPLATE_B64, validate=True)
-        template = np.frombuffer(template_bytes, dtype=np.uint8).reshape(
-            SHOES_ICON_TEMPLATE_HEIGHT, SHOES_ICON_TEMPLATE_WIDTH,
-        ).astype(np.float64)
-        resized -= resized.mean()
-        template -= template.mean()
-        denominator = float(np.linalg.norm(resized) * np.linalg.norm(template))
-        if denominator <= 1e-9:
-            return 0.0
-        return max(-1.0, min(1.0, float(np.sum(resized * template) / denominator)))
+        templates = {
+            field: tuple(values) for field, values in GEAR_ICON_TEMPLATES_B64.items()
+        }
+        templates["shoes"] = (SHOES_ICON_TEMPLATE_B64,)
+        scores = {field: -1.0 for field in templates}
+        for unit_scale in (0.97, 1.0, 1.03):
+            unit = header.height * unit_scale
+            for x_shift in (-0.05, 0.0, 0.05):
+                for y_shift in (-0.08, 0.0, 0.08):
+                    x0 = max(0, int(header.cx + x_shift * unit - 0.64 * unit))
+                    x1 = min(width, int(header.cx + x_shift * unit + 0.89 * unit))
+                    y0 = max(0, int(header.y0 + y_shift * unit + 6.36 * unit))
+                    y1 = min(height, int(header.y0 + y_shift * unit + 8.56 * unit))
+                    if x1 <= x0 or y1 <= y0:
+                        continue
+                    crop = image[y0:y1, x0:x1]
+                    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
+                    resized = cv2.resize(
+                        gray,
+                        (SHOES_ICON_TEMPLATE_WIDTH, SHOES_ICON_TEMPLATE_HEIGHT),
+                        interpolation=cv2.INTER_AREA,
+                    ).astype(np.float64)
+                    resized -= resized.mean()
+                    resized_norm = float(np.linalg.norm(resized))
+                    if resized_norm <= 1e-9:
+                        continue
+                    for field, encoded_templates in templates.items():
+                        for encoded in encoded_templates:
+                            template = np.frombuffer(
+                                base64.b64decode(encoded, validate=True), dtype=np.uint8,
+                            ).reshape(
+                                SHOES_ICON_TEMPLATE_HEIGHT, SHOES_ICON_TEMPLATE_WIDTH,
+                            ).astype(np.float64)
+                            template -= template.mean()
+                            denominator = resized_norm * float(np.linalg.norm(template))
+                            if denominator > 1e-9:
+                                similarity = float(np.sum(resized * template) / denominator)
+                                scores[field] = max(scores[field], similarity)
+        return scores
     except Exception:
-        return 0.0
+        return {}
+
+
+def _enhancement_anchor(
+    normalized: Sequence[tuple[Token, str]],
+) -> Optional[Token]:
+    headers = [token for token, text in normalized if text == "장비강화"]
+    if headers:
+        return max(headers, key=lambda token: token.confidence)
+    stages = [
+        token for token, text in normalized
+        if _enhancement_stage_value(text) is not None and token.confidence >= 0.80
+    ]
+    if stages:
+        stage = max(stages, key=lambda token: token.confidence)
+        unit = 1.30 * stage.height
+        top = stage.cy - 4.0 * unit
+        return Token(
+            "장비강화",
+            stage.confidence,
+            stage.cx - 1.5 * unit,
+            top,
+            stage.cx + 1.5 * unit,
+            top + unit,
+        )
+    buttons = [token for token, text in normalized if text == "강화하기"]
+    if not buttons:
+        return None
+    button = max(buttons, key=lambda token: token.confidence)
+    unit = 0.97 * button.height
+    top = button.cy - 16.0 * unit
+    return Token(
+        "장비강화",
+        button.confidence,
+        button.cx - 1.5 * unit,
+        top,
+        button.cx + 1.5 * unit,
+        top + unit,
+    )
+
+
+def _detected_enhancement_stage(
+    normalized: Sequence[tuple[Token, str]],
+) -> Optional[tuple[int, float]]:
+    matches = []
+    for token, text in normalized:
+        value = _enhancement_stage_value(text)
+        if value is not None and token.confidence >= 0.80:
+            matches.append((token.confidence, value[0]))
+    if not matches:
+        return None
+    confidence, value = max(matches)
+    return value, confidence
+
+
+def _enhancement_stage_from_anchor(
+    image: Any,
+    anchor: Token,
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> Optional[tuple[int, float]]:
+    height, width = image.shape[:2]
+    unit = anchor.height
+    x0 = max(0, int(anchor.cx - 2.0 * unit))
+    x1 = min(width, int(anchor.cx + 2.0 * unit))
+    y0 = max(0, int(anchor.y1 + 2.25 * unit))
+    y1 = min(height, int(anchor.y1 + 3.75 * unit))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    crop = image[y0:y1, x0:x1]
+    values = []
+    scores = []
+    for scale in (1, 2, 4):
+        text, score = line_reader(crop, scale)
+        value = _enhancement_stage_value(text)
+        if value is None or not 0 <= score <= 1:
+            return None
+        values.append(value[0])
+        scores.append(score)
+    if len(set(values)) != 1:
+        return None
+    return values[0], min(scores)
 
 
 def _enhancement_value(text: str) -> Optional[int]:
@@ -1133,6 +1376,507 @@ def _horse_max_health(
     return maximum, confidence
 
 
+def _skill_name_value(text: str) -> Optional[str]:
+    compact = re.sub(r"[^A-Za-z0-9가-힣]", "", compact_text(text))
+    matches = {
+        canonical
+        for alias, canonical in SKILL_NAME_ALIASES.items()
+        if compact == alias or (alias not in SKILL_EXACT_NAME_ALIASES and alias in compact)
+    }
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+def _generic_skill_name_value(text: str) -> Optional[str]:
+    """직업 catalog 없이 절기명 한 줄만 보수적으로 정규화한다."""
+    compact = re.sub(r"[^A-Za-z0-9가-힣]", "", compact_text(text))
+    if not 2 <= len(compact) <= 20 or not re.search(r"[가-힣]", compact):
+        return None
+    if compact in {"장수", "일반", "영웅", "필요포인트", "소유중인포인트"}:
+        return None
+    return compact
+
+
+def _skill_point_value(text: str) -> Optional[int]:
+    compact = compact_text(text).strip(".,·:;→>-_()[]{}※*+")
+    aliases = {
+        "O": "0", "o": "0", "D": "0", "d": "0", "ㅇ": "0", "ᄋ": "0",
+        "〇": "0", "○": "0", "ö": "0", "Ö": "0",
+        "I": "1", "i": "1", "l": "1", "|": "1", "ㅣ": "1", "ᅵ": "1",
+        "Z": "2", "z": "2",
+    }
+    compact = aliases.get(compact, compact)
+    if not re.fullmatch(r"\d{1,3}", compact):
+        return None
+    return int(compact)
+
+
+def _skill_recrop_consensus(
+    image: Any,
+    bounds: tuple[float, float, float, float],
+    parser: Callable[[str], Any],
+    line_reader: Callable[[Any, int], tuple[str, float]],
+    min_score: float = 0.30,
+) -> Optional[tuple[Any, float]]:
+    height, width = image.shape[:2]
+    x0 = max(0, int(math.floor(bounds[0])))
+    y0 = max(0, int(math.floor(bounds[1])))
+    x1 = min(width, int(math.ceil(bounds[2])))
+    y1 = min(height, int(math.ceil(bounds[3])))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    crop = image[y0:y1, x0:x1]
+    votes: list[Any] = []
+    scores: list[float] = []
+    for scale in (1, 2, 4):
+        text, score = line_reader(crop, scale)
+        value = parser(text)
+        if value is None or not min_score <= score <= 1:
+            return None
+        votes.append(value)
+        scores.append(score)
+    if len(set(votes)) != 1:
+        return None
+    return votes[0], min(scores)
+
+
+def _skill_fallback_row(token: Token, image: Any) -> Optional[int]:
+    height, width = image.shape[:2]
+    if not 0.19 <= token.cy / height <= 0.61:
+        return None
+    row = round((token.cy / height - 0.226) / SKILL_FALLBACK_ROW_STEP)
+    if not 0 <= row < len(SKILL_BUILD_ROWS):
+        return None
+    expected_y = 0.226 + row * SKILL_FALLBACK_ROW_STEP
+    return row if abs(token.cy / height - expected_y) <= 0.028 else None
+
+
+def _skill_need_hint(text: str) -> bool:
+    return any(marker in text for marker in (
+        "필요", "포인", "인트", "왕요", "월요", "있요", "링은",
+    )) or bool(re.fullmatch(r"인[012]", text))
+
+
+def _skill_fallback_title(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+) -> Optional[Token]:
+    """960x540 보관 frame에서 절기창의 고정 6행 구조를 확인한다.
+
+    값은 이 단계에서 추정하지 않는다. 정확한 제목·footer와 서로 다른 여러 행의
+    이름/필요포인트 흔적을 모두 요구한 뒤 각 값은 별도 3배율 recrop으로 읽는다.
+    """
+    height, width = image.shape[:2]
+    titles = [
+        token for token, text in normalized
+        if text == "절기" and token.confidence >= 0.95
+        and 0.46 <= token.cx / width <= 0.54
+        and 0.10 <= token.cy / height <= 0.20
+    ]
+    reset = any(
+        text in ("초기화", "조기화") and token.confidence >= 0.80
+        and 0.34 <= token.cx / width <= 0.43
+        and 0.79 <= token.cy / height <= 0.90
+        for token, text in normalized
+    )
+    owned_footer = any(
+        text.startswith("소") and "포인" in text
+        and 0.43 <= token.cx / width <= 0.54
+        and 0.77 <= token.cy / height <= 0.90
+        for token, text in normalized
+    )
+    if not reset or not owned_footer:
+        return None
+
+    name_rows: set[int] = set()
+    need_rows: set[int] = set()
+    for token, text in normalized:
+        row = _skill_fallback_row(token, image)
+        if row is None:
+            continue
+        normalized_x = token.cx / width
+        if 0.35 <= normalized_x <= 0.46:
+            name = _skill_name_value(text)
+            if name == SKILL_BUILD_ROWS[row][0]:
+                name_rows.add(row)
+        if 0.47 <= normalized_x <= 0.58 and _skill_need_hint(text):
+            need_rows.add(row)
+    if len(name_rows) < 2 or len(need_rows) < 3 or len(name_rows | need_rows) < 5:
+        return None
+    if len(name_rows) + len(need_rows) < 7:
+        return None
+    return max(titles, key=lambda token: token.confidence) if titles else None
+
+
+def _skill_scaled_bounds(
+    image: Any,
+    normalized_bounds: tuple[float, float, float, float],
+    row: int = 0,
+    row_step: float = SKILL_FALLBACK_ROW_STEP,
+) -> tuple[float, float, float, float]:
+    height, width = image.shape[:2]
+    x0, y0, x1, y1 = normalized_bounds
+    row_offset = row * row_step
+    return x0 * width, (y0 + row_offset) * height, x1 * width, (y1 + row_offset) * height
+
+
+def _skill_detected_owned_point(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+) -> Optional[tuple[int, float]]:
+    height, width = image.shape[:2]
+    candidates = []
+    for token, _text in normalized:
+        point = _skill_point_value(token.text)
+        if point is None:
+            continue
+        normalized_x = token.cx / width
+        normalized_y = token.cy / height
+        if 0.475 <= normalized_x <= 0.515 and 0.83 <= normalized_y <= 0.88:
+            candidates.append((abs(normalized_x - 0.493) + abs(normalized_y - 0.853), point, token.confidence))
+    if not candidates:
+        return None
+    _distance, point, confidence = min(candidates)
+    return point, confidence
+
+
+def _skill_build_result(
+    title: Token,
+    skills: list[dict[str, Any]],
+    owned_points: int,
+    scores: Sequence[float],
+) -> dict[str, Any]:
+    value = json.dumps(
+        {
+            "version": 1,
+            "preset": None,
+            "ownedPoints": owned_points,
+            "skills": skills,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    confidence = min(title.confidence, 0.99, max(0.95, min(scores)))
+    return {"field": "skillBuild", "value": value, "confidence": confidence}
+
+
+def _skill_panel_fallback(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> tuple[bool, Optional[dict[str, Any]]]:
+    title = _skill_fallback_title(image, normalized)
+    if title is None:
+        return False, None
+
+    skills = []
+    recrop_scores: list[float] = []
+    for row, (expected_name, expected_required) in enumerate(SKILL_BUILD_ROWS):
+        name_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_FALLBACK_NAME_BOUNDS, row),
+            _skill_name_value,
+            line_reader,
+        )
+        required_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_FALLBACK_REQUIRED_BOUNDS, row),
+            _skill_point_value,
+            line_reader,
+        )
+        allocated_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_FALLBACK_ALLOCATED_BOUNDS, row),
+            _skill_point_value,
+            line_reader,
+        )
+        if name_match is None or required_match is None or allocated_match is None:
+            return True, None
+        name, name_score = name_match
+        required, required_score = required_match
+        allocated, allocated_score = allocated_match
+        if name != expected_name or required != expected_required or not 0 <= allocated <= 99:
+            return True, None
+        skills.append({
+            "name": name,
+            "requiredPoints": required,
+            "allocatedPoints": allocated,
+        })
+        recrop_scores.extend((name_score, required_score, allocated_score))
+
+    owned_match = _skill_detected_owned_point(image, normalized)
+    if owned_match is None:
+        owned_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_FALLBACK_OWNED_BOUNDS),
+            _skill_point_value,
+            line_reader,
+            min_score=0.20,
+        )
+    if owned_match is None or not 0 <= owned_match[0] <= 99:
+        return True, None
+    owned_points, owned_score = owned_match
+    recrop_scores.append(owned_score)
+    return True, _skill_build_result(title, skills, owned_points, recrop_scores)
+
+
+def _skill_nine_row_title(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+) -> Optional[Token]:
+    height, width = image.shape[:2]
+    titles = [
+        token for token, text in normalized
+        if text == "절기" and token.confidence >= 0.95
+        and 0.46 <= token.cx / width <= 0.54
+        and 0.10 <= token.cy / height <= 0.20
+    ]
+    reset = any(
+        text in ("초기화", "조기화") and token.confidence >= 0.80
+        and 0.34 <= token.cx / width <= 0.43
+        and 0.79 <= token.cy / height <= 0.90
+        for token, text in normalized
+    )
+    owned = any(
+        text.startswith("소") and "포인" in text
+        and 0.43 <= token.cx / width <= 0.54
+        and 0.79 <= token.cy / height <= 0.90
+        for token, text in normalized
+    )
+    need_rows = {
+        round((token.cy / height - 0.223) / SKILL_NINE_ROW_STEP)
+        for token, text in normalized
+        if 0.47 <= token.cx / width <= 0.58 and _skill_need_hint(text)
+        and 0.19 <= token.cy / height <= 0.79
+    }
+    need_rows = {row for row in need_rows if 0 <= row < SKILL_NINE_ROW_COUNT}
+    if not titles or not reset or not owned or len(need_rows) < 5 or max(need_rows, default=-1) < 7:
+        return None
+    return max(titles, key=lambda token: token.confidence)
+
+
+def _skill_panel_nine_row_fallback(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> tuple[bool, Optional[dict[str, Any]]]:
+    title = _skill_nine_row_title(image, normalized)
+    if title is None:
+        return False, None
+
+    skills = []
+    scores: list[float] = []
+    names: set[str] = set()
+    for row in range(SKILL_NINE_ROW_COUNT):
+        name_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_NINE_NAME_BOUNDS, row, SKILL_NINE_ROW_STEP),
+            _generic_skill_name_value,
+            line_reader,
+        )
+        required_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_FALLBACK_REQUIRED_BOUNDS, row, SKILL_NINE_ROW_STEP),
+            _skill_point_value,
+            line_reader,
+        )
+        allocated_match = _skill_recrop_consensus(
+            image,
+            _skill_scaled_bounds(image, SKILL_FALLBACK_ALLOCATED_BOUNDS, row, SKILL_NINE_ROW_STEP),
+            _skill_point_value,
+            line_reader,
+        )
+        if name_match is None or required_match is None or allocated_match is None:
+            return True, None
+        name, name_score = name_match
+        required, required_score = required_match
+        allocated, allocated_score = allocated_match
+        if name in names or not 0 <= required <= 99 or not 0 <= allocated <= 99:
+            return True, None
+        names.add(name)
+        skills.append({
+            "name": name,
+            "requiredPoints": required,
+            "allocatedPoints": allocated,
+        })
+        scores.extend((name_score, required_score, allocated_score))
+
+    owned_match = _skill_detected_owned_point(image, normalized)
+    if owned_match is None or not 0 <= owned_match[0] <= 99:
+        return True, None
+    owned_points, owned_score = owned_match
+    scores.append(owned_score)
+    return True, _skill_build_result(title, skills, owned_points, scores)
+
+
+def _skill_panel_structure(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+) -> Optional[tuple[Token, list[tuple[Token, Token]], Token]]:
+    height, width = image.shape[:2]
+    titles = [
+        token for token, text in normalized
+        if text == "절기" and token.confidence >= 0.95
+        and 0.35 <= token.cx / width <= 0.65
+        and token.cy / height <= 0.25
+    ]
+    for title in sorted(titles, key=lambda token: token.confidence, reverse=True):
+        generals = sorted(
+            (
+                token for token, text in normalized
+                if text == "장수" and token.confidence >= 0.90
+                and 0.30 <= token.cx / width <= 0.48
+                and title.cy < token.cy < 0.68 * height
+            ),
+            key=lambda token: token.cy,
+        )
+        for start in range(max(0, len(generals) - 5)):
+            row_tokens = generals[start:start + len(SKILL_BUILD_ROWS)]
+            if len(row_tokens) != len(SKILL_BUILD_ROWS):
+                continue
+            row_heights = sorted(token.height for token in row_tokens)
+            row_height = row_heights[len(row_heights) // 2]
+            deltas = [
+                row_tokens[index + 1].cy - row_tokens[index].cy
+                for index in range(len(row_tokens) - 1)
+            ]
+            step = sorted(deltas)[len(deltas) // 2]
+            if not 2.2 * row_height <= step <= 6.0 * row_height:
+                continue
+            if any(abs(delta - step) > max(4.0, 0.18 * step) for delta in deltas):
+                continue
+            if max(token.cx for token in row_tokens) - min(token.cx for token in row_tokens) > 1.5 * row_height:
+                continue
+            if not 0.55 * step <= row_tokens[0].cy - title.cy <= 1.55 * step:
+                continue
+
+            needed = [
+                token for token, text in normalized
+                if text.startswith("필요포인트") and token.confidence >= 0.85
+                and row_tokens[0].cy - 0.5 * step <= token.cy <= row_tokens[-1].cy + 0.5 * step
+                and token.cx > row_tokens[0].cx + 2.0 * row_height
+                and token.cx - row_tokens[0].cx < 0.25 * width
+            ]
+            matches: list[tuple[Token, Token]] = []
+            unused = set(range(len(needed)))
+            for general in row_tokens:
+                candidates = sorted(
+                    (
+                        (abs(needed[index].cy - general.cy), index)
+                        for index in unused
+                        if abs(needed[index].cy - general.cy) <= 0.40 * step
+                    ),
+                )
+                if not candidates:
+                    matches = []
+                    break
+                _, index = candidates[0]
+                unused.remove(index)
+                matches.append((general, needed[index]))
+            if len(matches) != len(SKILL_BUILD_ROWS):
+                continue
+            need_heights = sorted(need.height for _general, need in matches)
+            need_height = need_heights[len(need_heights) // 2]
+            if max(need.cx for _general, need in matches) - min(
+                need.cx for _general, need in matches
+            ) > 2.0 * need_height:
+                continue
+
+            owned = [
+                token for token, text in normalized
+                if text == "소유중인포인트" and token.confidence >= 0.90
+                and 0.40 <= token.cx / width <= 0.60
+                and token.cy >= row_tokens[-1].cy + 2.0 * step
+                and token.cy <= 0.95 * height
+            ]
+            if owned:
+                return title, matches, max(owned, key=lambda token: token.confidence)
+    return None
+
+
+def _skill_panel(
+    image: Any,
+    normalized: Sequence[tuple[Token, str]],
+    line_reader: Callable[[Any, int], tuple[str, float]],
+) -> tuple[bool, Optional[dict[str, Any]]]:
+    structure = _skill_panel_structure(image, normalized)
+    if structure is None:
+        return False, None
+    title, rows, owned_label = structure
+    skills = []
+    recrop_scores: list[float] = []
+    for (expected_name, expected_required), (general, needed) in zip(SKILL_BUILD_ROWS, rows):
+        general_unit = general.height
+        name_match = _skill_recrop_consensus(
+            image,
+            (
+                general.x0 - 0.15 * general_unit,
+                general.y1 - 0.15 * general_unit,
+                general.x0 + 3.70 * general_unit,
+                general.y1 + 1.50 * general_unit,
+            ),
+            _skill_name_value,
+            line_reader,
+        )
+        if name_match is None:
+            return True, None
+        needed_unit = needed.height
+        required_match = _skill_recrop_consensus(
+            image,
+            (
+                needed.x0 + 3.55 * needed_unit,
+                needed.y0 - 0.25 * needed_unit,
+                needed.x0 + 5.35 * needed_unit,
+                needed.y1 + 0.25 * needed_unit,
+            ),
+            _skill_point_value,
+            line_reader,
+        )
+        if required_match is None:
+            return True, None
+        allocated_match = _skill_recrop_consensus(
+            image,
+            (
+                needed.x0 + 8.65 * needed_unit,
+                needed.y0 - 0.25 * needed_unit,
+                needed.x0 + 10.45 * needed_unit,
+                needed.y1 + 0.25 * needed_unit,
+            ),
+            _skill_point_value,
+            line_reader,
+        )
+        if allocated_match is None:
+            return True, None
+        name, name_score = name_match
+        required, required_score = required_match
+        allocated, allocated_score = allocated_match
+        if name != expected_name or required != expected_required:
+            return True, None
+        skills.append({
+            "name": name,
+            "requiredPoints": required,
+            "allocatedPoints": allocated,
+        })
+        recrop_scores.extend((name_score, required_score, allocated_score))
+
+    owned_unit = owned_label.height
+    owned_match = _skill_recrop_consensus(
+        image,
+        (
+            owned_label.cx - 0.75 * owned_unit,
+            owned_label.y1 + 0.10 * owned_unit,
+            owned_label.cx + 0.75 * owned_unit,
+            owned_label.y1 + 1.50 * owned_unit,
+        ),
+        _skill_point_value,
+        line_reader,
+    )
+    if owned_match is None:
+        return True, None
+    owned_points, owned_score = owned_match
+    recrop_scores.append(owned_score)
+    return True, _skill_build_result(title, skills, owned_points, recrop_scores)
+
+
 def parse_panel(
     image: Any,
     tokens: Sequence[Token],
@@ -1140,12 +1884,22 @@ def parse_panel(
     profile: str = DEFAULT_PROFILE,
 ) -> tuple[bool, list[dict[str, Any]]]:
     normalized = [(token, compact_text(token.text)) for token in tokens if token.confidence >= 0.30]
+    skill_panel = False
+    skill_result = None
+    if profile == HUD_COMBAT_PROFILE:
+        skill_panel, skill_result = _skill_panel_nine_row_fallback(image, normalized, line_reader)
+        if not skill_panel:
+            skill_panel, skill_result = _skill_panel(image, normalized, line_reader)
+        if not skill_panel:
+            skill_panel, skill_result = _skill_panel_fallback(image, normalized, line_reader)
     info_panel, info_results = _information_panel(image, normalized, line_reader)
     stat_labels = [(token, STAT_FIELDS[text]) for token, text in normalized if text in STAT_FIELDS]
     quantity_titles = [token for token, text in normalized if text == "기량"]
     stat_panel = bool(quantity_titles) and len({field for _, field in stat_labels}) >= 3
 
     results: list[dict[str, Any]] = list(info_results)
+    if skill_result is not None:
+        results.append(skill_result)
     if stat_panel:
         for label, field in stat_labels:
             match = _neighbor_parsed_value(label, tokens, _quantity_value, max_below_factor=1.8)
@@ -1176,12 +1930,27 @@ def parse_panel(
 
     for title, text in normalized:
         combined = COMBINED_GEAR_TITLE_RE.fullmatch(text)
-        if not combined:
-            continue
-        field = GEAR_FIELDS[combined.group(1)]
-        value = int(combined.group(2))
-        if 0 <= value <= 15 and field not in {item["field"] for item in results}:
-            results.append({"field": field, "value": value, "confidence": title.confidence})
+        if combined:
+            field = GEAR_FIELDS[combined.group(1)]
+            value = int(combined.group(2))
+            if 0 <= value <= 15 and field not in {item["field"] for item in results}:
+                results.append({"field": field, "value": value, "confidence": title.confidence})
+
+        item_title = ITEM_ENHANCEMENT_TITLE_RE.fullmatch(text)
+        if item_title:
+            field = KNOWN_GEAR_ITEM_NAMES.get(item_title.group(1))
+            value = int(item_title.group(2))
+            stage = _detected_enhancement_stage(normalized)
+            if (
+                field is not None and 0 <= value <= 15
+                and stage is not None and stage[0] == value
+                and field not in {item["field"] for item in results}
+            ):
+                results.append({
+                    "field": field,
+                    "value": value,
+                    "confidence": min(title.confidence, stage[1]),
+                })
 
     gear_categories = [(token, GEAR_FIELDS[text]) for token, text in normalized if text in GEAR_FIELDS]
     for category, field in gear_categories:
@@ -1217,28 +1986,44 @@ def parse_panel(
     texts = {text for _, text in normalized}
     marker_count = sum(any(marker in text for text in texts) for marker in ENHANCEMENT_MARKERS)
     has_stage = any("단계" in text and ("→" in text or "->" in text) for text in texts)
-    # 작은 단계 제목이 detector에서 빠져도 성공/하락/button/비용의 네 구조가
-    # 동시에 있으면 강화 panel로 볼 수 있다. 장비 종류가 없으면 값은 비운다.
-    enhancement_panel = marker_count >= 3 and (has_stage or marker_count >= 4)
-    enhancement_headers = [token for token, text in normalized if text == "장비강화"]
-    if enhancement_panel and enhancement_headers and "shoes" not in {item["field"] for item in results}:
-        header = max(enhancement_headers, key=lambda token: token.confidence)
-        current_stage = _enhancement_stage_consensus(image, header, line_reader)
-        icon_similarity = _shoes_icon_similarity(image, header)
-        if current_stage is not None and icon_similarity >= 0.82:
-            structural_confidence = min(
-                header.confidence,
-                0.95 + 0.04 * min(1.0, (icon_similarity - 0.82) / 0.18),
-            )
-            results.append({
-                "field": "shoes",
-                "value": current_stage,
-                "confidence": structural_confidence,
-            })
-    panel_visible = info_panel or stat_panel or enhancement_panel or horse_panel or hud_visible or bool(results)
+    anchor = _enhancement_anchor(normalized)
+    stage_match = _detected_enhancement_stage(normalized)
+    if stage_match is None and anchor is not None:
+        stage_match = _enhancement_stage_from_anchor(image, anchor, line_reader)
+    has_button = any(text == "강화하기" for _token, text in normalized)
+    structured_enhancement_panel = bool(
+        anchor is not None and stage_match is not None and has_button
+        and (marker_count >= 2 or has_stage)
+    )
+    enhancement_panel = (
+        marker_count >= 3 and (has_stage or marker_count >= 4)
+    ) or structured_enhancement_panel
+    if enhancement_panel and anchor is not None and stage_match is not None:
+        similarities = _gear_icon_similarities(image, anchor)
+        ranked = sorted(similarities.items(), key=lambda item: item[1], reverse=True)
+        if ranked:
+            field, icon_similarity = ranked[0]
+            runner_up = ranked[1][1] if len(ranked) > 1 else -1.0
+            if (
+                icon_similarity >= 0.90 and icon_similarity - runner_up >= 0.08
+                and field not in {item["field"] for item in results}
+            ):
+                current_stage, _stage_confidence = stage_match
+                structural_confidence = 0.96 + 0.03 * min(
+                    1.0, (icon_similarity - 0.90) / 0.10,
+                )
+                results.append({
+                    "field": field,
+                    "value": current_stage,
+                    "confidence": structural_confidence,
+                })
+    panel_visible = (
+        skill_panel or info_panel or stat_panel or enhancement_panel
+        or horse_panel or hud_visible or bool(results)
+    )
     order = {name: index for index, name in enumerate(
         (
-            "maxHealth", "healthStat", "activeGeneral", "attackPower", "defense",
+            "skillBuild", "maxHealth", "healthStat", "activeGeneral", "attackPower", "defense",
             "attackPowerBonusPct", "damageReductionPct", "criticalChancePct",
             "criticalDamagePct", "skillCooldownReductionPct", "skillDamageBonusPct",
             "moveSpeedBonusPct", "horseMaxHealth", "horse", "horseLevel",
@@ -1256,6 +2041,7 @@ def make_batch(profile: str, panel_visible: bool, results: Iterable[dict[str, An
     return {
         "version": VERSION,
         "profileId": profile,
+        "seasonId": CURRENT_SEASON_ID,
         "panelVisible": bool(panel_visible),
         "results": list(results),
     }

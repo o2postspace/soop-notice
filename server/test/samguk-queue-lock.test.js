@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const {
+  CURRENT_SEASON_ID,
   acquireObservationQueueLock,
   appendObservationQueue,
   compactObservationQueue,
@@ -22,6 +23,7 @@ function temporaryQueue(t, name = "queue.ndjson") {
 
 function observation(index, overrides = {}) {
   return {
+    seasonId: CURRENT_SEASON_ID,
     playerId: "P001",
     field: "strength",
     value: index,

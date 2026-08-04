@@ -9,9 +9,9 @@ const PLAYER_ID_PATTERN = /^P\d{3}$/;
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const ARCHIVE_REF_PATTERN = /^P\d{3}-\d{13}-q\d+-s[0-7]-[a-f0-9]{16}\.png$/;
 const DEFAULT_RETENTION_MS = 30 * 60_000;
-// 현재 후보 발생량(분당 약 70장)에서도 30분 보존시간이 파일 상한보다
-// 먼저 적용되도록 잡는다. 실제 PNG는 대개 1MiB 미만이다.
-const DEFAULT_MAX_FILES = 2_560;
+// 후보마다 SD fallback 2장과 ORIGINAL 전·해당·후 최대 4장을 보존한다.
+// 분당 약 200~240장에서도 30분 retention이 파일 상한보다 먼저 적용된다.
+const DEFAULT_MAX_FILES = 8_000;
 const MAX_PNG_BYTES = 16 * 1024 * 1024;
 
 class SamgukCandidateFrameArchiveError extends Error {

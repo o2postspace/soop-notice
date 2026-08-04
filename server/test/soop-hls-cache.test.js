@@ -18,10 +18,11 @@ function hlsResult(bjId, quality, version = 1) {
   };
 }
 
-function immediateResolvers(calls = { SD: 0, HD: 0 }) {
+function immediateResolvers(calls = { SD: 0, HD: 0, ORIGINAL: 0 }) {
   return {
     SD: async (bjId) => hlsResult(bjId, "SD", ++calls.SD),
     HD: async (bjId) => hlsResult(bjId, "HD", ++calls.HD),
+    ORIGINAL: async (bjId) => hlsResult(bjId, "ORIGINAL", ++calls.ORIGINAL),
   };
 }
 
@@ -47,7 +48,7 @@ test("resolver·TTL·최대 BJ 수와 SD/HD 품질을 엄격히 검증한다", a
     error => error.code === "invalid_config",
   );
 
-  const calls = { SD: 0, HD: 0 };
+  const calls = { SD: 0, HD: 0, ORIGINAL: 0 };
   const cache = createSoopHlsCache({ resolvers: immediateResolvers(calls) });
   assert.throws(() => cache.get("valid_bj", "sd"), error => error.code === "invalid_quality");
   assert.throws(() => cache.get("../invalid", "SD"), error => error.code === "invalid_bj_id");
@@ -75,12 +76,12 @@ test("resolver·TTL·최대 BJ 수와 SD/HD 품질을 엄격히 검증한다", a
   await assert.rejects(cache.get("valid_bj", "SD", proxyOptions), error => (
     error.code === "aborted" && !error.message.includes("proxy-secret")
   ));
-  assert.equal(calls.SD + calls.HD, 0);
+  assert.equal(calls.SD + calls.HD + calls.ORIGINAL, 0);
 });
 
 test("quality별 resolver 결과를 TTL 동안 재사용하고 만료 시 갱신한다", async () => {
   let currentTime = 1_000;
-  const calls = { SD: 0, HD: 0 };
+  const calls = { SD: 0, HD: 0, ORIGINAL: 0 };
   const cache = createSoopHlsCache({
     resolvers: immediateResolvers(calls),
     ttlMs: 60_000,
@@ -99,6 +100,10 @@ test("quality별 resolver 결과를 TTL 동안 재사용하고 만료 시 갱신
   assert.equal(firstHd.quality, "HD");
   assert.equal(calls.HD, 1);
 
+  const firstOriginal = await cache.get("devil0108", "ORIGINAL");
+  assert.equal(firstOriginal.quality, "ORIGINAL");
+  assert.equal(calls.ORIGINAL, 1);
+
   currentTime = 61_000;
   const secondSd = await cache.get("devil0108", "SD");
   assert.notEqual(secondSd, firstSd);
@@ -106,9 +111,10 @@ test("quality별 resolver 결과를 TTL 동안 재사용하고 만료 시 갱신
   assert.match(secondSd.hlsUrl, /\?aid=private-2$/);
 
   const snapshot = cache.getSnapshot();
-  assert.equal(snapshot.cachedCount, 2);
+  assert.equal(snapshot.cachedCount, 3);
   assert.deepEqual(snapshot.byQuality.SD, { entries: 1, cached: 1, pending: 0 });
   assert.deepEqual(snapshot.byQuality.HD, { entries: 1, cached: 1, pending: 0 });
+  assert.deepEqual(snapshot.byQuality.ORIGINAL, { entries: 1, cached: 1, pending: 0 });
   const visible = JSON.stringify(snapshot);
   assert.equal(visible.includes("https://"), false);
   assert.equal(visible.includes("aid="), false);

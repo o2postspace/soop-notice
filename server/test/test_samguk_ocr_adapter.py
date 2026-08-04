@@ -1,5 +1,7 @@
 import importlib.util
 import base64
+import hashlib
+import json
 import struct
 from pathlib import Path
 import subprocess
@@ -29,6 +31,64 @@ def minimal_png(width=1, height=1):
     header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
     scanline = b"\x00" + b"\x00\x00\x00" * width
     return adapter.PNG_SIGNATURE + png_chunk(b"IHDR", header) + png_chunk(b"IDAT", zlib.compress(scanline * height)) + png_chunk(b"IEND", b"")
+
+
+def skill_panel_tokens(row_count=6):
+    rows = []
+    for index in range(row_count):
+        y0 = 100 + index * 50
+        rows.extend((
+            token("장수", .97, 360, y0, 390, y0 + 18),
+            token(
+                f"필요 포인트  {1 if index < 3 else 2}",
+                .92,
+                560,
+                y0 + 5,
+                650,
+                y0 + 25,
+            ),
+        ))
+    return [
+        token("절기", .999, 455, 40, 505, 62),
+        *rows,
+        token("소유 중인 포인트", .98, 430, 470, 530, 490),
+    ]
+
+
+def low_resolution_skill_panel_tokens():
+    row_y = lambda index: 0.226 * 540 + index * adapter.SKILL_FALLBACK_ROW_STEP * 540
+    needs = (
+        "필요인을1", "인1", "있요프인", "필요모인트2", "인트", "링은프인트2",
+    )
+    rows = []
+    for index, need in enumerate(needs):
+        cy = row_y(index)
+        rows.append(token(need, .70, 485, cy - 10, 535, cy + 10))
+    rows.extend((
+        token("류성보", .84, 350, row_y(0) - 10, 410, row_y(0) + 10),
+        token("호신감기", .88, 345, row_y(1) - 10, 415, row_y(1) + 10),
+    ))
+    return [
+        token("절기", .998, 455, 70, 505, 92),
+        *rows,
+        token("소음강인포인", .61, 425, 435, 520, 455),
+        token("조기화", .92, 340, 440, 400, 462),
+        token("D", .89, 466, 451, 480, 471),
+    ]
+
+
+def nine_row_skill_panel_tokens():
+    rows = []
+    for index in range(9):
+        cy = (0.223 + index * adapter.SKILL_NINE_ROW_STEP) * 540
+        rows.append(token("필요 포인트", .94, 480, cy - 10, 550, cy + 10))
+    return [
+        token("절기", .999, 455, 70, 505, 92),
+        *rows,
+        token("소유 중인 포인트", .98, 430, 435, 530, 455),
+        token("초기화", .97, 340, 438, 400, 462),
+        token("0", .99, 468, 455, 480, 473),
+    ]
 
 
 class AdapterParserTest(unittest.TestCase):
@@ -494,6 +554,261 @@ class AdapterParserTest(unittest.TestCase):
             {"field": "horseMaxHealth", "value": 950, "confidence": .997},
         ])
 
+    def test_hud_profile_emits_canonical_skill_build_after_all_recrop_consensus(self):
+        rows = (
+            ("류성보", "유성보", 1),
+            ("호신강기", "호신강기", 1),
+            ("회선란", "회선난", 1),
+            ("천파강림", "천패강림", 2),
+            ("비룡귀잠", "비룡귀참", 2),
+            ("승천낙회", "승천낙뢰", 2),
+        )
+        responses = []
+        for recrop_name, _canonical_name, required in rows:
+            responses.extend([(recrop_name, .98)] * 3)
+            responses.extend([(str(required), .98)] * 3)
+            responses.extend([("0", .98)] * 3)
+        responses.extend([("i", .98)] * 3)
+        scales = []
+
+        def reader(_crop, scale):
+            scales.append(scale)
+            return responses.pop(0)
+
+        visible, results = adapter.parse_panel(
+            self.image,
+            skill_panel_tokens(),
+            reader,
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertTrue(visible)
+        expected = {
+            "version": 1,
+            "preset": None,
+            "ownedPoints": 1,
+            "skills": [
+                {"name": name, "requiredPoints": required, "allocatedPoints": 0}
+                for _recrop_name, name, required in rows
+            ],
+        }
+        self.assertEqual(results, [{
+            "field": "skillBuild",
+            "value": json.dumps(expected, ensure_ascii=False, separators=(",", ":")),
+            "confidence": .98,
+        }])
+        self.assertEqual(scales, [1, 2, 4] * 19)
+        self.assertEqual(responses, [])
+
+    def test_hud_profile_accepts_catalog_independent_nine_row_skill_build(self):
+        names = tuple(f"직업절기{index + 1}" for index in range(9))
+        required = (1, 1, 1, 1, 2, 4, 3, 3, 2)
+        allocated = (0, 0, 0, 1, 0, 2, 2, 2, 0)
+        responses = []
+        for name, need, point in zip(names, required, allocated):
+            responses.extend([(name, .98)] * 3)
+            responses.extend([(str(need), .98)] * 3)
+            responses.extend([(str(point), .98)] * 3)
+
+        visible, results = adapter.parse_panel(
+            self.image,
+            nine_row_skill_panel_tokens(),
+            lambda _crop, _scale: responses.pop(0),
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertTrue(visible)
+        self.assertEqual(len(results), 1)
+        build = json.loads(results[0]["value"])
+        self.assertEqual([skill["name"] for skill in build["skills"]], list(names))
+        self.assertEqual([skill["requiredPoints"] for skill in build["skills"]], list(required))
+        self.assertEqual([skill["allocatedPoints"] for skill in build["skills"]], list(allocated))
+        self.assertEqual(build["ownedPoints"], 0)
+        self.assertEqual(responses, [])
+
+    def test_incomplete_skill_row_structure_never_emits_skill_build(self):
+        def unexpected_reader(_crop, _scale):
+            self.fail("incomplete structure must not start recrop OCR")
+
+        visible, results = adapter.parse_panel(
+            self.image,
+            skill_panel_tokens(row_count=5),
+            unexpected_reader,
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertFalse(visible)
+        self.assertEqual(results, [])
+
+    def test_skill_recrop_scale_disagreement_keeps_panel_without_result(self):
+        responses = [
+            ("유성보", .99), ("류성보", .99), ("유성보", .99),
+            ("1", .99), ("1", .99), ("2", .99),
+        ]
+        visible, results = adapter.parse_panel(
+            self.image,
+            skill_panel_tokens(),
+            lambda _crop, _scale: responses.pop(0),
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertTrue(visible)
+        self.assertEqual(results, [])
+        self.assertEqual(responses, [])
+
+    def test_low_resolution_p031_layout_recovers_skill_build_from_strict_recrops(self):
+        names = ("성보", "호신감기", "해선남", "전매강일", "비장", "승천난의")
+        required = ("1,", "1.", "1", "2-", "2", "2")
+        allocated = ("ㅇ", "1", "0", "ㅇ", "ㅇ", "0")
+        responses = []
+        for name, need, point in zip(names, required, allocated):
+            responses.extend([(name, .81)] * 3)
+            responses.extend([(need, .72)] * 3)
+            responses.extend([(point, .66)] * 3)
+        scales = []
+
+        def reader(_crop, scale):
+            scales.append(scale)
+            return responses.pop(0)
+
+        visible, results = adapter.parse_panel(
+            self.image,
+            low_resolution_skill_panel_tokens(),
+            reader,
+            profile=adapter.HUD_COMBAT_PROFILE,
+        )
+        self.assertTrue(visible)
+        self.assertEqual(len(results), 1)
+        value = json.loads(results[0]["value"])
+        self.assertEqual(value["ownedPoints"], 0)
+        self.assertEqual(
+            [skill["allocatedPoints"] for skill in value["skills"]],
+            [0, 1, 0, 0, 0, 0],
+        )
+        self.assertEqual(
+            [skill["name"] for skill in value["skills"]],
+            [name for name, _required in adapter.SKILL_BUILD_ROWS],
+        )
+        self.assertEqual(results[0]["confidence"], .95)
+        self.assertEqual(scales, [1, 2, 4] * 18)
+        self.assertEqual(responses, [])
+
+    def test_attached_and_p031_archived_frames_full_ocr_regression(self):
+        home = Path.home()
+        python = home / ".local/share/soop-notice/samguk-ocr-venv/bin/python"
+        model_dir = home / ".local/share/soop-notice/rapidocr-models"
+        fixtures = (
+            (
+                home / "Downloads/스크린샷 2026-08-04 193055.png",
+                "7820f852adb9007cac82cd514cd5dd35a1bdb9da5993d64a0d27a219ca0cbced",
+                1,
+                [0, 0, 0, 0, 0, 0],
+            ),
+            (
+                home / "backups/soop-notice/hugukji-reset-20260804-193640/"
+                "samguk-hls-monitor/candidate-frames/"
+                "P031-1785839461415-q4511-s4-ed5ca60be9e81604.png",
+                "ed5ca60be9e816049ba4f7129442460047d47a6ceaf9ecf51196c3dbe7f8fd03",
+                0,
+                [0, 1, 0, 0, 0, 0],
+            ),
+        )
+        if not python.is_file() or not model_dir.is_dir() or any(
+            not fixture[0].is_file() for fixture in fixtures
+        ):
+            self.skipTest("로컬 RapidOCR 또는 실제 회귀 frame이 없습니다.")
+
+        for frame, expected_hash, owned_points, allocated_points in fixtures:
+            with self.subTest(frame=frame.name):
+                png = frame.read_bytes()
+                self.assertEqual(hashlib.sha256(png).hexdigest(), expected_hash)
+                completed = subprocess.run(
+                    [
+                        str(python), str(MODULE_PATH),
+                        "--profile=hud-combat-v1",
+                        f"--model-dir={model_dir}",
+                    ],
+                    input=png,
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                batch = json.loads(completed.stdout)
+                self.assertTrue(batch["panelVisible"])
+                self.assertEqual(len(batch["results"]), 1)
+                result = batch["results"][0]
+                self.assertEqual(result["field"], "skillBuild")
+                build = json.loads(result["value"])
+                self.assertEqual(build["ownedPoints"], owned_points)
+                self.assertEqual(
+                    [skill["allocatedPoints"] for skill in build["skills"]],
+                    allocated_points,
+                )
+                self.assertGreaterEqual(result["confidence"], .95)
+
+    def test_live_weapon_and_armor_frames_full_ocr_regression(self):
+        home = Path.home()
+        python = home / ".local/share/soop-notice/samguk-ocr-venv/bin/python"
+        model_dir = home / ".local/share/soop-notice/rapidocr-models"
+        fixtures = (
+            (home / "exports/soopnotice-live-capture-P006-weapon-20260805-0232.png", "c85a3098c3729e6281db9ee446afc62ca1ba7044e7442417cf8f2c0a66ae8e8c", "weapon", 1),
+            (home / "exports/soopnotice-live-capture-P007-gear-20260805.png", "c00358b91f1ab1c92702ee52cd41fdb0991094529251b261f9b74f31faf1a42d", "weapon", 4),
+            (home / "exports/soopnotice-live-capture-P007-gear-20260805-companion.png", "53db1654606ce7c5864c6dc82a09f4405a33789926a1c6c79e9b753b2cbaa281", "weapon", 4),
+            (home / "exports/soopnotice-live-capture-P054-weapon-20260805-0236.png", "964fbbfb4fe6242e98e388cfe327629ed5d49f1fdf48bbb1c0f255ec369d8a30", "weapon", 2),
+            (home / "exports/soopnotice-live-capture-P054-armor-20260805-0248.png", "3886f1e9427cb95b02c941f5d3784c4dd0d737b6253fb035d0b7995cf8439569", "armor", 1),
+            (home / "exports/soopnotice-live-capture-P054-armor-20260805-0248-companion.png", "8628d43ea32e1fe6ed285598bcfc63f754db7db84d38dbff506a134623e40f1d", "armor", 1),
+        )
+        if not python.is_file() or not model_dir.is_dir() or any(not row[0].is_file() for row in fixtures):
+            self.skipTest("로컬 RapidOCR 또는 실제 장비 frame이 없습니다.")
+        for frame, expected_hash, field, value in fixtures:
+            with self.subTest(frame=frame.name):
+                png = frame.read_bytes()
+                self.assertEqual(hashlib.sha256(png).hexdigest(), expected_hash)
+                completed = subprocess.run(
+                    [str(python), str(MODULE_PATH), "--profile=hud-combat-v1", f"--model-dir={model_dir}"],
+                    input=png, capture_output=True, check=False, timeout=30,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                batch = json.loads(completed.stdout)
+                result = next((item for item in batch["results"] if item["field"] == field), None)
+                self.assertIsNotNone(result)
+                self.assertEqual(result["value"], value)
+                self.assertGreaterEqual(result["confidence"], .95)
+
+    def test_p058_information_frames_recover_missing_percent_rows(self):
+        home = Path.home()
+        python = home / ".local/share/soop-notice/samguk-ocr-venv/bin/python"
+        model_dir = home / ".local/share/soop-notice/rapidocr-models"
+        fixtures = (
+            (
+                home / "exports/soopnotice-live-capture-P058-info-20260805-031950.png",
+                "e9cc6d41b1f1cf214ab16468b159fd909527aa851dc5e072873f40c97126efbe",
+            ),
+            (
+                home / "exports/soopnotice-live-capture-P058-info-20260805-031950-companion.png",
+                "996e84cfd4d9110df69ea79b00c7b387c10f2fd874559502bcdf6b76e95b4a89",
+            ),
+        )
+        if not python.is_file() or not model_dir.is_dir() or any(
+            not frame.is_file() for frame, _expected_hash in fixtures
+        ):
+            self.skipTest("로컬 RapidOCR 또는 P058 실제 정보창 frame이 없습니다.")
+
+        for frame, expected_hash in fixtures:
+            with self.subTest(frame=frame.name):
+                png = frame.read_bytes()
+                self.assertEqual(hashlib.sha256(png).hexdigest(), expected_hash)
+                completed = subprocess.run(
+                    [str(python), str(MODULE_PATH), "--profile=hud-combat-v1", f"--model-dir={model_dir}"],
+                    input=png, capture_output=True, check=False, timeout=30,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                batch = json.loads(completed.stdout)
+                values = {item["field"]: item for item in batch["results"]}
+                for field, expected_value in (
+                    ("attackPowerBonusPct", 5),
+                    ("damageReductionPct", 7),
+                ):
+                    self.assertEqual(values[field]["value"], expected_value)
+                    self.assertGreaterEqual(values[field]["confidence"], .95)
+
     def test_horse_health_recrop_requires_exact_multiscale_ratio_consensus(self):
         horse = token("(860/950HP)", .94378, 810, 500, 910, 518)
         scores = {1: .95489, 2: .96609, 4: .96139}
@@ -583,7 +898,13 @@ class AdapterParserTest(unittest.TestCase):
 
     def test_batch_has_exact_v2_keys(self):
         batch = adapter.make_batch("stats-panel-v1", False, [])
-        self.assertEqual(batch, {"version": 2, "profileId": "stats-panel-v1", "panelVisible": False, "results": []})
+        self.assertEqual(batch, {
+            "version": 2,
+            "profileId": "stats-panel-v1",
+            "seasonId": "hugukji-2026-08-04",
+            "panelVisible": False,
+            "results": [],
+        })
 
     def test_png_validator_rejects_crc_trailing_iend_and_dimension_cap(self):
         valid = minimal_png()

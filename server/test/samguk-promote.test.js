@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
+  CURRENT_SEASON_ID,
   appendObservationQueue,
   readObservationQueue,
 } = require("../lib/samguk-observations");
@@ -25,6 +26,7 @@ function temporaryQueue(t) {
 
 function payload() {
   return {
+    seasonId: CURRENT_SEASON_ID,
     source: "google-sheet",
     stale: false,
     sheetUrl: "https://docs.google.com/spreadsheets/d/test-sheet/edit",
@@ -51,6 +53,7 @@ function candidate(sourceType, value, sourceId, observedAt = "2026-08-02T10:10:0
     ? "https://www.fmkorea.com/123"
     : "https://play.sooplive.com/cnsgkcnehd74";
   return {
+    seasonId: CURRENT_SEASON_ID,
     playerId: "P001", field: "strength", value, sourceType, sourceId, sourceUrl,
     observedAt, collectedAt: observedAt,
     ocrConfidence: sourceType === "broadcast" ? 0.98 : null,
@@ -60,8 +63,16 @@ function candidate(sourceType, value, sourceId, observedAt = "2026-08-02T10:10:0
 test("현재 Sheet를 player/field baseline 관측으로 만든다", () => {
   const rows = baselineObservations(payload(), Date.parse("2026-08-02T10:20:00Z"));
   assert.equal(rows.length, 11);
+  assert.ok(rows.every(row => row.seasonId === CURRENT_SEASON_ID));
   assert.ok(rows.every(row => row.playerId === "P001" && row.sourceType === "sheet"));
   assert.equal(rows.find(row => row.field === "strength").value, 10);
+
+  for (const seasonId of [undefined, "samgukji-2026-08-03"]) {
+    const invalid = payload();
+    if (seasonId === undefined) delete invalid.seasonId;
+    else invalid.seasonId = seasonId;
+    assert.throws(() => baselineObservations(invalid), /seasonId/);
+  }
 });
 
 test("단독 후보는 버리고 Sheet와 일치한 최신 후보만 완전 스냅샷으로 승격한다", () => {
@@ -75,9 +86,10 @@ test("단독 후보는 버리고 Sheet와 일치한 최신 후보만 완전 스�
     candidate("broadcast", 11, "frame-1", "2026-08-02T10:11:00.000Z"),
   ], { windowMs: 60 * 60 * 1000, now: Date.parse("2026-08-02T10:30:00Z") });
   assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].seasonId, CURRENT_SEASON_ID);
   assert.equal(snapshots[0].fields.strength, 11);
   assert.equal(snapshots[0].fields.weapon, 2);
-  assert.equal(Object.keys(snapshots[0].fields).length, 37);
+  assert.equal(Object.keys(snapshots[0].fields).length, 38);
   assert.equal(snapshots[0].fields.healthStat, null);
   assert.equal(snapshots[0].fields.activeGeneral, null);
   assert.equal(snapshots[0].fields.horseMaxHealth, null);
@@ -124,6 +136,75 @@ test("write 모드는 승격 스냅샷만 writer에 전달한다", async () => {
   assert.equal(written[0].fields.strength, 11);
   assert.deepEqual(written[0].sourceTypes, ["fmkorea", "broadcast"]);
   assert.equal(result.compaction, null);
+  assert.equal(result.baselineAttempts, 1);
+});
+
+test("일시적인 stale baseline은 제한된 지수 backoff 뒤 한 번만 승격한다", async () => {
+  let baselineLoads = 0;
+  let writes = 0;
+  const waits = [];
+  const fresh = payload();
+  const stale = { ...fresh, source: "google-sheet-last-good", stale: true };
+
+  const result = await promote({
+    observations: [
+      candidate("fmkorea", 11, "post-retry"),
+      candidate("broadcast", 11, "frame-retry", "2026-08-02T10:11:00.000Z"),
+    ],
+    write: true,
+    service: {
+      load: async () => (++baselineLoads < 3 ? stale : fresh),
+    },
+    writer: {
+      appendSnapshot: async () => {
+        writes += 1;
+        return { ok: true };
+      },
+    },
+    baselineRetryAttempts: 3,
+    baselineRetryBaseMs: 25,
+    baselineRetryMaxMs: 40,
+    sleepFn: async milliseconds => { waits.push(milliseconds); },
+    windowMs: 60 * 60 * 1000,
+    now: () => FIXED_NOW,
+  });
+
+  assert.equal(result.baselineAttempts, 3);
+  assert.deepEqual(waits, [25, 40]);
+  assert.equal(baselineLoads, 3);
+  assert.equal(writes, 1);
+});
+
+test("baseline 재시도가 모두 실패하면 writer와 compaction 없이 queue를 보존한다", async (t) => {
+  const queuePath = temporaryQueue(t);
+  const rows = [
+    candidate("fmkorea", 11, "post-baseline-failure"),
+    candidate("broadcast", 11, "frame-baseline-failure", "2026-08-02T10:11:00.000Z"),
+  ];
+  appendObservationQueue(queuePath, rows, { now: FIXED_NOW });
+  const before = fs.readFileSync(queuePath, "utf8");
+  let writes = 0;
+  const waits = [];
+  const stale = { ...payload(), source: "fallback-seed", stale: true };
+
+  await assert.rejects(promote({
+    queuePath,
+    write: true,
+    service: { load: async () => stale },
+    writer: { appendSnapshot: async () => { writes += 1; } },
+    baselineRetryAttempts: 3,
+    baselineRetryBaseMs: 10,
+    baselineRetryMaxMs: 15,
+    sleepFn: async milliseconds => { waits.push(milliseconds); },
+    windowMs: 60 * 60 * 1000,
+    now: () => FIXED_NOW,
+  }), error => error?.code === "baseline_unavailable" && /3회/.test(error.message));
+
+  assert.equal(writes, 0);
+  assert.deepEqual(waits, [10, 15]);
+  assert.equal(fs.readFileSync(queuePath, "utf8"), before);
+  assert.equal(readObservationQueue(queuePath).length, rows.length);
+  assert.equal(fs.existsSync(`${queuePath}.promoted`), false);
 });
 
 test("compaction은 반영된 값만 제거하고 충돌·미해결 관측은 보존한다", () => {

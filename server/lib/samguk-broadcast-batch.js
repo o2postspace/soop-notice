@@ -1,9 +1,11 @@
 "use strict";
 
 const {
+  CURRENT_SEASON_ID,
   MIN_BROADCAST_CONFIDENCE,
   appendObservationQueue,
   normalizeObservation,
+  normalizeSeasonId,
 } = require("./samguk-observations");
 
 const BATCH_VERSION = 2;
@@ -42,12 +44,15 @@ const BATCH_FIELDS = Object.freeze([
   "moveSpeedIncrease",
   "healthIncrease",
   "skillHasteIncrease",
+  "skillBuild",
 ]);
 const MAX_BATCH_RESULTS = BATCH_FIELDS.length;
 const BATCH_FIELD_SET = new Set(BATCH_FIELDS);
-const BATCH_KEYS = new Set(["version", "profileId", "panelVisible", "results"]);
+const BATCH_KEYS = new Set(["version", "profileId", "seasonId", "panelVisible", "results"]);
+const REQUIRED_BATCH_KEYS = ["version", "profileId", "seasonId", "panelVisible", "results"];
 const RESULT_KEYS = new Set(["field", "value", "confidence"]);
 const VALUE_VALIDATION_CONTEXT = Object.freeze({
+  seasonId: CURRENT_SEASON_ID,
   playerId: "P000",
   sourceType: "broadcast",
   sourceId: "screen:batch-value-validation",
@@ -90,6 +95,14 @@ function normalizeProfileId(value, label = "profileId") {
   return value;
 }
 
+function normalizeBatchSeasonId(value, label = "seasonId") {
+  try {
+    return normalizeSeasonId(value);
+  } catch {
+    fail("invalid_season", `${label}는 현재 후국지 season과 일치해야 합니다.`);
+  }
+}
+
 function normalizeResultValue(field, value, confidence) {
   try {
     return normalizeObservation({
@@ -103,14 +116,19 @@ function normalizeResultValue(field, value, confidence) {
   }
 }
 
-function normalizeBatchObject(input, { expectedProfileId } = {}) {
-  strictObject(input, BATCH_KEYS, [...BATCH_KEYS], "OCR batch");
+function normalizeBatchObject(input, { expectedProfileId, expectedSeasonId } = {}) {
+  strictObject(input, BATCH_KEYS, REQUIRED_BATCH_KEYS, "OCR batch");
   if (input.version !== BATCH_VERSION) {
     fail("invalid_version", `OCR batch version은 ${BATCH_VERSION}여야 합니다.`);
   }
   const profileId = normalizeProfileId(input.profileId);
   if (expectedProfileId !== undefined && profileId !== normalizeProfileId(expectedProfileId, "expectedProfileId")) {
     fail("profile_mismatch", "OCR batch profileId가 worker 설정과 다릅니다.");
+  }
+  const seasonId = normalizeBatchSeasonId(input.seasonId);
+  if (expectedSeasonId !== undefined
+    && seasonId !== normalizeBatchSeasonId(expectedSeasonId, "expectedSeasonId")) {
+    fail("season_mismatch", "OCR batch seasonId가 worker frame context와 다릅니다.");
   }
   if (typeof input.panelVisible !== "boolean") {
     fail("invalid_schema", "panelVisible은 boolean이어야 합니다.");
@@ -147,6 +165,7 @@ function normalizeBatchObject(input, { expectedProfileId } = {}) {
   return Object.freeze({
     version: BATCH_VERSION,
     profileId,
+    seasonId,
     panelVisible: input.panelVisible,
     results: Object.freeze(results),
   });
@@ -165,7 +184,7 @@ function parseBroadcastBatchOutput(stdout, options = {}) {
   return normalizeBatchObject(parsed, options);
 }
 
-function normalizeFrameContext(input, profileId, now) {
+function normalizeFrameContext(input, profileId, seasonId, now) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     fail("invalid_context", "worker frame context가 필요합니다.");
   }
@@ -184,6 +203,7 @@ function normalizeFrameContext(input, profileId, now) {
   try {
     const normalized = normalizeObservation({
       playerId: input.playerId,
+      seasonId: input.seasonId,
       field: "level",
       value: 0,
       sourceType: "broadcast",
@@ -194,7 +214,11 @@ function normalizeFrameContext(input, profileId, now) {
       evidenceHash: input.evidenceHash,
       ocrConfidence: 1,
     }, { now });
+    if (normalized.seasonId !== seasonId) {
+      fail("season_mismatch", "OCR batch seasonId가 worker frame context와 다릅니다.");
+    }
     return {
+      seasonId: normalized.seasonId,
       playerId: normalized.playerId,
       sourceType: normalized.sourceType,
       sourceId: normalized.sourceId,
@@ -211,10 +235,11 @@ function normalizeFrameContext(input, profileId, now) {
 /** 반환 배열 전체를 appendObservationQueue에 한 번만 전달해야 같은 frame batch 경계를 유지할 수 있습니다. */
 function flattenBroadcastBatch(input, frameContext, { now = Date.now() } = {}) {
   const expectedProfileId = frameContext && frameContext.profileId;
+  const expectedSeasonId = frameContext && frameContext.seasonId;
   const batch = typeof input === "string"
-    ? parseBroadcastBatchOutput(input, { expectedProfileId })
-    : normalizeBatchObject(input, { expectedProfileId });
-  const context = normalizeFrameContext(frameContext, batch.profileId, now);
+    ? parseBroadcastBatchOutput(input, { expectedProfileId, expectedSeasonId })
+    : normalizeBatchObject(input, { expectedProfileId, expectedSeasonId });
+  const context = normalizeFrameContext(frameContext, batch.profileId, batch.seasonId, now);
   if (!batch.panelVisible) return [];
 
   return batch.results
