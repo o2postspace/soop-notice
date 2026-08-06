@@ -3,49 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>숲공지 | SOOP 방송 공지·방송 일정 캘린더</title>
+<title>숲공지 | SOOP 방송 공지·일정 비공식 캘린더</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/samguk.css?v=20260803c">
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-9J4PTFHT9S"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-9J4PTFHT9S');
-</script>
-<!-- Google Tag Manager -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-TT7GGJW2');</script>
-<!-- End Google Tag Manager -->
-<!-- Google Tag Manager (2) -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-WWFQ9ZH7');</script>
-<!-- End Google Tag Manager (2) -->
-<!-- Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-X41YVCDSB4"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-X41YVCDSB4');
-</script>
-<meta name="description" content="숲공지(SOOPNOTICE)에서 SOOP 스트리머의 방송 공지와 방송 일정을 한눈에 확인하세요. 오늘의 일정, 주간 캘린더, 인기 공지를 한곳에 정리합니다.">
+<meta name="description" content="SOOP 공식 서비스가 아닌 비공식 팬 서비스 숲공지(SOOPNOTICE)에서 공개 방송 공지와 일정을 한눈에 확인하세요.">
 <meta name="keywords" content="숲공지, soopnotice, SOOP, 숲, 아프리카TV, 스트리머, 공지사항, 방송일정, 캘린더">
-<meta property="og:title" content="숲공지 | SOOP 방송 공지·방송 일정 캘린더">
-<meta property="og:description" content="SOOP 스트리머의 방송 공지와 오늘·주간 방송 일정을 한눈에 확인하세요.">
+<meta property="og:title" content="숲공지 | SOOP 방송 공지·일정 비공식 캘린더">
+<meta property="og:description" content="SOOP 공식 서비스가 아닌 비공식 팬 서비스에서 공개 방송 공지와 오늘·주간 일정을 확인하세요.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://soopnotice.com/">
 <meta property="og:site_name" content="숲공지">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="숲공지 | SOOP 방송 공지·방송 일정 캘린더">
-<meta name="twitter:description" content="SOOP 스트리머의 방송 공지와 오늘·주간 방송 일정을 한눈에 확인하세요.">
+<meta name="twitter:title" content="숲공지 | SOOP 방송 공지·일정 비공식 캘린더">
+<meta name="twitter:description" content="SOOP 공식 서비스가 아닌 비공식 팬 서비스의 공개 방송 공지·일정 캘린더입니다.">
 <link rel="canonical" href="https://soopnotice.com/">
 <script type="application/ld+json">
 {
@@ -54,7 +24,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   "name": "숲공지",
   "alternateName": "SOOPNOTICE",
   "url": "https://soopnotice.com/",
-  "description": "SOOP 스트리머의 방송 공지와 방송 일정을 한눈에 확인하는 캘린더 서비스",
+  "description": "SOOP 공식 서비스가 아닌 비공식 팬 서비스로, 공개 방송 공지와 일정을 한눈에 확인하는 캘린더",
   "inLanguage": "ko-KR"
 }
 </script>
@@ -103,6 +73,22 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     white-space: nowrap; z-index: 999; pointer-events: none;
   }
   .info-tooltip:hover .info-tooltip-text { display: block; }
+  .unofficial-strip {
+    flex-shrink: 0;
+    padding: 5px 12px;
+    border-bottom: 1px solid #e5e7f2;
+    background: #f7f8ff;
+    color: #62677b;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: center;
+    width: 100%;
+    max-width: 100vw;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .unofficial-strip strong { color: #4d5685; }
+  .unofficial-strip a { color: #5B6AED; font-weight: 700; }
   .auto-refresh {
     display: flex; align-items: center; gap: 5px;
     font-size: 12px; color: #999;
@@ -709,6 +695,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
   @media (max-width: 600px) {
     header { display: none; }
+    .unofficial-strip { padding: 6px 8px; font-size: 10px; }
     .mobile-dark-toggle { display: block !important; }
     .page { padding: 10px 8px; }
     .filter-bar { padding: 6px 10px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 5px; }
@@ -1094,6 +1081,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   .samguk-skill-build-row + .samguk-skill-build-row { border-top: 1px solid #f0f1f7; }
   .samguk-skill-build-name { min-width: 0; overflow-wrap: anywhere; color: #555a70; }
   .samguk-skill-build-points { white-space: nowrap; color: #8b8fa4; }
+  .samguk-combat-observation .samguk-skill-build-row { grid-template-columns: 1fr; gap: 2px; }
+  .samguk-combat-observation .samguk-skill-build-points { white-space: normal; line-height: 1.45; }
   .samguk-card-btns {
     display: flex;
     gap: 4px;
@@ -1363,6 +1352,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   html.dark .samguk-ranking-section { background: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   html.dark .samguk-ranking-guide { background: #1d1d26; border-color: #333545; color: #85899a; }
   html.dark .samguk-ranking-guide b { color: #b0b4c7; }
+  html.dark .unofficial-strip { background: #1d1d26; border-bottom-color: #333545; color: #a4a8ba; }
+  html.dark .unofficial-strip strong { color: #c5c9df; }
   html.dark .samguk-ranking-header,
   html.dark .samguk-ranking-table th,
   html.dark .samguk-ranking-table td { border-color: #333; }
@@ -2061,14 +2052,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 </style>
 </head>
 <body>
-<!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TT7GGJW2"
-height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript) -->
-<!-- Google Tag Manager (noscript 2) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WWFQ9ZH7"
-height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript 2) -->
 <div class="app-wrap">
 
 <header>
@@ -2098,6 +2081,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
 </header>
 
+<div class="unofficial-strip" role="note">
+  <strong>비공식 개인 팬 서비스</strong> · SOOP 공식 서비스나 공식 제휴 서비스가 아닙니다. <a href="/about">서비스 안내</a>
+</div>
+
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">캘린더</button>
   <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지</button>
@@ -2117,7 +2104,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div class="divider"></div>
   <button class="edit-fav-btn" onclick="openModal()">본진 설정</button>
   <div class="search-box">
-    <input id="searchInput" type="text" placeholder="검색 (제목, 내용, 스트리머)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
+    <input id="searchInput" type="text" placeholder="검색 (제목, 스트리머)" oninput="onSearch()" onkeydown="if(event.key==='Escape'){this.value='';onSearch();}">
     <button class="search-clear" onclick="document.getElementById('searchInput').value='';onSearch();">X</button>
   </div>
 </div>
@@ -2164,7 +2151,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="samguk-head">
       <div>
         <h2 class="samguk-title">감스트 후국지 현황</h2>
-        <p class="samguk-subtitle">후국지 · 2026년 8월 4일–10일 · 위·촉·오 참가자 90명<br>시트·에펨코리아·방송 관측값을 교차 확인하고 최신값으로 동기화합니다.</p>
+        <p class="samguk-subtitle">후국지 · 2026년 8월 4일–10일 · 위·촉·오 참가자 90명<br>비공식 팬메이드 현황이며 공개 자료와 방송 관측값을 교차 확인해 동기화합니다. 공식 순위나 참가자·실력 평가가 아닙니다. <a href="mailto:soopnotice@gmail.com">정정·제외 요청</a></p>
       </div>
       <div class="samguk-actions">
         <span class="samguk-sync-badge" id="samgukSyncBadge">데이터 불러오는 중</span>
@@ -2382,9 +2369,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="detail-meta" id="detailMeta"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
-    <div class="detail-footer" style="padding:12px 20px 16px; border-top:1px solid #eee; text-align:center;">
-      <button id="detailCopyBtn" onclick="copyForFmkorea()" style="padding:10px 24px; background:#1859E6; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">📋 펨코 복사</button>
-    </div>
   </div>
 </div>
 
@@ -2630,14 +2614,39 @@ function sanitizeHtml(html) {
   return template.innerHTML;
 }
 
-function optimizeImages(html) {
-  if (!html) return "";
-  return html
-    .replace(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/gi, function(match, url) {
-      var proxy = 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=400&output=webp&q=75';
-      return 'src="' + proxy + '" data-full="' + url + '"';
-    })
-    .replace(/<img(?![^>]*loading)/gi, '<img loading="lazy"');
+const NOTICE_CONTENT_CACHE_LIMIT = 32;
+const noticeContentCache = new Map();
+const noticeContentPending = new Map();
+
+async function fetchNoticeContent(titleNo) {
+  const key = String(titleNo || '');
+  if (!/^\d+$/.test(key)) throw new Error('잘못된 공지 번호입니다.');
+
+  if (noticeContentCache.has(key)) {
+    const cached = noticeContentCache.get(key);
+    noticeContentCache.delete(key);
+    noticeContentCache.set(key, cached);
+    return cached;
+  }
+  if (noticeContentPending.has(key)) return noticeContentPending.get(key);
+
+  const request = fetch(API_BASE + '/api/notice-content?title_no=' + encodeURIComponent(key), {
+    credentials: 'omit',
+  }).then(async function(resp) {
+    if (!resp.ok) throw new Error(resp.status === 404 ? '본문을 찾을 수 없습니다.' : '본문을 불러오지 못했습니다.');
+    const data = await resp.json();
+    const html = sanitizeHtml(data.content_html || '');
+    noticeContentCache.set(key, html);
+    while (noticeContentCache.size > NOTICE_CONTENT_CACHE_LIMIT) {
+      noticeContentCache.delete(noticeContentCache.keys().next().value);
+    }
+    return html;
+  }).finally(function() {
+    noticeContentPending.delete(key);
+  });
+
+  noticeContentPending.set(key, request);
+  return request;
 }
 
 // 이모티콘 링크 무력화 (SOOP 이모티콘 구매페이지 이동 방지)
@@ -2654,7 +2663,6 @@ function neutralizeEmoticonLinks(container) {
 
 // 필터
 function setFilter(f) {
-  gtag('event', 'filter_click', { filter_name: f });
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('.filter-btn[data-filter="'+f+'"]').classList.add('active');
@@ -2755,23 +2763,12 @@ function saveFav() {
   }, 400);
 }
 
-// 이미지가 많거나 큰 본문인지 판별
-function isLargeContent(html) {
-  if (!html) return false;
-  const imgCount = (html.match(/<img[\s>]/gi) || []).length;
-  if (imgCount >= 2) return true;
-  // 큰 이미지가 포함된 경우 (width 속성이 크거나 style에 큰 값)
-  if (imgCount >= 1 && html.length > 500) return true;
-  return false;
-}
-
 // 카드 HTML 생성
 function buildCardHtml(item) {
   const n = item.notice;
   const pin = n.is_pin ? '<span class="pin">PIN</span>' : '';
   const newBadge = isNew(n.reg_date) ? '<span class="new-badge">N</span>' : '';
   const reads = (n.read_cnt || n.count?.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const bodyHtml = n.contentHtml || n.content_html || '';
   return '<div class="card" data-bjid="' + item.bjId + '" data-titleno="' + n.title_no + '">'
     + '<div class="card-header">'
     + '<img class="card-profile" src="https://profile.img.sooplive.co.kr/LOGO/' + item.bjId.slice(0,2) + '/' + item.bjId + '/' + item.bjId + '.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
@@ -2786,8 +2783,6 @@ function buildCardHtml(item) {
     + '<span>' + timeAgo(n.reg_date) + '</span>'
     + '<span>조회 ' + reads + '</span>'
     + '</div>'
-    + (bodyHtml ? '<div class="card-body">' + bodyHtml + '</div>'
-      + '<button class="card-expand-btn" onclick="toggleExpand(event, this)">더보기</button>' : '')
     + '</div>'
     + '</div>';
 }
@@ -2815,32 +2810,18 @@ function getFilteredNotices(data) {
     list = list.filter(x => {
       const n = x.notice;
       const title = (n.title_name || '').toLowerCase();
-      const body = (n.content_html || n.contentHtml || '').replace(/<[^>]+>/g, ' ').toLowerCase();
       const bj = (x.name || '').toLowerCase();
-      return title.includes(query) || body.includes(query) || bj.includes(query);
+      return title.includes(query) || bj.includes(query);
     });
   }
   return list;
 }
 
-// 카드 높이 추정 (본문 없으면 짧음, 있으면 슬롯 꽉 참)
-function estimateCardH(item, slotH) {
-  const body = item.notice.contentHtml || '';
-  if (!body) return 90; // 헤더+제목+메타만
-  if (body.length < 100 && !body.includes('<img')) return 140;
-  return slotH; // 긴 본문/이미지 → 슬롯 최대
-}
-
-// 카드가 span2인지 판별
-function isCardSpan2(item) {
-  return isLargeContent(item.notice.contentHtml || '');
-}
-
-// 4열 × 1행 고정 패킹 (가로 우선 배치)
+// 본문 없는 요약 카드를 화면 크기에 맞춰 여러 행으로 묶는다.
 function packIntoPages(notices) {
   const w = window.innerWidth;
   const cols = w <= 700 ? 1 : w <= 1200 ? 2 : 4;
-  const maxRows = 1;
+  const maxRows = w <= 700 ? 4 : 3;
   const pages = [];
   let i = 0;
 
@@ -2878,11 +2859,6 @@ function renderPages(data) {
     return;
   }
 
-  // 화면 높이 기준 본문 최대 높이
-  const scroller = document.getElementById('scroller');
-  const bodyMax = Math.max(60, scroller.clientHeight - 170);
-  document.documentElement.style.setProperty('--card-body-max', bodyMax + 'px');
-
   packedPages = packIntoPages(filteredNotices);
   totalPages = packedPages.length;
   currentPage = Math.min(currentPage, totalPages - 1);
@@ -2896,15 +2872,6 @@ function renderPages(data) {
     html += '</div></div>';
   }
   container.innerHTML = html;
-  container.querySelectorAll('.card-body').forEach(b => neutralizeEmoticonLinks(b));
-
-  // 긴 본문에만 "더보기" 버튼 표시
-  container.querySelectorAll('.card-body').forEach(body => {
-    if (body.scrollHeight > body.clientHeight + 10) {
-      const btn = body.nextElementSibling;
-      if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
-    }
-  });
 
   showCurrentPage();
   if (currentTab === 'notices') {
@@ -2912,16 +2879,10 @@ function renderPages(data) {
   }
 }
 
-function toggleExpand(e, btn) {
-  e.stopPropagation();
-  const body = btn.previousElementSibling;
-  const expanded = body.classList.toggle('expanded');
-  btn.textContent = expanded ? '접기' : '더보기';
-}
-
 let detailBjId = '', detailTitleNo = '';
+let detailRequestToken = 0;
 
-function openDetail(cardEl) {
+async function openDetail(cardEl) {
   const titleNo = cardEl.dataset.titleno;
 
   const notice = prevData.find(r => String(r.title_no) === String(titleNo));
@@ -2940,11 +2901,7 @@ function openDetail(cardEl) {
   document.getElementById('detailMeta').innerHTML = '<span>' + formatDate(notice.reg_date) + '</span><span>' + timeAgo(notice.reg_date) + '</span><span>조회 ' + reads + '</span>';
 
   const bodyEl = document.getElementById('detailBody');
-  let html = notice.content_html || '<p style="color:#999">본문 없음</p>';
-  // 모달에서는 원본 이미지로 복원
-  html = html.replace(/src="https:\/\/wsrv\.nl\/[^"]*"(\s*data-full="([^"]+)")/gi, 'src="$2" loading="lazy"');
-  bodyEl.innerHTML = html;
-  neutralizeEmoticonLinks(bodyEl);
+  bodyEl.innerHTML = '<div style="text-align:center;padding:30px;color:#999;">본문 불러오는 중...</div>';
   bodyEl.scrollTop = 0;
 
   // 카드의 라이브 상태를 모달에도 반영
@@ -2957,128 +2914,21 @@ function openDetail(cardEl) {
   document.getElementById('detailBg').classList.add('show');
   document.body.style.overflow = 'hidden';
   scheduleLiveStatusCheck();
-}
-async function copyForFmkorea() {
-  const btn = document.getElementById('detailCopyBtn');
-  const originalText = btn.innerHTML;
-  btn.innerHTML = '⏳ 처리 중...';
-  btn.disabled = true;
 
+  const requestToken = ++detailRequestToken;
   try {
-    const notice = prevData.find(r => String(r.title_no) === String(detailTitleNo));
-    if (!notice) throw new Error('공지 데이터를 찾을 수 없습니다');
-    const bjId = notice.bj_id || detailBjId;
-    const name = notice.bj_name || '';
-    const title = notice.title_name || '';
-    const pin = notice.is_pin ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;font-size:13px;color:#ff6b6b;border:1px solid #ff6b6b;border-radius:99px;">공지</span>' : '';
-    const reads = (notice.read_cnt || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const regDate = formatDate(notice.reg_date);
-    const postUrl = 'https://www.sooplive.com/station/' + bjId + '/post/' + detailTitleNo;
-    const liveUrl = 'https://play.sooplive.com/' + bjId;
-
-    // 본문 복제 후 이미지 data URL 변환
-    const bodyEl = document.getElementById('detailBody');
-    const clone = bodyEl.cloneNode(true);
-
-    // lazy load 이미지 원본 src 복원
-    clone.querySelectorAll('img[data-src]').forEach(img => {
-      img.src = img.dataset.src;
-      img.removeAttribute('data-src');
-    });
-
-    // 이미지 스타일 정리 (data URL 변환 생략 - 클립보드 타임아웃 방지)
-    clone.querySelectorAll('img').forEach(img => {
-      const src = img.src;
-      const alt = img.alt || '';
-      const origW = img.style.width;
-      const attrs = Array.from(img.attributes);
-      attrs.forEach(a => img.removeAttribute(a.name));
-      img.src = src;
-      img.alt = alt;
-      if (origW && origW !== '100%') {
-        img.style.width = origW;
-        img.style.height = 'auto';
-      } else {
-        img.style.width = '100%';
-        img.style.height = 'auto';
-        img.style.maxWidth = '100%';
-      }
-    });
-
-    const bodyHtml = clone.innerHTML;
-
-    // 펨코용 HTML 구성
-    const html = `
-      <div style="margin-bottom:20px;">
-        <h2 style="font-size:24px;font-weight:bold;margin:0;line-height:1.2;">
-          ${pin}<span style="vertical-align:middle;">${escapeHtml(title)}</span>
-        </h2>
-      </div>
-      <table style="border:none;border-collapse:collapse;width:100%;max-width:600px;">
-        <tbody><tr>
-          <td style="vertical-align:middle;">
-            <div style="font-size:16px;font-weight:bold;">${escapeHtml(name)}</div>
-            <div style="font-size:12px;color:#888;">
-              <span>${regDate}</span>
-              <span style="margin:0 4px;">·</span>
-              <span>조회수 ${reads}</span>
-            </div>
-          </td>
-        </tr></tbody>
-      </table>
-      <div style="border-top:1px solid #eee;margin:20px 0;"></div>
-      <div style="font-size:14px;line-height:1.6;">${bodyHtml}</div>
-      <div style="margin-top:24px;padding:20px 0;border-top:2px solid #eee;border-bottom:2px solid #eee;text-align:center;">
-        <a href="${postUrl}" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#6c757d;border:1px solid #6c757d;border-radius:4px;">공지사항 바로가기</a>
-        <a href="${liveUrl}" target="_blank" style="display:inline-block;margin:0 5px;padding:11px 20px;font-size:14px;font-weight:bold;color:#fff;text-decoration:none;background:#1859E6;border:1px solid #1859E6;border-radius:4px;">생방송 바로가기</a>
-      </div>
-    `;
-
-    // 클립보드 복사 (Clipboard API 우선, 실패 시 execCommand 폴백)
-    let copied = false;
-    if (navigator.clipboard && window.ClipboardItem) {
-      try {
-        const blob = new Blob([html], { type: 'text/html' });
-        await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
-        copied = true;
-      } catch(_) {}
-    }
-    if (!copied) {
-      const tmp = document.createElement('div');
-      tmp.contentEditable = 'true';
-      tmp.innerHTML = html;
-      tmp.style.position = 'fixed';
-      tmp.style.left = '-9999px';
-      document.body.appendChild(tmp);
-      const range = document.createRange();
-      range.selectNodeContents(tmp);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand('copy');
-      sel.removeAllRanges();
-      document.body.removeChild(tmp);
-    }
-
-    btn.innerHTML = '✅ 복사 완료!';
-    btn.style.backgroundColor = '#28a745';
-    setTimeout(() => {
-      btn.innerHTML = originalText;
-      btn.style.backgroundColor = '#1859E6';
-      btn.disabled = false;
-    }, 2000);
-  } catch(e) {
-    console.error('펨코 복사 오류:', e);
-    btn.innerHTML = '❌ 실패';
-    setTimeout(() => {
-      btn.innerHTML = originalText;
-      btn.style.backgroundColor = '#1859E6';
-      btn.disabled = false;
-    }, 2000);
+    const html = await fetchNoticeContent(titleNo);
+    if (requestToken !== detailRequestToken || String(detailTitleNo) !== String(titleNo)) return;
+    bodyEl.innerHTML = html || '<p style="color:#999">본문 없음</p>';
+    neutralizeEmoticonLinks(bodyEl);
+  } catch (error) {
+    if (requestToken !== detailRequestToken || String(detailTitleNo) !== String(titleNo)) return;
+    bodyEl.innerHTML = '<p style="color:#f66;">' + escapeHtml(error.message || '본문 로드 실패') + ' 원문은 위 SOOP 버튼에서 확인할 수 있습니다.</p>';
   }
 }
 
 function closeDetail() {
+  detailRequestToken++;
   document.getElementById('detailBg').classList.remove('show');
   document.body.style.overflow = '';
 }
@@ -3098,7 +2948,7 @@ document.getElementById('detailBody').addEventListener('click', function(e) {
 document.addEventListener('click', (e) => {
   if (e.target.id === 'detailBg') closeDetail();
   const card = e.target.closest('.card');
-  if (card && !e.target.closest('.card-expand-btn') && !e.target.closest('a')) {
+  if (card && !e.target.closest('a')) {
     if (!document.getElementById('detailBg').classList.contains('show')) {
       openDetail(card);
     }
@@ -3146,9 +2996,6 @@ function goPage(dir) {
   // 해당 페이지가 DOM에 없으면 추가
   const existing = document.querySelector('#container .page[data-page="' + next + '"]');
   if (!existing) {
-    const scroller = document.getElementById('scroller');
-    const pageH = scroller.clientHeight;
-    const bodyMax = Math.max(60, pageH - 40 - 130);
     let html = '<div class="page" data-page="' + next + '"><div class="page-inner">';
     for (const idx of packedPages[next]) {
       html += buildCardHtml(filteredNotices[idx]);
@@ -3156,13 +3003,6 @@ function goPage(dir) {
     html += '</div></div>';
     document.getElementById('container').insertAdjacentHTML('beforeend', html);
 
-    const newPage = document.querySelector('#container .page[data-page="' + next + '"]');
-    newPage.querySelectorAll('.card-body').forEach(body => {
-      if (body.scrollHeight > body.clientHeight + 10) {
-        const btn = body.nextElementSibling;
-        if (btn && btn.classList.contains('card-expand-btn')) btn.classList.add('visible');
-      }
-    });
   }
 
   showCurrentPage();
@@ -3301,16 +3141,10 @@ async function loadAll() {
   btn.textContent = "...";
 
   try {
-    // 본문 없이 전체 목록 한번에 (~40KB, CDN 캐시)
+    // 본문을 제외한 공지 metadata만 한 번에 받는다.
     const resp = await fetch(API_BASE + "/api/notices");
+    if (!resp.ok) throw new Error('공지 목록을 불러오지 못했습니다.');
     const data = await resp.json();
-
-    // 프론트엔드에서 HTML 정화 + 이미지 최적화
-    for (const row of data) {
-      if (row.content_html) {
-        row.content_html = optimizeImages(sanitizeHtml(row.content_html));
-      }
-    }
 
     const isFirstLoad = prevData.length === 0;
     // 데이터 변경 여부 확인 (첫 공지 title_no 비교)
@@ -3362,7 +3196,6 @@ function switchTab(tab, options) {
     } else if (tab !== 'community' && location.hash.startsWith('#community')) {
       communitySetRouteHash('', true);
     }
-    gtag('event', 'tab_click', { tab_name: tab });
   }
   currentTab = tab;
   communityUpdateHeaderControls(tab);
@@ -3705,11 +3538,11 @@ function samgukSkillBuildDetail(member) {
   if (!metrics) return '';
   const build = metrics.build;
   const preset = build.preset === null ? '프리셋 미확인' : '프리셋 ' + build.preset;
-  const rows = build.skills.map(function(skill) {
+  const rows = build.skills.map(function(skill, index) {
     return '<div class="samguk-skill-build-row">'
-      + '<span class="samguk-skill-build-name">' + escapeHtml(skill.name) + '</span>'
-      + '<span class="samguk-skill-build-points">배분 ' + escapeHtml(String(skill.allocatedPoints))
-      + ' · 필요 ' + escapeHtml(String(skill.requiredPoints)) + '</span></div>';
+      + '<span class="samguk-skill-build-name">' + escapeHtml(String(index + 1)) + '번 스킬</span>'
+      + '<span class="samguk-skill-build-points">' + escapeHtml(String(skill.allocatedPoints))
+      + '강</span></div>';
   }).join('');
   return '<details class="samguk-skill-build"><summary><span>스킬 강화(절기)</span>'
     + '<span class="samguk-skill-build-meta">투자 합 ' + escapeHtml(String(metrics.allocatedTotal))
@@ -3719,17 +3552,41 @@ function samgukSkillBuildDetail(member) {
     + '<div class="samguk-skill-build-rows">' + rows + '</div></details>';
 }
 
+function samgukCombatObservationDetail(member) {
+  const metric = function(label, field, suffix) {
+    if (!hasSamgukValue(member && member[field])) return '';
+    return label + ' ' + samgukTextValue(member[field], suffix || '');
+  };
+  const groups = [
+    [metric('최대HP', 'maxHealth'), metric('공격력', 'attackPower'), metric('방어력', 'defense'), metric('말HP', 'horseMaxHealth')],
+    [metric('공증', 'attackPowerBonusPct', '%'), metric('피감', 'damageReductionPct', '%'), metric('치확', 'criticalChancePct', '%'), metric('치피', 'criticalDamagePct', '%')],
+    [metric('쿨감', 'skillCooldownReductionPct', '%'), metric('절기증', 'skillDamageBonusPct', '%'), metric('이속', 'moveSpeedBonusPct', '%')],
+    [metric('무력+', 'strengthBonus'), metric('기민+', 'agilityBonus'), metric('기력+', 'vitalityBonus'), metric('지모+', 'intelligenceBonus')],
+    [metric('공증량', 'attackPowerIncrease'), metric('이속량', 'moveSpeedIncrease'), metric('체증량', 'healthIncrease'), metric('절기가속', 'skillHasteIncrease')],
+  ].map(function(group) { return group.filter(Boolean); }).filter(function(group) { return group.length; });
+  if (!groups.length) return '';
+  const summary = groups[0].slice(0, 2).join(' · ');
+  const rows = groups.map(function(group, index) {
+    return '<div class="samguk-skill-build-row"><span class="samguk-skill-build-name">'
+      + (index === 0 ? '전투 수치' : index === 1 ? '전투 비율' : index === 2 ? '스킬·이속' : index === 3 ? '기량 보너스' : '기량 증가량')
+      + '</span><span class="samguk-skill-build-points">' + escapeHtml(group.join(' · ')) + '</span></div>';
+  }).join('');
+  return '<details class="samguk-skill-build samguk-combat-observation"><summary><span>전투 관측</span>'
+    + '<span class="samguk-skill-build-meta">' + escapeHtml(summary) + '</span></summary>'
+    + '<div class="samguk-skill-build-rows">' + rows + '</div></details>';
+}
+
 function samgukSkillBuildRankingCell(member) {
   const metrics = samgukSkillBuildMetrics(member);
   if (!metrics) return '<span class="samguk-rank-coverage">수집 중 · 파워 v1.6 미반영</span>';
   const build = metrics.build;
-  const details = build.skills.map(function(skill) {
-    return skill.name + ' +' + skill.allocatedPoints + ' (필요 ' + skill.requiredPoints + ')';
+  const details = build.skills.map(function(skill, index) {
+    return (index + 1) + '번 ' + skill.allocatedPoints + '강';
   }).join(' · ');
   return '<div class="samguk-power-skill"><b>투자 ' + escapeHtml(String(metrics.allocatedTotal)) + '</b><br>'
     + '<span class="samguk-rank-coverage">강화 ' + escapeHtml(String(metrics.upgradedCount)) + '/'
     + escapeHtml(String(build.skills.length)) + ' · 남은 ' + escapeHtml(String(build.ownedPoints)) + '</span>'
-    + '<details class="samguk-power-skill-detail"><summary>스킬별 상세</summary><span>'
+    + '<details class="samguk-power-skill-detail"><summary>강화별 상세</summary><span>'
     + escapeHtml(details) + '</span></details><span class="samguk-rank-coverage">파워 v1.6 미반영</span></div>';
 }
 
@@ -3770,6 +3627,7 @@ function renderSamguk() {
         + '<span class="samguk-stat"><span class="samguk-stat-label">지모</span><span class="samguk-stat-value">' + samgukValue(member.intelligence) + '</span></span>'
         + '</div>'
         + samgukSkillBuildDetail(member)
+        + samgukCombatObservationDetail(member)
         + '<div class="samguk-card-btns">'
         + '<a class="samguk-soop-link" href="https://www.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">SOOP</a>'
         + '<a class="samguk-soop-link samguk-live-link live-link" data-bjid="' + member.soopId + '" href="https://play.sooplive.com/' + member.soopId + '" target="_blank" rel="noopener">LIVE</a>'
@@ -3895,9 +3753,8 @@ function renderSamgukPowerRanking() {
 
     const character = [
       hasSamgukValue(member.activeGeneral) ? '장수 ' + samgukTextValue(member.activeGeneral) : '',
-      metric('체력', member.healthStat),
+      metric('말 최대체력', member.horseMaxHealth),
       metric('방어', member.defense),
-      metric('말HP', member.horseMaxHealth),
     ].filter(Boolean);
     const context = [member.basicAttackTarget, member.combatConditions].filter(hasSamgukValue).map(function(value) {
       return samgukTextValue(value);
@@ -3985,7 +3842,9 @@ function renderSamgukPowerRanking() {
     return section;
   }
 
-  let html = '<div class="samguk-ranking-guide"><b>파워 v1.6 · 기량합 1점 = 파워 1점</b> · '
+  let html = '<div class="samguk-ranking-guide"><b>비공식 팬메이드 · 공개 방송 관측 기반</b> · SOOP 및 참가자 공식 순위나 인물·실력 평가가 아닙니다. '
+    + '<a href="mailto:soopnotice@gmail.com">정정·삭제·랭킹 제외 요청</a><br>'
+    + '<b>파워 v1.6 · 기량합 1점 = 파워 1점</b> · '
     + '<b>레벨·기량 30%</b> · <b>장비 강화 35%</b> · <b>각인 20%</b> · <b>말 강화 15%</b> · 확인된 구성요소의 하한점수로 정렬<br>'
     + escapeHtml(populationText) + ' · '
     + '<span class="samguk-rank-coverage">' + escapeHtml(scopeLabel) + ' · 현재 순위 ' + ranked.length + '명 · 품질 확정 '
@@ -4163,10 +4022,8 @@ async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
   scheduleLiveStatusCheck();
 
   try {
-    const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
-    const data = await resp.json();
-    overlay.querySelector('.wk-modal-body').innerHTML =
-      optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
+    const html = await fetchNoticeContent(titleNo);
+    overlay.querySelector('.wk-modal-body').innerHTML = html || '<p style="color:#999">본문 없음</p>';
     neutralizeEmoticonLinks(overlay.querySelector('.wk-modal-body'));
   } catch {
     overlay.querySelector('.wk-modal-body').innerHTML = '<p style="color:#f66;">로드 실패</p>';
@@ -4177,6 +4034,7 @@ async function openWkModal(bjId, bjName, titleNo, timeStr, readCnt) {
 let calDayOffset = 0;
 let calSlots = [];
 let currentCalTab = 'hot';
+let calBodyObserver = null;
 
 function changeDay(dir) {
   if (dir === 0) calDayOffset = 0;
@@ -4222,6 +4080,7 @@ async function loadHotNotices(offset) {
     const resp = await fetch(API_BASE + '/api/hot-notices?day_offset=' + offset);
     const data = await resp.json();
     document.getElementById('calDateLabel').textContent = data.date + ' (' + data.day_name + ')';
+    calSlots = data.slots || [];
     renderHotCalendar(data);
   } catch(e) {
     idx.innerHTML = '<div class="cal-empty-day">로드 실패</div>';
@@ -4286,13 +4145,12 @@ function renderDayCalendar(data) {
       + '<a class="soop-link" href="https://www.sooplive.com/station/' + s.bj_id + '/post/' + s.title_no + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="SOOP에서 보기">SOOP</a>'
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
-      + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
+      + '<div class="cal-notice-body" id="cal-body-' + i + '" data-title-no="' + escapeHtml(String(s.title_no)) + '" data-index="' + i + '"><div class="cal-notice-loading">화면에 표시되면 본문을 불러옵니다.</div></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
 
-  // 본문 lazy load
-  data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
+  setupCalendarBodyLoading(initIdx);
 
   // 현재 시간 슬롯으로 자동 스크롤
   if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
@@ -4343,12 +4201,12 @@ function renderHotCalendar(data) {
       + '<a class="live-link" data-bjid="' + s.bj_id + '" href="https://play.sooplive.com/' + s.bj_id + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="생방송 보러가기">LIVE</a>'
       + '</div>'
       + '<div class="cal-notice-title" style="font-size:20px;font-weight:700;margin-bottom:10px;">' + escapeHtml(s.title_name || s.description || '') + '</div>'
-      + '<div class="cal-notice-body" id="cal-body-' + i + '"><div class="cal-notice-loading">로딩 중...</div></div>'
+      + '<div class="cal-notice-body" id="cal-body-' + i + '" data-title-no="' + escapeHtml(String(s.title_no)) + '" data-index="' + i + '"><div class="cal-notice-loading">화면에 표시되면 본문을 불러옵니다.</div></div>'
       + '</div>';
   });
   content.innerHTML = contentHtml;
 
-  data.slots.forEach((s, i) => loadNoticeBody(s.title_no, i));
+  setupCalendarBodyLoading(initIdx);
 
   // 현재 시간 슬롯으로 자동 스크롤
   if (initIdx > 0) setTimeout(() => scrollToNotice(initIdx), 100);
@@ -4359,14 +4217,49 @@ function renderHotCalendar(data) {
 
 async function loadNoticeBody(titleNo, index) {
   const bodyEl = document.getElementById('cal-body-' + index);
-  if (!bodyEl) return;
+  if (!bodyEl || bodyEl.dataset.loadState === 'loading' || bodyEl.dataset.loadState === 'loaded') return;
+  bodyEl.dataset.loadState = 'loading';
+  bodyEl.onclick = null;
+  bodyEl.innerHTML = '<div class="cal-notice-loading">본문 불러오는 중...</div>';
   try {
-    const resp = await fetch(API_BASE + '/api/notice-content?title_no=' + titleNo);
-    const data = await resp.json();
-    bodyEl.innerHTML = optimizeImages(sanitizeHtml(data.content_html)) || '<p style="color:#999">본문 없음</p>';
+    const html = await fetchNoticeContent(titleNo);
+    if (!bodyEl.isConnected) return;
+    bodyEl.innerHTML = html || '<p style="color:#999">본문 없음</p>';
+    bodyEl.dataset.loadState = 'loaded';
     neutralizeEmoticonLinks(bodyEl);
   } catch(e) {
-    bodyEl.innerHTML = '<p style="color:#f66;">로드 실패</p>';
+    if (!bodyEl.isConnected) return;
+    bodyEl.dataset.loadState = 'error';
+    bodyEl.innerHTML = '<button type="button" class="cal-notice-loading">본문을 불러오지 못했습니다. 다시 시도</button>';
+    bodyEl.querySelector('button').addEventListener('click', function() {
+      loadNoticeBody(titleNo, index);
+    }, { once: true });
+  }
+}
+
+function setupCalendarBodyLoading(initialIndex) {
+  if (calBodyObserver) {
+    calBodyObserver.disconnect();
+    calBodyObserver = null;
+  }
+  const content = document.getElementById('calContent');
+  const bodies = Array.from(content.querySelectorAll('.cal-notice-body[data-title-no]'));
+  if (!bodies.length) return;
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        const body = entry.target;
+        observer.unobserve(body);
+        loadNoticeBody(body.dataset.titleNo, Number(body.dataset.index));
+      });
+    }, { root: content, rootMargin: '180px 0px', threshold: 0.01 });
+    calBodyObserver = observer;
+    bodies.forEach(function(body) { observer.observe(body); });
+  } else {
+    const body = bodies[Math.max(0, Number(initialIndex) || 0)];
+    if (body) loadNoticeBody(body.dataset.titleNo, Number(body.dataset.index));
   }
 }
 
@@ -4388,6 +4281,8 @@ function scrollToNotice(index) {
   scrollLock = true;
   const container = document.getElementById('calContent');
   const el = document.getElementById('cal-notice-' + index);
+  const body = document.getElementById('cal-body-' + index);
+  if (body) loadNoticeBody(body.dataset.titleNo, index);
   if (el && container) {
     container.scrollTop = el.offsetTop - container.offsetTop;
   }
@@ -5236,13 +5131,6 @@ setupAutoRefresh();
   }, {passive: true});
 })();
 
-// GA4 이벤트: SOOP 원본 공지 클릭, LIVE 클릭
-document.addEventListener('click', function(e) {
-  var soop = e.target.closest('.soop-link');
-  if (soop) gtag('event', 'soop_link_click', { bj_id: soop.href });
-  var live = e.target.closest('.live-link');
-  if (live) gtag('event', 'live_link_click', { bj_id: live.dataset.bjid || '' });
-});
 </script>
 <script src="/samguk.js?v=20260804a"></script>
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2a7991f5d48b4bf6acb31d0558113837"}'></script><!-- End Cloudflare Web Analytics -->

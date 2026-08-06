@@ -6,6 +6,7 @@ const { supabase } = require("./lib/supabase");
 const { BJ_LIST } = require("./lib/bj-list");
 
 const PORT = 3000;
+const NOTICE_METADATA_COLUMNS = "id,bj_id,bj_name,bj_tag,title_no,title_name,reg_date,read_cnt,is_pin,updated_at";
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css",
@@ -23,7 +24,7 @@ const server = http.createServer(async (req, res) => {
       const validIds = Object.keys(BJ_LIST);
       const { data, error } = await supabase
         .from("notices")
-        .select("*")
+        .select(NOTICE_METADATA_COLUMNS)
         .in("bj_id", validIds)
         .order("reg_date", { ascending: false })
         .limit(1000);
