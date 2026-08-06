@@ -219,8 +219,8 @@ function buildHtml(ranking, renderedAt) {
   .method{font-size:14px;line-height:1.65}.method b{color:#e0c38e}.method strong{color:#d67461;font-weight:800}.brand{text-align:right}
   .brand b{display:block;color:#e7c783;font-family:"Noto Serif CJK KR",serif;font-size:34px;letter-spacing:4px}.brand span{display:block;margin-top:2px;color:#8e8170;font-size:11px;letter-spacing:3px}
 </style></head><body><main class="poster"><div class="frame"></div>
-  <header class="masthead"><div class="eyebrow">2026 SOOP 후국지 서버</div><div class="title-line"><h1>후국지 <em>파워 랭킹</em></h1><div class="seal">戰力<br>榜</div></div>
-    <p class="subtitle"><b>90인 전체 순위</b> · 공개 시트와 방송 OCR 관측값 반영 · 절기 강화 별도 표시 · 파워 ${escapeHtml(POWER_INDEX_VERSION)}</p><span class="asof">${escapeHtml(renderedAt)}</span></header>
+  <header class="masthead"><div class="eyebrow">2026 후국지 · 비공식 팬 집계</div><div class="title-line"><h1>후국지 <em>파워 랭킹</em></h1><div class="seal">戰力<br>榜</div></div>
+    <p class="subtitle"><b>90인 비공식 관측 순위</b> · SOOP 및 참가자 공식 순위나 실력 평가가 아님 · 공개 시트와 방송 관측 데이터 반영 · 파워 ${escapeHtml(POWER_INDEX_VERSION)}</p><span class="asof">${escapeHtml(renderedAt)}</span></header>
   <section class="podium">${top.map((entry, index) => topCard(entry, index + 1)).join("\n")}</section>
   <section class="board"><div class="board-title"><h3>全軍 戰力序列</h3><p>총 90명 · 표시점수 ${displayNumber(maxPoints)}–${displayNumber(minPoints)} PWR</p></div>
     <div class="columns">${columns.map(rankingColumn).join("\n")}</div></section>

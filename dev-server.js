@@ -10,6 +10,8 @@ const { supabase } = require("./lib/supabase");
 const { BJ_LIST, POPULAR_BJ_IDS } = require("./lib/bj-list");
 
 const PORT = process.env.PORT || 3000;
+const NOTICE_METADATA_COLUMNS = "id,bj_id,bj_name,bj_tag,title_no,title_name,reg_date,read_cnt,is_pin,updated_at";
+const noticeContentClients = new Map();
 
 // Cron 핸들러 (남아있는 api/ 파일)
 const cronHandler = require("./api/cron/fetch-notices");
@@ -25,9 +27,37 @@ function mockRes() {
   return res;
 }
 
-function jsonResp(res, status, data) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+function jsonResp(res, status, data, headers = {}) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", ...headers });
   res.end(JSON.stringify(data));
+}
+
+function isAllowedNoticeContentOrigin(req) {
+  const rawOrigin = req.headers.origin;
+  if (!rawOrigin) return true;
+  try {
+    const origin = new URL(rawOrigin).origin;
+    const sameOrigin = new URL(`http://${req.headers.host}`).origin;
+    return origin === sameOrigin
+      || origin === "https://soopnotice.com"
+      || origin === "https://www.soopnotice.com";
+  } catch {
+    return false;
+  }
+}
+
+function consumeNoticeContentQuota(req, now = Date.now()) {
+  const key = req.socket.remoteAddress || "unknown";
+  let state = noticeContentClients.get(key);
+  if (!state || now >= state.resetAt) {
+    state = { count: 0, resetAt: now + 60_000 };
+    noticeContentClients.set(key, state);
+  }
+  if (state.count >= 120) {
+    return { allowed: false, retryAfter: Math.max(1, Math.ceil((state.resetAt - now) / 1000)) };
+  }
+  state.count += 1;
+  return { allowed: true, retryAfter: 0 };
 }
 
 function getDayRange(dayOffset) {
@@ -60,7 +90,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/api/notices") {
     try {
       const validIds = Object.keys(BJ_LIST);
-      const { data, error } = await supabase.from("notices").select("*").in("bj_id", validIds).order("reg_date", { ascending: false }).limit(1000);
+      const { data, error } = await supabase.from("notices").select(NOTICE_METADATA_COLUMNS).in("bj_id", validIds).order("reg_date", { ascending: false }).limit(1000);
       if (error) return jsonResp(res, 500, { error: error.message });
       return jsonResp(res, 200, data);
     } catch (e) { return jsonResp(res, 500, { error: e.message }); }
@@ -68,13 +98,36 @@ const server = http.createServer(async (req, res) => {
 
   // --- /api/notice-content ---
   if (url.pathname === "/api/notice-content") {
-    const titleNo = parseInt(url.searchParams.get("title_no"));
-    if (!titleNo) return jsonResp(res, 400, { error: "title_no required" });
+    const securityHeaders = {
+      "Cache-Control": "no-store",
+      "Vary": "Origin",
+      "X-Content-Type-Options": "nosniff",
+      "X-Robots-Tag": "noindex, noarchive, nosnippet",
+    };
+    if (!isAllowedNoticeContentOrigin(req)) {
+      return jsonResp(res, 403, { error: "Origin not allowed" }, securityHeaders);
+    }
+    const quota = consumeNoticeContentQuota(req);
+    if (!quota.allowed) {
+      return jsonResp(res, 429, { error: "Too many requests" }, {
+        ...securityHeaders,
+        "Retry-After": String(quota.retryAfter),
+      });
+    }
+    const rawTitleNo = url.searchParams.get("title_no") || "";
+    const titleNo = Number(rawTitleNo);
+    if (!/^\d+$/.test(rawTitleNo) || !Number.isSafeInteger(titleNo) || titleNo <= 0) {
+      return jsonResp(res, 400, { error: "valid title_no required" }, securityHeaders);
+    }
     try {
-      const { data, error } = await supabase.from("notices").select("content_html").eq("title_no", titleNo).single();
-      if (error) return jsonResp(res, 404, { error: "Not found" });
-      return jsonResp(res, 200, { content_html: data.content_html });
-    } catch (e) { return jsonResp(res, 500, { error: e.message }); }
+      const validIds = Object.keys(BJ_LIST);
+      const { data, error } = await supabase.from("notices").select("content_html").eq("title_no", titleNo).in("bj_id", validIds).single();
+      if (error) return jsonResp(res, 404, { error: "Not found" }, securityHeaders);
+      return jsonResp(res, 200, { content_html: data.content_html }, {
+        ...securityHeaders,
+        "Cache-Control": "private, max-age=300",
+      });
+    } catch (e) { return jsonResp(res, 500, { error: e.message }, securityHeaders); }
   }
 
   // --- /api/schedules ---
