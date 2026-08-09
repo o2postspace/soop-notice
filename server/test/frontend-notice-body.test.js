@@ -51,3 +51,10 @@ test("비공식 고지는 모바일 포함 상시 노출되고 불필요한 추�
   assert.doesNotMatch(html, /googletagmanager\.com|gtag\(|wsrv\.nl/);
   assert.match(html, /static\.cloudflareinsights\.com\/beacon\.min\.js/);
 });
+
+test("후국지 탭은 공개 화면에서 노출하지 않고 직접 진입은 캘린더로 돌린다", () => {
+  const switchTab = functionSource("switchTab", "setSamgukNation");
+
+  assert.doesNotMatch(html, /class="tab-btn"[^>]*data-tab="samguk"/);
+  assert.match(switchTab, /if \(tab === 'samguk'\) tab = 'calendar';/);
+});
